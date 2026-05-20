@@ -24,7 +24,8 @@ npm run dev
 ```
 
 完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。  
-发布到 GitHub 见 **[GITHUB.md](GITHUB.md)**（`npm run github:publish` 需先安装并登录 `gh`）。
+发布到 GitHub 见 **[GITHUB.md](GITHUB.md)**（`npm run github:publish` 需先安装并登录 `gh`）。  
+上下文备份 OBS 见 **[docs/OBS.md](docs/OBS.md)**（`npm run context:upload`）。
 
 ## Cloudflare 部署
 

@@ -14,6 +14,8 @@
     "dashboard": "powershell -ExecutionPolicy Bypass -File scripts/open-dashboard.ps1",
     "bind:domain": "powershell -ExecutionPolicy Bypass -File scripts/bind-custom-domain.ps1",
     "github:publish": "powershell -ExecutionPolicy Bypass -File scripts/publish-github.ps1",
+    "context:build": "powershell -ExecutionPolicy Bypass -File scripts/build-context-bundle.ps1",
+    "context:upload": "powershell -ExecutionPolicy Bypass -File scripts/upload-obs.ps1",
     "kv:create": "wrangler kv namespace create QTVQ_KV && wrangler kv namespace create QTVQ_KV --preview",
     "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
   }
