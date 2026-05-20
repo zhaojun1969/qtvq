@@ -23,7 +23,8 @@ npm run dev
 # http://localhost:8788
 ```
 
-完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。
+完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。  
+发布到 GitHub 见 **[GITHUB.md](GITHUB.md)**（`npm run github:publish` 需先安装并登录 `gh`）。
 
 ## Cloudflare 部署
 
