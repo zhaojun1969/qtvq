@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="爱情避坑大全 - 相亲暧昧异地彩礼出轨等场景直线方案">
+  <title>避坑大全 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="pitfalls.html" class="active">避坑大全</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+        <span class="stat-badge">直线 <strong data-line-value>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <h1>爱情避坑大全</h1>
+    <p class="hero-sub">共 <strong id="pitfall-count">50</strong> 个典型情感坑 · 测验 · 行动卡 · 音视频</p>
+    <p class="hero-sub" style="margin-top:0.35rem">
+      <input type="search" id="pitfall-search" class="search-input" placeholder="搜索坑名称或场景…">
+    </p>
+  </section>
+
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="money">金钱代价</button>
+    <button class="filter-btn" data-filter="time">时间代价</button>
+    <button class="filter-btn" data-filter="emotion">情感代价</button>
+  </div>
+
+  <div class="filters filters-cat" id="category-filters">
+    <button type="button" class="filter-btn active" data-category="all">全场景</button>
+  </div>
+
+  <section class="topics-wrap" id="topics-section"></section>
+
+  <p class="submit-lesson-bar">
+    <button type="button" id="btn-submit-lesson" class="btn btn-primary">提交我的教训（审核有奖）</button>
+  </p>
+
+  <div class="pitfall-grid" id="pitfall-grid"></div>
+
+  <div id="media-modal" class="modal">
+    <div class="modal-backdrop" data-close-media></div>
+    <div class="modal-box modal-box-wide">
+      <h3 id="media-modal-title">讲述</h3>
+      <p id="media-modal-body" class="media-body-text"></p>
+      <div id="media-modal-player"></div>
+      <button type="button" class="btn btn-secondary" data-close-media style="margin-top:1rem">关闭</button>
+    </div>
+  </div>
+
+  <div id="submit-modal" class="modal">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-box">
+      <h3>提交避坑教训</h3>
+      <p class="modal-hint">经审核后奖励 Q智慧值或 VIP（演示）。请勿填写真实姓名与联系方式。</p>
+      <form id="submit-form">
+        <label>坑名称<input name="title" required placeholder="如：网恋没见面就借钱"></label>
+        <label>真实教训<textarea name="story" rows="4" placeholder="简述经过与代价"></textarea></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-modal>取消</button>
+          <button type="submit" class="btn btn-primary">提交审核</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>阅读避坑并通过测验可获得直线值 · <a href="index.html">去 Q 问</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/pitfalls.js"></script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="我心永恒-Q问：情感避坑与AI智慧问答，用智慧引导爱情，直线解决难题。">
+  <title>我心永恒 - Q问 | qtvq.cn</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">
+          我心永恒
+          <span>Q问 · qtvq.cn</span>
+        </div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html" class="active">Q问</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+        <span class="stat-badge">直线 <strong data-line-value>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <h1 class="hero-tagline">写下你的爱情难题，我教你直线走</h1>
+        <p class="hero-sub">避坑 + 直线解决 · 不说鸡汤 · 3步内给出行动方案</p>
+
+        <div class="chat-panel">
+          <div id="chat-messages" class="chat-messages">
+            <div class="msg msg-welcome">👋 你好，我是 Q 智慧顾问。描述你的情感困境，我会给你直线方案。（匿名提问，不存储真实姓名与联系方式）</div>
+          </div>
+          <div class="chat-input-area">
+            <textarea id="question-input" placeholder="例如：暧昧半年对方不确认关系，我该怎么办？" rows="3"></textarea>
+            <div class="chat-actions">
+              <button type="button" id="btn-voice" class="btn btn-secondary" title="语音输入">🎤 语音</button>
+              <button type="button" id="btn-ask" class="btn btn-primary">获取直线方案</button>
+              <button type="button" id="btn-followup" class="btn btn-secondary" disabled>再问一步</button>
+            </div>
+            <p class="quota-note">提问额度：<span data-quota-status>24 小时内还可提问 5/5 次</span> · 「再问一步」不计入 · 先锋次数独立 · <button type="button" id="btn-open-subscribe" class="link-btn">办理会员不限次</button></p>
+            <p class="pioneer-note">Q问先锋：剩余 <strong data-pioneer-left>10</strong> 次 · <a href="profile.html">邀请好友 +5 次</a></p>
+            <p class="privacy-note">🔒 隐私保护：提问可匿名，AI 回答不涉及人肉信息</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar-panel">
+        <div class="hot-card">
+          <h3>🔥 今日最多人问的坑</h3>
+          <ul class="hot-list" id="hot-topics"></ul>
+        </div>
+        <div class="hot-card">
+          <h3>💡 本周直线解答率最高</h3>
+          <ul class="hot-list">
+            <li>暧昧期限设定法<span class="hot-meta">解答率 94%</span></li>
+            <li>网恋借钱拒绝话术<span class="hot-meta">解答率 91%</span></li>
+            <li>冷暴力底线沟通<span class="hot-meta">解答率 89%</span></li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+
+    <section class="features">
+      <h2 class="section-title">两大核心服务</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h4>Q智慧问答</h4>
+          <p>AI 实时对话，基于情感心理学语料与真实案例，给出可执行的行动步骤。「再问一步」直达具体措辞。</p>
+        </article>
+        <article class="feature-card">
+          <h4>爱情避坑大全</h4>
+          <p>50 个典型情感坑，含测验、行动卡、音视频。相亲/暧昧/异地/彩礼/出轨等场景直线方案。</p>
+          <a href="pitfalls.html" class="feature-link">进入避坑大全 →</a>
+        </article>
+        <article class="feature-card">
+          <h4>缘服务 · 高认知匹配</h4>
+          <p>基于提问与浏览记录，推荐适合类型与常见坑。学完专题可生成「缘分直线卡」分享给心仪对象。</p>
+          <a href="profile.html" class="feature-link">进入我的缘值 →</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="success-wall">
+      <h2 class="section-title">成功案例墙</h2>
+      <div class="story-grid" id="success-stories"></div>
+    </section>
+  </main>
+
+  <div id="subscribe-modal" class="modal">
+    <div class="modal-backdrop" data-close-subscribe></div>
+    <div class="modal-box modal-box-wide subscribe-modal-box">
+      <h3>办理 Q问 会员 · 不限次数提问</h3>
+      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后需对公汇款，<strong>核实到账后方可解禁</strong>。</p>
+      <div class="plan-grid">
+        <button type="button" class="plan-card plan-selected" data-plan="month">月卡<br><strong>¥288</strong></button>
+        <button type="button" class="plan-card" data-plan="quarter">季卡<br><strong>¥788</strong></button>
+        <button type="button" class="plan-card" data-plan="year">年卡<br><strong>¥2888</strong></button>
+      </div>
+      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥288</span>（请按所选套餐金额汇款）</p>
+      <div id="bank-info"></div>
+      <p class="modal-hint payment-legal">收款方：我心永恒（北京）网络科技有限公司。汇款后请提交信息，我司核对工商银行到账记录无误后开通会员，不开通自动退款请联系客服。</p>
+      <form id="payment-form">
+        <label>汇款人姓名（对公户名或您的姓名）<input name="payerName" required maxlength="40"></label>
+        <label>汇款时间<input name="paidAt" type="datetime-local" required></label>
+        <label>汇款金额（元）<input name="amount" type="number" required placeholder="与所选套餐一致"></label>
+        <label>汇款备注 / 后四位<input name="remark" maxlength="80" placeholder="建议填写设备编号"></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-subscribe>稍后</button>
+          <button type="submit" class="btn btn-primary">我已汇款，提交核实</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>域名 qtvq.cn · Q Thought, Voice, Question</span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+    <p><a href="pitfalls.html">避坑大全</a> · <a href="profile.html">我的缘值</a> · 不存储真实姓名/联系方式</p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/home.js"></script>
+</body>
+</html>

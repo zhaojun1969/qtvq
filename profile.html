@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="我的缘值 - Q币、智慧值、缘分直线卡">
+  <title>我的缘值 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="profile.html" class="active">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+        <span class="stat-badge">直线 <strong data-line-value>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="profile-main">
+    <h1 class="hero-tagline" style="text-align:center;margin-bottom:1.5rem">我的缘值</h1>
+
+    <div class="profile-card">
+      <h3>激励体系</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin-top:0.5rem">
+        完成提问得 Q币 · 阅读避坑得直线值 · Q币+智慧值解锁深度内容
+      </p>
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <div class="value" data-q-coins>0</div>
+          <div class="label">Q币</div>
+        </div>
+        <div class="profile-stat">
+          <div class="value" data-wisdom>0</div>
+          <div class="label">Q智慧值</div>
+        </div>
+        <div class="profile-stat">
+          <div class="value" data-line-value>0</div>
+          <div class="label">直线值</div>
+        </div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--text-muted)">解锁进度（200 分解锁直播答疑）</p>
+      <div class="progress-bar"><div id="unlock-progress" class="progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="profile-card">
+      <h3>缘分直线卡</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin:0.75rem 0">
+        学完避坑专题后可生成，分享给心仪对象：「我已避开这些坑，欢迎直线沟通」
+      </p>
+      <div class="fate-card-preview" id="fate-card">
+        <h4>💜 缘分直线卡</h4>
+        <p id="fate-card-text">完成 1 次 Q问 或阅读 3 条避坑后解锁</p>
+        <button type="button" id="btn-share-card" class="btn btn-primary" style="margin-top:1rem" disabled>生成并分享</button>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <h3>缘认知匹配</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin:0.5rem 0">基于提问与避坑浏览，推荐适合类型及常见坑</p>
+      <div id="fate-match" class="fate-match-box"></div>
+    </div>
+
+    <div class="profile-card">
+      <h3>解锁权益</h3>
+      <div id="unlock-list" class="unlock-list"></div>
+      <button type="button" id="btn-coach" class="btn btn-secondary" style="margin-top:0.5rem" disabled>预约直线教练答疑（100分解锁）</button>
+      <button type="button" id="btn-report" class="btn btn-secondary" style="margin-top:0.5rem" disabled>生成定制避坑报告（200分解锁）</button>
+    </div>
+
+    <div class="profile-card">
+      <h3>Q缘连线</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin:0.5rem 0">授权后匹配同专题用户，共建提问（演示）</p>
+      <label class="auth-check"><input type="checkbox" id="fate-auth"> 同意开启（不展示真实联系方式）</label>
+      <div id="q-yuan-panel" class="q-yuan-panel" hidden>
+        <input type="text" id="coask-topic" class="text-input" placeholder="共建主题，如：异地恋沟通底线">
+        <button type="button" id="btn-coask" class="btn btn-primary" style="margin-top:0.75rem">发起共建提问</button>
+      </div>
+    </div>
+
+    <div class="profile-card" id="subscription-card">
+      <h3>Q问 提问会员</h3>
+      <p class="modal-hint" data-quota-status>24 小时内还可提问 5/5 次</p>
+      <p id="subscription-detail" style="font-size:0.9rem;color:var(--text-muted);margin:0.5rem 0"></p>
+      <button type="button" id="btn-profile-subscribe" class="btn btn-primary" style="margin-top:0.5rem">办理月卡/季卡/年卡</button>
+    </div>
+
+    <div class="profile-card">
+      <h3>Q问先锋</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin-top:0.5rem">
+        剩余 <strong data-pioneer-left>10</strong> 次高级问答 · 邀请1人再送5次
+      </p>
+      <button type="button" id="btn-invite" class="btn btn-secondary" style="margin-top:1rem">复制邀请链接</button>
+    </div>
+  </main>
+
+  <div id="coach-modal" class="modal">
+    <div class="modal-backdrop" data-close-coach></div>
+    <div class="modal-box">
+      <h3>预约情感教练（演示）</h3>
+      <p class="modal-hint">直线派教练 1v1 答疑，30 分钟。正式版开放排期与支付。</p>
+      <form id="coach-form">
+        <label>联系邮箱（演示，可填假邮箱）<input type="email" name="email" placeholder="you@example.com"></label>
+        <label>希望讨论的主题<textarea name="topic" rows="3" placeholder="如：暧昧半年如何确认关系"></textarea></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-coach>取消</button>
+          <button type="submit" class="btn btn-primary">提交预约</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span><a href="index.html">返回 Q问</a> · <a href="pitfalls.html">避坑大全</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/profile.js"></script>
+</body>
+</html>

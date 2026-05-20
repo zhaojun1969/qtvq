@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>汇款核实 · 我心永恒 Q问（内部）</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    body { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    .staff-panel { background: var(--bg-card, #1a1a2e); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .pending-item { border: 1px solid rgba(108,92,231,.35); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; font-size: 0.85rem; }
+    .pending-item button { margin-top: 0.5rem; }
+    pre { background: #111; padding: 1rem; overflow: auto; font-size: 0.8rem; border-radius: 8px; }
+    .warn { color: #f59e0b; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>汇款核实（工作人员）</h1>
+  <p class="warn">内部页面，请勿对外公开链接。核对<strong>工商银行</strong>到账后再解禁。</p>
+
+  <section class="staff-panel">
+    <h2>待核实列表</h2>
+    <button type="button" id="btn-refresh" class="btn btn-secondary">刷新待核实</button>
+    <div id="pending-list"></div>
+  </section>
+
+  <section class="staff-panel">
+    <h2>手动核实</h2>
+    <form id="form">
+      <label>管理密钥<input name="adminKey" type="password" required autocomplete="off"></label>
+      <label>用户设备编号<input name="clientId" required placeholder="q_xxx"></label>
+      <label>套餐
+        <select name="plan">
+          <option value="month">月卡 ¥288</option>
+          <option value="quarter">季卡 ¥788</option>
+          <option value="year">年卡 ¥2888</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary">核实通过并解禁</button>
+    </form>
+  </section>
+
+  <pre id="out"></pre>
+
+  <script>
+    const out = document.getElementById('out');
+    const pendingList = document.getElementById('pending-list');
+    let savedKey = sessionStorage.getItem('qtvq_admin_key') || '';
+
+    function log(data) {
+      out.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+
+    async function loadPending() {
+      const key = document.querySelector('[name="adminKey"]')?.value || savedKey;
+      if (!key) {
+        pendingList.innerHTML = '<p class="warn">请先填写管理密钥</p>';
+        return;
+      }
+      pendingList.innerHTML = '加载中…';
+      try {
+        const res = await fetch(`/api/payment?list=pending&adminKey=${encodeURIComponent(key)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+        sessionStorage.setItem('qtvq_admin_key', key);
+        savedKey = key;
+        if (!data.items?.length) {
+          pendingList.innerHTML = `<p>暂无待核实（存储：${data.storage || '—'}）</p>`;
+          return;
+        }
+        pendingList.innerHTML = data.items.map((item) => `
+          <div class="pending-item">
+            <div><strong>${item.clientId}</strong> · ${item.planLabel || item.plan} · ¥${item.amount}</div>
+            <div>汇款人：${item.payerName} · 时间：${item.paidAt}</div>
+            <div>备注：${item.remark || '—'}</div>
+            <button type="button" class="btn btn-primary btn-quick-verify" data-id="${item.clientId}" data-plan="${item.plan}">核实通过</button>
+          </div>
+        `).join('');
+        pendingList.querySelectorAll('.btn-quick-verify').forEach((btn) => {
+          btn.addEventListener('click', () => verify(btn.dataset.id, btn.dataset.plan, key));
+        });
+      } catch (e) {
+        pendingList.innerHTML = `<p class="warn">${e.message}</p>`;
+      }
+    }
+
+    async function verify(clientId, plan, adminKey) {
+      log('提交中…');
+      const res = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', adminKey, clientId, plan }),
+      });
+      const data = await res.json();
+      log(data);
+      if (res.ok) loadPending();
+    }
+
+    document.getElementById('btn-refresh')?.addEventListener('click', loadPending);
+    document.getElementById('form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      await verify(fd.get('clientId'), fd.get('plan'), fd.get('adminKey'));
+    });
+
+    if (savedKey) {
+      const input = document.querySelector('[name="adminKey"]');
+      if (input) input.value = savedKey;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+name = "qtvq"
+compatibility_date = "2024-08-01"
+pages_build_output_dir = "."
+
+# Cloudflare Dashboard → Pages → Settings → Functions → 启用 Workers AI
+# 绑定变量名必须为 AI
+[ai]
+binding = "AI"
+
+# QTVQ_KV (npm run setup:kv)
+[[kv_namespaces]]
+binding = "QTVQ_KV"
+id = "4ec5d9cc8b3e4210bd29112073a6c502"
+preview_id = "2ccfcfce96164bb4b5805c51f0375f4e"

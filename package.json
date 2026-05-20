@@ -1,0 +1,19 @@
+{
+  "name": "qtvq",
+  "version": "1.0.0",
+  "description": "我心永恒-Q问 情感避坑与AI智慧问答",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx wrangler pages dev . --port 8788",
+    "serve": "python -m http.server 8080",
+    "deploy": "wrangler pages deploy . --project-name=qtvq",
+    "setup:kv": "powershell -ExecutionPolicy Bypass -File scripts/setup-kv.ps1",
+    "deploy:full": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1",
+    "post-deploy": "powershell -ExecutionPolicy Bypass -File scripts/post-deploy.ps1",
+    "dashboard": "powershell -ExecutionPolicy Bypass -File scripts/open-dashboard.ps1",
+    "bind:domain": "powershell -ExecutionPolicy Bypass -File scripts/bind-custom-domain.ps1",
+    "kv:create": "wrangler kv namespace create QTVQ_KV && wrangler kv namespace create QTVQ_KV --preview",
+    "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
+  }
+}

@@ -1,0 +1,2 @@
+# Cloudflare Pages redirects (部署后生效)
+/www.qtvq.cn/* https://qtvq.cn/:splat 301
