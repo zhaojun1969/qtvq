@@ -92,34 +92,39 @@ a:hover {
   overflow: visible;
 }
 
-.logo-symbol {
-  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo:hover .logo-qmark {
-  transform: translate(12px, -12px);
-}
-
-.logo:hover .logo-heart {
-  transform: translate(-15px, 12px);
-}
-
-.logo-infinity,
 .logo-ring {
-  transition: opacity 0.3s, stroke-width 0.3s;
+  transition: stroke-width 0.35s ease, opacity 0.35s;
 }
 
-.logo:hover .logo-infinity,
+.logo-wen {
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: 32px 31px;
+}
+
+.logo-q-tail {
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: 32px 51px;
+}
+
 .logo:hover .logo-ring {
-  opacity: 1;
+  stroke-width: 2.8;
 }
 
-.logo-q {
-  transition: transform 0.55s ease;
+.logo:hover .logo-wen {
+  transform: scale(1.04);
 }
 
-.logo:hover .logo-q {
-  transform: scale(1.12);
+.logo:hover .logo-q-tail {
+  transform: translate(0.5px, 0.5px);
+}
+
+.logo-wen-dot {
+  transition: transform 0.45s ease;
+  transform-origin: 37px 19.5px;
+}
+
+.logo:hover .logo-wen-dot {
+  transform: translate(0.5px, -1px);
 }
 
 .footer-line {
