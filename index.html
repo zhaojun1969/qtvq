@@ -33,27 +33,32 @@
 
   <main>
     <section class="hero">
-      <div>
+      <div class="hero-head">
         <h1 class="hero-tagline">写下你的爱情难题，我教你直线走</h1>
         <p class="hero-sub">避坑 + 直线解决 · 不说鸡汤 · 3步内给出行动方案</p>
+      </div>
 
+      <div class="hero-columns">
         <div class="chat-panel">
           <div id="chat-messages" class="chat-messages">
             <div class="msg msg-welcome">👋 你好，我是 Q 智慧顾问。描述你的情感困境，我会给你直线方案。（匿名提问，不存储真实姓名与联系方式）</div>
           </div>
           <div class="chat-input-area">
-            <textarea id="question-input" placeholder="例如：暧昧半年对方不确认关系，我该怎么办？" rows="3"></textarea>
-            <div class="chat-actions">
-              <button type="button" id="btn-voice" class="btn btn-secondary" title="语音输入">🎤 语音</button>
-              <button type="button" id="btn-ask" class="btn btn-primary">获取直线方案</button>
-              <button type="button" id="btn-followup" class="btn btn-secondary" disabled>再问一步</button>
+            <div class="chat-input-main">
+              <textarea id="question-input" placeholder="例如：暧昧半年对方不确认关系，我该怎么办？" rows="2"></textarea>
+              <div class="chat-actions">
+                <button type="button" id="btn-voice" class="btn btn-secondary" title="语音输入">🎤 语音</button>
+                <button type="button" id="btn-ask" class="btn btn-primary">获取直线方案</button>
+                <button type="button" id="btn-followup" class="btn btn-secondary" disabled>再问一步</button>
+              </div>
             </div>
-            <p class="quota-note">提问额度：<span data-quota-status>24 小时内还可提问 5/5 次</span> · 「再问一步」不计入 · 先锋次数独立 · <button type="button" id="btn-open-subscribe" class="link-btn">办理会员不限次</button></p>
-            <p class="pioneer-note">Q问先锋：剩余 <strong data-pioneer-left>10</strong> 次 · <a href="profile.html">邀请好友 +5 次</a></p>
-            <p class="privacy-note">🔒 隐私保护：提问可匿名，AI 回答不涉及人肉信息</p>
+            <div class="chat-input-notes">
+              <p class="quota-note">提问额度：<span data-quota-status>24 小时内还可提问 5/5 次</span> · 「再问一步」不计入 · 先锋次数独立 · <button type="button" id="btn-open-subscribe" class="link-btn">办理会员不限次</button></p>
+              <p class="pioneer-note">Q问先锋：剩余 <strong data-pioneer-left>10</strong> 次 · <a href="profile.html">邀请好友 +5 次</a></p>
+              <p class="privacy-note">🔒 隐私保护：提问可匿名，AI 回答不涉及人肉信息</p>
+            </div>
           </div>
         </div>
-      </div>
 
       <aside class="sidebar-panel">
         <div class="hot-card">
@@ -63,12 +68,13 @@
         <div class="hot-card">
           <h3>💡 本周直线解答率最高</h3>
           <ul class="hot-list">
-            <li>暧昧期限设定法<span class="hot-meta">解答率 94%</span></li>
-            <li>网恋借钱拒绝话术<span class="hot-meta">解答率 91%</span></li>
-            <li>冷暴力底线沟通<span class="hot-meta">解答率 89%</span></li>
+            <li><span class="hot-text">暧昧期限设定法</span><span class="hot-meta">解答率 94%</span></li>
+            <li><span class="hot-text">网恋借钱拒绝话术</span><span class="hot-meta">解答率 91%</span></li>
+            <li><span class="hot-text">冷暴力底线沟通</span><span class="hot-meta">解答率 89%</span></li>
           </ul>
         </div>
       </aside>
+      </div>
     </section>
 
     <section class="features">

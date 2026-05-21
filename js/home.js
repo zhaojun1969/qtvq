@@ -25,7 +25,7 @@ function initHotTopics() {
   if (!list) return;
   HOT_TOPICS.forEach((item) => {
     const li = document.createElement('li');
-    li.innerHTML = `${item.text}<span class="hot-meta">${item.count} 人问过</span>`;
+    li.innerHTML = `<span class="hot-text">${item.text}</span><span class="hot-meta">${item.count} 人问过</span>`;
     li.addEventListener('click', () => {
       document.getElementById('question-input').value = item.text;
       document.getElementById('question-input').focus();
