@@ -1,7 +1,6 @@
 name = "qtvq-api"
 compatibility_date = "2024-08-01"
 pages_build_output_dir = "."
-account_id = "bb7eb342a5cfde7c0a84cd9bd519a859"
 
 # Cloudflare Dashboard → Pages → Settings → Functions → 启用 Workers AI
 # 绑定变量名必须为 AI
