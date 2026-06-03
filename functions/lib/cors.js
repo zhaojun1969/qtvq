@@ -8,6 +8,8 @@ export const ALLOW_ORIGINS = [
   'http://127.0.0.1:8788',
   'http://localhost:8080',
   'http://127.0.0.1:8080',
+  // 多端 H5 壳 / 本地调试（按需追加）
+  // 'http://localhost:5173',
 ];
 
 export function corsHeaders(request) {

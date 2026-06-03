@@ -1,0 +1,60 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "Q问",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/pitfalls/pitfalls",
+      "style": {
+        "navigationBarTitleText": "避坑大全",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/profile/profile",
+      "style": {
+        "navigationBarTitleText": "我的缘值",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "我心永恒 Q问",
+    "navigationBarBackgroundColor": "#0f0e17",
+    "backgroundColor": "#0f0e17"
+  },
+  "tabBar": {
+    "color": "#a0a0b0",
+    "selectedColor": "#ff6b81",
+    "backgroundColor": "#1a1928",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "Q问",
+        "iconPath": "static/tab-ask.png",
+        "selectedIconPath": "static/tab-ask-active.png"
+      },
+      {
+        "pagePath": "pages/pitfalls/pitfalls",
+        "text": "避坑",
+        "iconPath": "static/tab-pit.png",
+        "selectedIconPath": "static/tab-pit-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "缘值",
+        "iconPath": "static/tab-fate.png",
+        "selectedIconPath": "static/tab-fate-active.png"
+      }
+    ]
+  }
+}

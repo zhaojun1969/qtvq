@@ -1,0 +1,7 @@
+[
+  { "id": 1, "category": "网恋", "title": "红包陷阱：转账备注写借款", "helped": 2847, "cost": "金钱" },
+  { "id": 2, "category": "暧昧", "title": "备胎陷阱：只聊天不确认关系", "helped": 1923, "cost": "时间" },
+  { "id": 3, "category": "异地", "title": "冷暴力：已读不回超过72小时", "helped": 3156, "cost": "情感" },
+  { "id": 4, "category": "彩礼", "title": "天价彩礼：无书面约定", "helped": 2104, "cost": "金钱" },
+  { "id": 5, "category": "出轨", "title": "口头道歉无行动", "helped": 1678, "cost": "情感" }
+]

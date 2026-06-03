@@ -5,6 +5,9 @@
 !.dev.vars.example
 .wrangler/
 node_modules/
+apps/qtvq-uni/node_modules/
+apps/qtvq-uni/dist/
+apps/qtvq-uni/unpackage/
 .DS_Store
 Thumbs.db
 *.log
