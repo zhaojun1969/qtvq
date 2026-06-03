@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "npx wrangler pages dev . --port 8788",
     "serve": "python -m http.server 8080",
-    "deploy": "wrangler pages deploy . --project-name=qtvq-api",
-    "deploy:site": "wrangler pages deploy . --project-name=qtvq-site",
+    "deploy": "npx wrangler pages deploy . --project-name=qtvq-api",
+    "deploy:api:linux": "bash tools/scripts/deploy-api.sh",
+    "deploy:site": "npx wrangler pages deploy . --project-name=qtvq-site",
     "setup:kv": "powershell -ExecutionPolicy Bypass -File tools/scripts/setup-kv.ps1",
     "deploy:full": "powershell -ExecutionPolicy Bypass -File tools/scripts/deploy.ps1",
     "post-deploy": "powershell -ExecutionPolicy Bypass -File tools/scripts/post-deploy.ps1",
@@ -22,7 +23,10 @@
     "uni:install": "cd apps/qtvq-uni && npm install",
     "uni:dev:h5": "cd apps/qtvq-uni && npm run dev:h5",
     "uni:dev:mp-weixin": "cd apps/qtvq-uni && npm run dev:mp-weixin",
-    "kv:create": "wrangler kv namespace create QTVQ_KV && wrangler kv namespace create QTVQ_KV --preview",
+    "kv:create": "npx wrangler kv namespace create QTVQ_KV && npx wrangler kv namespace create QTVQ_KV --preview",
     "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
+  },
+  "devDependencies": {
+    "wrangler": "^4.96.0"
   }
 }
