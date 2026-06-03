@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root
 
 function Find-Gh {

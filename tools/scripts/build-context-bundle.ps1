@@ -2,7 +2,7 @@
 # 输出: dist/qtvq-context-YYYYMMDD-HHmmss.zip
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"

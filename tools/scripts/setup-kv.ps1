@@ -2,7 +2,7 @@
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/setup-kv.ps1
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $WranglerToml = Join-Path $Root "wrangler.toml"
 
 function Invoke-WranglerKvCreate([string]$Title, [switch]$Preview) {

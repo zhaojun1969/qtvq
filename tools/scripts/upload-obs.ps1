@@ -2,7 +2,7 @@
 # Prereq: copy obs.env.example -> obs.env, pip install esdk-obs-python
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root
 
 if (-not (Test-Path "obs.env")) {

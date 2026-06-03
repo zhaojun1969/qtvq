@@ -43,7 +43,9 @@
 
   <pre id="out"></pre>
 
-  <script>
+  <script type="module">
+    import { apiUrl } from '../js/config.js';
+
     const out = document.getElementById('out');
     const pendingList = document.getElementById('pending-list');
     let savedKey = sessionStorage.getItem('qtvq_admin_key') || '';
@@ -60,7 +62,7 @@
       }
       pendingList.innerHTML = '加载中…';
       try {
-        const res = await fetch(`/api/payment?list=pending&adminKey=${encodeURIComponent(key)}`);
+        const res = await fetch(apiUrl(`/api/payment?list=pending&adminKey=${encodeURIComponent(key)}`));
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || res.status);
         sessionStorage.setItem('qtvq_admin_key', key);
@@ -87,7 +89,7 @@
 
     async function verify(clientId, plan, adminKey) {
       log('提交中…');
-      const res = await fetch('/api/payment', {
+      const res = await fetch(apiUrl('/api/payment'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify', adminKey, clientId, plan }),

@@ -3,11 +3,11 @@
 
 param(
     [switch]$SkipKv,
-    [string]$ProjectName = "qtvq"
+    [string]$ProjectName = "qtvq-api"
 )
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root
 
 function Test-WranglerAuth {
@@ -28,7 +28,7 @@ if (-not $SkipKv) {
     $toml = Get-Content "wrangler.toml" -Raw -Encoding UTF8
     if ($toml -notmatch '\[\[kv_namespaces\]\]' -or $toml -notmatch 'id\s*=\s*"[a-f0-9]{32}"') {
         Write-Host ">> Running KV setup ..."
-        & powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\setup-kv.ps1")
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $Root "tools\scripts\setup-kv.ps1")
     } else {
         Write-Host "KV already in wrangler.toml (use -SkipKv to skip)"
     }
@@ -54,5 +54,6 @@ Write-Host "Deploy OK. Verify in Dashboard:" -ForegroundColor Green
 Write-Host "  - Workers AI binding: AI"
 Write-Host "  - KV binding: QTVQ_KV"
 Write-Host "  - Env: PAYMENT_ADMIN_KEY"
-Write-Host "  - Domain: qtvq.cn"
-Write-Host "  - Staff: /tools/verify-payment.html"
+Write-Host "  - API: https://qtvq-api.pages.dev"
+Write-Host "  - Static: sync to qtvq.cn via tools/scripts/sync-static.sh"
+Write-Host "  - Staff: https://qtvq-api.pages.dev/tools/verify-payment.html"

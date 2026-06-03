@@ -4,6 +4,7 @@
  */
 
 import { canAsk, recordAsk, getQuota } from '../lib/quota-store.js';
+import { corsPreflight, jsonResponse } from '../lib/http.js';
 const SYSTEM_PROMPT = `你是「我心永恒-Q问」的情感智慧顾问。你的风格是「避坑+直线解决」：
 - 不说鸡汤，不给模糊安慰
 - 用3步以内给出可执行的行动方案
@@ -36,28 +37,32 @@ const MOCK_REPLIES = [
   '【直线方案】\n1. 冷暴力超过3天，发一条「我需要沟通，X日前谈或各自冷静」。\n2. 到期无回应，停止投入，把精力转回自己。\n3. 避坑：反复道歉换不来尊重，只会降低你的议价权。',
 ];
 
+export async function onRequestOptions(context) {
+  return corsPreflight(context.request);
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   // 简易速率限制（生产环境建议用 KV）
   const ip = request.headers.get('CF-Connecting-IP') || 'local';
   if (!checkRate(ip)) {
-    return json({ error: '请求过于频繁，请稍后再试' }, 429);
+    return jsonResponse(request, { error: '请求过于频繁，请稍后再试' }, 429);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: '无效的请求格式' }, 400);
+    return jsonResponse(request, { error: '无效的请求格式' }, 400);
   }
 
   const { message, followUp, clientId } = body;
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    return json({ error: '请输入您的问题' }, 400);
+    return jsonResponse(request, { error: '请输入您的问题' }, 400);
   }
   if (message.length > 2000) {
-    return json({ error: '问题过长，请精简后重试' }, 400);
+    return jsonResponse(request, { error: '问题过长，请精简后重试' }, 400);
   }
 
   const cid =
@@ -67,7 +72,8 @@ export async function onRequestPost(context) {
   const quotaCheck = await canAsk(env, cid, !!followUp);
   if (!quotaCheck.ok) {
     if (quotaCheck.code === 'QUOTA_EXCEEDED') {
-      return json(
+      return jsonResponse(
+        request,
         {
           error: '24 小时内免费提问已达 5 次，请办理月卡/季卡/年卡，汇款核实后解禁不限次数提问',
           code: 'QUOTA_EXCEEDED',
@@ -76,7 +82,7 @@ export async function onRequestPost(context) {
         403
       );
     }
-    return json({ error: quotaCheck.error || '无法提问' }, 400);
+    return jsonResponse(request, { error: quotaCheck.error || '无法提问' }, 400);
   }
 
   const userContent = followUp
@@ -106,7 +112,7 @@ export async function onRequestPost(context) {
 
     if (!followUp) await recordAsk(env, cid);
 
-    return json({
+    return jsonResponse(request, {
       reply,
       qCoins: 10,
       wisdom: Math.min(5, Math.floor(message.length / 50) + 1),
@@ -115,23 +121,13 @@ export async function onRequestPost(context) {
     });
   } catch (err) {
     console.error('AI error:', err);
-    return json({
+    return jsonResponse(request, {
       reply: MOCK_REPLIES[0],
       qCoins: 5,
       wisdom: 1,
       fallback: true,
     });
   }
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-    },
-  });
 }
 
 const rateMap = new Map();

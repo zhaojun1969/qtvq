@@ -27,17 +27,19 @@ npm run dev
 发布到 GitHub 见 **[GITHUB.md](GITHUB.md)**（`npm run github:publish` 需先安装并登录 `gh`）。  
 上下文备份 OBS 见 **[docs/OBS.md](docs/OBS.md)**（`npm run context:upload`）。
 
-## Cloudflare 部署
+## Cloudflare 部署（API）
 
 ```bash
 npm i -g wrangler
 wrangler login
-wrangler pages deploy .
+npm run deploy    # 部署到 qtvq-api.pages.dev
 ```
 
-**线上地址：** https://qtvq.pages.dev（绑定备案域见 [docs/DOMAIN-qtvq.cn.md](docs/DOMAIN-qtvq.cn.md)）
+**API 地址：** https://qtvq-api.pages.dev  
+**国内静态：** https://qtvq.cn（阿里云，见 [docs/DUAL-DEPLOY.md](docs/DUAL-DEPLOY.md)）
 
-在控制台为 Pages 绑定 **Workers AI**（变量名 `AI`）、**KV**（`QTVQ_KV`）、**`PAYMENT_ADMIN_KEY`**。一键部署：`npm run deploy:full` · 收尾：`npm run post-deploy` · 打开控制台：`npm run dashboard`
+在控制台为 Pages 项目 **`qtvq-api`** 绑定 **Workers AI**（`AI`）、**KV**（`QTVQ_KV`）、**`PAYMENT_ADMIN_KEY`**。  
+一键：`npm run deploy:full` · 收尾：`npm run post-deploy` · 静态同步：`tools/scripts/sync-static.sh`（Ubuntu）
 
 ## 项目结构
 
@@ -50,6 +52,8 @@ wrangler pages deploy .
 | js/logo.js + layout.js | 统一 Logo |
 | functions/api/chat.js | AI 接口 |
 | functions/api/quota.js | 提问额度查询 |
+| js/config.js | API 基址（qtvq.cn → qtvq-api） |
+| functions/lib/cors.js | 跨域允许 qtvq.cn |
 | functions/api/payment.js | 汇款登记与工作人员核实 |
 | js/quota.js + js/subscribe.js | 额度逻辑与会员弹窗 |
 

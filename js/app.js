@@ -1,5 +1,7 @@
 /** 我心永恒-Q问 主逻辑 */
 
+import { apiUrl } from './config.js';
+
 import {
   getClientId,
   canAskNewQuestion,
@@ -146,7 +148,7 @@ export function commitNewQuestionAsk() {
 export async function syncQuotaFromServer() {
   const clientId = getClientId();
   try {
-    const res = await fetch(`/api/quota?clientId=${encodeURIComponent(clientId)}`);
+    const res = await fetch(apiUrl(`/api/quota?clientId=${encodeURIComponent(clientId)}`));
     if (!res.ok) return;
     const data = await res.json();
     applyServerQuota(data);
@@ -182,7 +184,7 @@ export function applyServerQuota(data) {
 
 async function syncQuotaToServer(action) {
   const clientId = getClientId();
-  await fetch('/api/quota', {
+  await fetch(apiUrl('/api/quota'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, clientId }),
@@ -196,7 +198,7 @@ export async function submitPaymentRequest(payload) {
   saveUser(user);
   refreshQuotaUI(user);
   try {
-    const res = await fetch('/api/payment', {
+    const res = await fetch(apiUrl('/api/payment'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, ...payload }),
@@ -224,7 +226,7 @@ export function applyServerSubscription(subscription, paymentPending) {
 export async function askAI(message, followUp = false) {
   const clientId = getClientId();
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetch(apiUrl('/api/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, followUp, clientId }),

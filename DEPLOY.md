@@ -1,5 +1,32 @@
 # Cloudflare 部署指南 · 我心永恒-Q问
 
+## 当前生产架构（双域）
+
+| 角色 | 域名 / 项目 | 说明 |
+|------|-------------|------|
+| **国内静态** | https://qtvq.cn | 阿里云 Ubuntu + Nginx，仅 HTML/CSS/JS |
+| **API + AI** | https://qtvq-api.pages.dev | Cloudflare Pages 项目 **`qtvq-api`**（Functions、Workers AI、KV） |
+| **工作人员核实** | https://qtvq-api.pages.dev/tools/verify-payment.html | 勿放在 qtvq.cn（国内机无 `/api`） |
+
+前端 `js/config.js` 在 **qtvq.cn** 上会把请求指向 **qtvq-api.pages.dev**；Functions 已配置 CORS。
+
+**更新静态（阿里云）：**
+
+```bash
+cd /opt/qtvq && git pull && bash tools/scripts/sync-static.sh
+```
+
+**更新 API（本机或 CI）：**
+
+```bash
+npm run deploy          # → qtvq-api
+npm run post-deploy     # 上传密钥 + 冒烟测试
+```
+
+详细步骤见 **[docs/DUAL-DEPLOY.md](docs/DUAL-DEPLOY.md)**。
+
+---
+
 ## 前置条件
 
 - [Node.js](https://nodejs.org/) 18+
@@ -33,7 +60,7 @@ wrangler pages project create qtvq
 项目根目录即为构建输出（`wrangler.toml` 中 `pages_build_output_dir = "."`）。
 
 ```bash
-wrangler pages deploy . --project-name=qtvq
+wrangler pages deploy . --project-name=qtvq-api
 ```
 
 部署成功后终端会输出访问地址。
@@ -42,13 +69,13 @@ wrangler pages deploy . --project-name=qtvq
 
 | 项目 | 值 |
 |------|-----|
-| Pages 主域 | https://qtvq.pages.dev |
-| 项目名称 | `qtvq` |
+| API 主域 | https://qtvq-api.pages.dev |
+| 国内静态 | https://qtvq.cn（阿里云 Nginx） |
+| Pages 项目名 | `qtvq-api` |
 | Account ID | `bb7eb342a5cfde7c0a84cd9bd519a859` |
 | KV 生产 id | `4ec5d9cc8b3e4210bd29112073a6c502` |
 | KV preview id | `2ccfcfce96164bb4b5805c51f0375f4e` |
-| 工作人员核实页 | https://qtvq.pages.dev/tools/verify-payment.html |
-| 备案域名（绑定中） | https://qtvq.cn（需 DNS 见下方） |
+| 工作人员核实页 | https://qtvq-api.pages.dev/tools/verify-payment.html |
 | 绑定域名脚本 | `npm run bind:domain` |
 | DNS 控制台直达 | https://dash.cloudflare.com/e6e39f6e75301e5116ca38c93a4a10ad/qtvq.cn/dns/records |
 
@@ -57,7 +84,7 @@ wrangler pages deploy . --project-name=qtvq
 ## 四、绑定 Workers AI（必做，否则仅用本地 mock）
 
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. **Workers & Pages** → 选择项目 `qtvq`
+2. **Workers & Pages** → 选择项目 **`qtvq-api`**
 3. **Settings** → **Functions** → 开启 **Workers AI**
 4. 添加绑定：变量名 **`AI`**，类型 **Workers AI**
 
@@ -70,7 +97,17 @@ binding = "AI"
 
 重新部署后，`/api/chat` 将调用 `@cf/meta/llama-3-8b-instruct`。
 
-## 五、绑定自定义域名 qtvq.cn
+## 五、国内域名 qtvq.cn（阿里云静态）
+
+**qtvq.cn 不在 Cloudflare Pages 上**，由阿里云轻量机 Nginx 提供静态文件；DNS 在注册商/阿里云解析为 **A 记录 → 轻量机 IP**。
+
+绑定与自检见 **[docs/DUAL-DEPLOY.md](docs/DUAL-DEPLOY.md)**。  
+若曾将 qtvq.cn CNAME 到 Pages，请改回 A 记录指向国内服务器。
+
+~~（以下为原 Cloudflare 全站托管方案，仅作参考）~~
+
+<!--
+## 五（旧）、绑定自定义域名 qtvq.cn 到 Pages
 
 **详细图文步骤见：** [docs/DOMAIN-qtvq.cn.md](docs/DOMAIN-qtvq.cn.md)
 
@@ -87,6 +124,16 @@ binding = "AI"
 
 ```powershell
 Invoke-RestMethod "https://qtvq.cn/api/payment"
+```
+
+-->
+
+绑定完成后自检（国内静态 + 境外 API）：
+
+```powershell
+curl.exe -I https://qtvq.cn/
+curl.exe -s https://qtvq.cn/js/config.js
+curl.exe -s https://qtvq-api.pages.dev/api/payment
 ```
 
 ## 六、安全建议（Dashboard）
@@ -134,8 +181,8 @@ npm run serve
 
 ```powershell
 # .dev.vars 中一行: PAYMENT_ADMIN_KEY=你的强密钥
-Get-Content .dev.vars | Where-Object { $_ -match '^PAYMENT_ADMIN_KEY=' } | ForEach-Object { ($_ -split '=',2)[1] } | npx wrangler pages secret put PAYMENT_ADMIN_KEY --project-name=qtvq
-npx wrangler pages deploy . --project-name=qtvq
+Get-Content .dev.vars | Where-Object { $_ -match '^PAYMENT_ADMIN_KEY=' } | ForEach-Object { ($_ -split '=',2)[1] } | npx wrangler pages secret put PAYMENT_ADMIN_KEY --project-name=qtvq-api
+npx wrangler pages deploy . --project-name=qtvq-api
 ```
 
 或执行：`npm run post-deploy`（从 `.dev.vars` 上传密钥并 redeploy + 冒烟测试）。
