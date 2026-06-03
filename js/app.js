@@ -184,7 +184,7 @@ export function applyServerQuota(data) {
 
 async function syncQuotaToServer(action) {
   const clientId = getClientId();
-  await fetch(apiUrl('/api/quota'), {
+  await fetch(apiUrl(`/api/quota?clientId=${encodeURIComponent(clientId)}`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, clientId }),

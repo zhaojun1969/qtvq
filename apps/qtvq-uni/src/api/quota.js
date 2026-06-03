@@ -5,7 +5,10 @@ export function fetchQuota(clientId) {
 }
 
 export function recordQuota(clientId) {
-  return post('/api/quota', { action: 'record', clientId });
+  return post(`/api/quota?clientId=${encodeURIComponent(clientId)}`, {
+    action: 'record',
+    clientId,
+  });
 }
 
 export function fetchPaymentInfo() {

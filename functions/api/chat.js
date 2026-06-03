@@ -31,6 +31,37 @@ function buildSystemPrompt(message) {
   return SYSTEM_PROMPT + KNOWLEDGE + (extra ? '\n' + extra : '');
 }
 
+const AI_MODELS = [
+  '@cf/meta/llama-3.1-8b-instruct',
+  '@cf/meta/llama-3-8b-instruct',
+];
+
+async function runAI(env, message, userContent) {
+  if (!env.AI) return { reply: null, reason: 'AI_NOT_BOUND' };
+
+  let lastError = null;
+  for (const model of AI_MODELS) {
+    try {
+      const response = await env.AI.run(model, {
+        messages: [
+          { role: 'system', content: buildSystemPrompt(message) },
+          { role: 'user', content: userContent },
+        ],
+        max_tokens: 512,
+      });
+      const reply =
+        response?.response ||
+        response?.result?.response ||
+        (typeof response === 'string' ? response : null);
+      if (reply) return { reply, model };
+    } catch (err) {
+      lastError = err;
+      console.error(`AI model ${model} failed:`, err);
+    }
+  }
+  return { reply: null, reason: 'AI_RUN_FAILED', error: lastError?.message };
+}
+
 const MOCK_REPLIES = [
   '【直线方案】\n1. 今晚先不发长文，发一句具体关心（如「记得吃饭」），观察对方是否回应。\n2. 若24小时无回应，不要追问，隔天用轻松话题试探。\n3. 避坑：连续发小作文会被视为压迫感。\n\n【再问一步】需要我帮你写第一条消息的具体措辞吗？',
   '【直线方案】\n1. 明确你的底线：借钱/投资类请求，未见面一律拒绝。\n2. 回复模板：「我们还不够熟，这类事我不方便。」\n3. 避坑：转账备注写「借款」可能被追债，绝不转账。\n\n【代价】金钱+信任，平均损失数千至数万。',
@@ -90,34 +121,26 @@ export async function onRequestPost(context) {
     : message.trim();
 
   try {
-    let reply;
-
-    if (env.AI) {
-      const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-        messages: [
-          { role: 'system', content: buildSystemPrompt(message) },
-          { role: 'user', content: userContent },
-        ],
-        max_tokens: 512,
-      });
-      reply =
-        response?.response ||
-        response?.result?.response ||
-        (typeof response === 'string' ? response : null);
-    }
+    const ai = await runAI(env, message, userContent);
+    let reply = ai.reply;
+    let fallback = false;
+    let fallbackReason = null;
 
     if (!reply) {
       reply = MOCK_REPLIES[Math.floor(Math.random() * MOCK_REPLIES.length)];
+      fallback = true;
+      fallbackReason = ai.reason || 'MOCK';
     }
 
     if (!followUp) await recordAsk(env, cid);
 
     return jsonResponse(request, {
       reply,
-      qCoins: 10,
-      wisdom: Math.min(5, Math.floor(message.length / 50) + 1),
+      qCoins: fallback ? 5 : 10,
+      wisdom: fallback ? 1 : Math.min(5, Math.floor(message.length / 50) + 1),
       followUpHint: '点击「再问一步」获取更具体的行动措辞',
       quota: await getQuota(env, cid),
+      ...(fallback ? { fallback: true, fallbackReason, aiError: ai.error || null } : {}),
     });
   } catch (err) {
     console.error('AI error:', err);
@@ -126,6 +149,8 @@ export async function onRequestPost(context) {
       qCoins: 5,
       wisdom: 1,
       fallback: true,
+      fallbackReason: 'EXCEPTION',
+      aiError: err?.message || String(err),
     });
   }
 }
