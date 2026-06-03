@@ -33,11 +33,21 @@ python scripts/upload-obs.py dist\qtvq-context-xxxxxxxx.zip
 
 ## 包内内容
 
-- `CONTEXT-SNAPSHOT.md` — 项目状态摘要
-- `README.md`、`DEPLOY.md`、`GITHUB.md`、`wrangler.toml` 等
-- `docs/` — 域名与部署说明
-- `agent-transcript.txt` — 对话记录（已去除密码、oauth token）
-- `project/` — 源码目录（不含 `.dev.vars`、`.wrangler`、`node_modules`）
+- `CONTEXT-SNAPSHOT.md` — 项目状态摘要（双域架构、待办）
+- 根目录全部 `.md`：`README.md`、`DEPLOY.md`、`GITHUB.md`、`我心永恒-Q问.txt` 等
+- `docs/` — 全部文档（DUAL-DEPLOY、MULTI-PLATFORM、OBS、CLOUDFLARE-TOKEN、GITEE-SETUP 等）
+- `apps/` — 多端 README
+- `agent-transcript.txt` — Cursor 对话导出（已脱敏 Token/密码）
+- `project/` — 完整源码（不含 `.dev.vars`、`node_modules`、`.wrangler`）
+
+## 一键命令
+
+```powershell
+copy obs.env.example obs.env
+# 编辑 obs.env 填写 AK/SK/endpoint/bucket
+pip install esdk-obs-python
+npm run context:upload
+```
 
 ## 桶权限建议
 

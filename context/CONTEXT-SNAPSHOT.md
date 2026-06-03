@@ -1,22 +1,32 @@
 # 我心永恒-Q问 · 项目上下文快照
 
-生成用途：备份到 OBS，便于换机/协作时恢复背景。
+生成用途：备份到 OBS，便于换机/协作时恢复背景。  
+生成命令：`npm run context:build` / `npm run context:upload`
 
 ## 产品
 
 - 名称：我心永恒 - Q问
-- 域名：qtvq.cn（备案 京ICP备：19045082号）
+- 域名：qtvq.cn（备案 京ICP备：19045082号，阿里云 Nginx 静态）
+- API：https://qtvq-api.pages.dev（Cloudflare Pages Functions）
 - 公司：我心永恒（北京）网络科技有限公司
 
-## 线上环境
+## 线上架构（双域）
+
+| 角色 | 地址 |
+|------|------|
+| 国内静态 | https://qtvq.cn → 阿里云 Ubuntu `/var/www/qtvq` |
+| API + AI + KV | https://qtvq-api.pages.dev 项目名 **qtvq-api** |
+| 工作人员核实 | https://qtvq-api.pages.dev/tools/verify-payment.html |
+
+## Cloudflare
 
 | 项 | 值 |
 |----|-----|
-| Pages 项目 | qtvq |
-| 默认 URL | https://qtvq.pages.dev |
 | Account ID | bb7eb342a5cfde7c0a84cd9bd519a859 |
+| Pages 项目（API） | qtvq-api |
 | KV binding | QTVQ_KV |
-| AI binding | AI (@cf/meta/llama-3-8b-instruct) |
+| AI binding | AI（变量名必须为 AI） |
+| 部署 | `npm run deploy`（需 Node 22+，API Token 或 wrangler login） |
 
 ## 核心业务规则
 
@@ -28,26 +38,30 @@
 ## 仓库与部署
 
 - 本地路径：`d:\qtvq`
-- Git：已 init，见 `GITHUB.md`
-- 部署：`npm run deploy:full` / `npm run deploy`
-- 密钥：`PAYMENT_ADMIN_KEY` 在 `.dev.vars`（勿上传 OBS 公开桶）
+- GitHub：zhaojun1969/qtvq（私有）
+- Gitee：待配置私有仓
+- 静态同步（阿里云）：`bash tools/scripts/sync-static.sh`
+- 密钥：`PAYMENT_ADMIN_KEY` 在 `.dev.vars`（**勿上传 OBS 公开桶**）
 
 ## 目录要点
 
 | 路径 | 说明 |
 |------|------|
-| index.html / js/home.js | Q问首页 |
-| pitfalls.html / js/pitfalls.js | 避坑大全 |
-| profile.html / js/profile.js | 我的缘值 |
-| functions/api/*.js | Cloudflare Pages Functions |
-| js/quota.js, js/subscribe.js | 额度与会员 |
-| tools/verify-payment.html | 工作人员核实 |
-| DEPLOY.md, docs/DOMAIN-qtvq.cn.md | 部署与域名 |
+| js/config.js | qtvq.cn → qtvq-api 跨域 API |
+| functions/api/*.js | chat / quota / payment / health |
+| apps/qtvq-uni/ | uni-app 多端 MVP |
+| docs/DUAL-DEPLOY.md | 双域部署 |
+| docs/MULTI-PLATFORM.md | App/小程序方案 |
+| docs/CLOUDFLARE-TOKEN.md | API Token 权限 |
+| docs/FIX-WORKERS-AI.md | AI fallback 修复 |
+| docs/GIT-PRIVATE.md, GITEE-SETUP.md | 私有 Git |
 
-## 域名待办
+## 已知待办
 
-`qtvq.cn` 需在 Cloudflare DNS 配置 CNAME → `qtvq.pages.dev`（勿 URL 跳转）。
+- Workers AI 绑定后消除 `fallback: true`
+- Gitee 私有仓推送
+- GitHub 仓库设为 Private
 
 ## 对话记录
 
-完整 Cursor 对话导出见同包内 `agent-transcript.txt`（已脱敏，不含用户密码）。
+同包内 `agent-transcript.txt`（已从 Cursor jsonl 导出并脱敏 Token/密码）。
