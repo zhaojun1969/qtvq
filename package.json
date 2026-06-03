@@ -17,6 +17,11 @@
     "github:publish": "powershell -ExecutionPolicy Bypass -File tools/scripts/publish-github.ps1",
     "context:build": "powershell -ExecutionPolicy Bypass -File tools/scripts/build-context-bundle.ps1",
     "context:upload": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-obs.ps1",
+    "git:push-all": "powershell -ExecutionPolicy Bypass -File tools/scripts/push-all.ps1",
+    "check:live": "powershell -ExecutionPolicy Bypass -File tools/scripts/check-live.ps1",
+    "uni:install": "cd apps/qtvq-uni && npm install",
+    "uni:dev:h5": "cd apps/qtvq-uni && npm run dev:h5",
+    "uni:dev:mp-weixin": "cd apps/qtvq-uni && npm run dev:mp-weixin",
     "kv:create": "wrangler kv namespace create QTVQ_KV && wrangler kv namespace create QTVQ_KV --preview",
     "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
   }

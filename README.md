@@ -25,7 +25,7 @@ npm run dev
 
 完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。  
 多端 App / 小程序方案见 **[docs/MULTI-PLATFORM.md](docs/MULTI-PLATFORM.md)**。  
-发布到 GitHub / Gitee 见 **[docs/GIT-PRIVATE.md](docs/GIT-PRIVATE.md)**（**务必私有仓库**）。  
+发布到 GitHub / Gitee 见 **[docs/GIT-PRIVATE.md](docs/GIT-PRIVATE.md)**、Gitee 首次 **[docs/GITEE-SETUP.md](docs/GITEE-SETUP.md)**（**务必私有**）。双推：`npm run git:push-all`  
 上下文备份 OBS 见 **[docs/OBS.md](docs/OBS.md)**（`npm run context:upload`）。
 
 ## Cloudflare 部署（API）
