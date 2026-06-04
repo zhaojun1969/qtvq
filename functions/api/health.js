@@ -1,6 +1,10 @@
 import { corsPreflight, jsonResponse } from '../lib/http.js';
+import { isMailConfigured } from '../lib/mail.js';
+import { isRagReady } from '../lib/rag.js';
+import { isNlsConfigured } from '../lib/aliyun-nls.js';
 
 const PROBE_MODELS = [
+  '@cf/zai-org/glm-4.7-flash',
   '@cf/meta/llama-3.1-8b-instruct',
   '@cf/meta/llama-3-8b-instruct',
 ];
@@ -13,6 +17,9 @@ export async function onRequest(context) {
     project: 'qtvq-api',
     aiBound: !!env.AI,
     kvBound: !!env.QTVQ_KV,
+    mailConfigured: isMailConfigured(env),
+    ragReady: isRagReady(),
+    speechConfigured: isNlsConfigured(env),
     aiProbe: null,
     aiError: null,
     hint: null,

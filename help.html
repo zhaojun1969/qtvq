@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="我心永恒-Q问 使用帮助：Q问、避坑大全、缘值与会员操作说明">
+  <title>使用帮助 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+        <span class="stat-badge">直线 <strong data-line-value>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="help-main">
+    <nav class="help-breadcrumb" aria-label="帮助导航">
+      <a href="index.html">首页</a>
+      <span>/</span>
+      <span>使用帮助</span>
+    </nav>
+
+    <h1 class="help-title">使用帮助</h1>
+    <p class="help-lead">按功能分区说明操作路径。任意页面顶栏可切换三大模块；页脚可联系客服或返回本页。</p>
+
+    <div class="help-layout">
+      <aside class="help-toc">
+        <h2>目录</h2>
+        <ul>
+          <li><a href="#map">站点地图</a></li>
+          <li><a href="#qask">Q问 · 首页</a></li>
+          <li><a href="#pitfalls">避坑大全</a></li>
+          <li><a href="#profile">我的缘值</a></li>
+          <li><a href="#member">会员与汇款</a></li>
+          <li><a href="#contact">联系客服</a></li>
+          <li><a href="#privacy">隐私说明</a></li>
+          <li><a href="#download">客户端下载</a></li>
+          <li><a href="#404">找不到页面</a></li>
+        </ul>
+        <p class="help-toc-foot"><a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>客户邮箱 qtvq@qtvq.cn</a></p>
+      </aside>
+
+      <div class="help-content">
+        <section id="map" class="help-section">
+          <h2>站点地图</h2>
+          <div class="help-card">
+            <table class="help-table">
+              <thead><tr><th>页面</th><th>入口</th><th>主要功能</th><th>离开方式</th></tr></thead>
+              <tbody>
+                <tr><td><a href="index.html">Q问</a></td><td>顶栏 / 首页</td><td>AI 直线问答、语音、热点</td><td>→ 避坑 / 缘值 / 帮助</td></tr>
+                <tr><td><a href="pitfalls.html">避坑大全</a></td><td>顶栏</td><td>50 坑、测验、行动卡</td><td>→ Q问 / 缘值 / 帮助</td></tr>
+                <tr><td><a href="profile.html">我的缘值</a></td><td>顶栏</td><td>Q币、直线卡、会员</td><td>→ Q问 / 避坑 / 帮助</td></tr>
+                <tr><td><a href="help.html">使用帮助</a></td><td>页脚</td><td>本说明</td><td>→ 任意顶栏链接</td></tr>
+                <tr><td><a href="privacy.html">隐私说明</a></td><td>页脚</td><td>隐私政策全文</td><td>→ 首页 / 下载</td></tr>
+                <tr><td><a href="download.html">客户端下载</a></td><td>页脚</td><td>安卓 / iOS / 鸿蒙 / 小程序</td><td>→ 首页 / 隐私</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="help-nav-row"><a href="#qask" class="btn btn-primary btn-sm">下一节：Q问</a></p>
+        </section>
+
+        <section id="qask" class="help-section">
+          <h2>Q问 · 首页</h2>
+          <div class="help-card">
+            <h3>① 提问拿方案</h3>
+            <ol>
+              <li>在输入框描述情感困境（可点右侧「今日热点」自动填入）。</li>
+              <li>点 <strong>获取直线方案</strong>，等待 AI 回复（约数秒）。</li>
+              <li>需要更具体话术时，点 <strong>再问一步</strong>（不计入 24h 提问次数）。</li>
+            </ol>
+            <h3>② 语音输入</h3>
+            <p>点 🎤 <strong>语音</strong>，允许麦克风后说话；再点 <strong>停止</strong>，文字会自动填入输入框。</p>
+            <ul>
+              <li>站点已配置 <strong>阿里云语音识别</strong> 时，优先走服务端识别（国内可用）。</li>
+              <li>未配置时回退浏览器 Web Speech（Chrome / Edge + HTTPS）；国内常提示「网络不可用」，请改用手打。</li>
+              <li>若提示「未授权」：在地址栏锁图标 → 网站设置 → 允许麦克风。</li>
+              <li>单次录音最长约 30 秒；环境尽量安静、语速清晰。</li>
+            </ul>
+            <h3>③ 提问额度</h3>
+            <p>免费用户每 <strong>24 小时 5 次</strong>新提问；「再问一步」不占用。额度用尽后点 <strong>办理会员不限次</strong> 或前往 <a href="profile.html#subscription">我的缘值 · 会员</a>。</p>
+            <h3>④ 先锋次数</h3>
+            <p>新用户有独立先锋问答次数；在 <a href="profile.html#pioneer">缘值页</a> 可邀请好友 +5 次。</p>
+          </div>
+          <p class="help-nav-row">
+            <a href="#map" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="index.html" class="btn btn-secondary btn-sm">去 Q问</a>
+            <a href="#pitfalls" class="btn btn-primary btn-sm">下一节：避坑</a>
+          </p>
+        </section>
+
+        <section id="pitfalls" class="help-section">
+          <h2>避坑大全</h2>
+          <div class="help-card">
+            <h3>① 浏览与筛选</h3>
+            <ol>
+              <li>顶栏进入 <strong>避坑大全</strong>。</li>
+              <li>用搜索框找关键词；上方按钮按「金钱/时间/情感代价」与场景分类筛选。</li>
+              <li>点专题条可展开系列坑位。</li>
+            </ol>
+            <h3>② 单个避坑卡片</h3>
+            <ul>
+              <li><strong>展开详情</strong>：看直线方案与行动步骤。</li>
+              <li><strong>避坑测验</strong>：答对 +10 直线值。</li>
+              <li><strong>下载行动卡</strong>：保存 PNG 备忘。</li>
+              <li><strong>去 Q 问</strong>：带当前坑名跳转首页继续 AI 追问。</li>
+              <li>有音视频演示时，点 🎧 / ▶ 播放（演示内容）。</li>
+            </ul>
+            <h3>③ 提交教训</h3>
+            <p>页中 <strong>提交我的教训</strong> 可填坑名与故事（勿填真实姓名电话），审核通过可获奖励（演示）。</p>
+          </div>
+          <p class="help-nav-row">
+            <a href="#qask" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="pitfalls.html" class="btn btn-secondary btn-sm">去避坑</a>
+            <a href="#profile" class="btn btn-primary btn-sm">下一节：缘值</a>
+          </p>
+        </section>
+
+        <section id="profile" class="help-section">
+          <h2>我的缘值</h2>
+          <div class="help-card">
+            <h3>① 三项数值</h3>
+            <ul>
+              <li><strong>Q币</strong>：完成提问获得，用于解锁深度内容。</li>
+              <li><strong>Q智慧值</strong>：阅读与互动积累。</li>
+              <li><strong>直线值</strong>：通过测验、避坑阅读等获得，进度条满 200 分解锁更多权益（演示）。</li>
+            </ul>
+            <h3 id="fate-card">② 缘分直线卡</h3>
+            <p>完成 1 次 Q问 或阅读 3 条避坑后，可 <strong>生成并分享</strong> 直线卡文案。</p>
+            <h3>③ 缘认知匹配</h3>
+            <p>根据提问与浏览记录，页面展示推荐类型与常见坑（本地演示，不展示真实联系方式）。</p>
+            <h3 id="subscription">④ 提问会员</h3>
+            <p>查看剩余额度，点 <strong>办理月卡/季卡/年卡</strong> 打开汇款说明（与首页会员弹窗相同）。</p>
+            <h3 id="pioneer">⑤ Q问先锋</h3>
+            <p><strong>复制邀请链接</strong> 分享给好友，双方可获额外次数（演示）。</p>
+            <h3>⑥ Q缘连线</h3>
+            <p>勾选授权后可发起共建主题（演示，不展示真实联系方式）。</p>
+          </div>
+          <p class="help-nav-row">
+            <a href="#pitfalls" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="profile.html" class="btn btn-secondary btn-sm">去缘值</a>
+            <a href="#member" class="btn btn-primary btn-sm">下一节：会员</a>
+          </p>
+        </section>
+
+        <section id="member" class="help-section">
+          <h2>会员与支付</h2>
+          <div class="help-card">
+            <h3>① 扫码支付（推荐）</h3>
+            <ol>
+              <li>在首页或缘值页打开 <strong>办理会员</strong> 弹窗，选择月卡/季卡/年卡。</li>
+              <li>点击下列四种收款码之一放大：<strong>微信</strong>、<strong>支付宝</strong>、<strong>支付宝扫一扫</strong>、<strong>云闪付/工商银行</strong>。</li>
+              <li>用对应 App 扫一扫，按弹窗所示金额付款，备注填写设备编号。</li>
+              <li>支付完成后点 <strong>我已完成支付</strong>，填写信息提交核实。</li>
+            </ol>
+            <h3>② 对公银行汇款</h3>
+            <ol>
+              <li>在会员弹窗展开 <strong>或 对公银行汇款</strong>，按账户信息转账。</li>
+              <li>填写汇款人、时间、金额后点 <strong>我已汇款，提交核实</strong>。</li>
+              <li>工作人员核对到账后开通不限次提问。</li>
+            </ol>
+            <p>汇款疑问可 <a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>联系客服 qtvq@qtvq.cn</a>。</p>
+          </div>
+          <p class="help-nav-row">
+            <a href="#profile" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="index.html" class="btn btn-secondary btn-sm">去办会员</a>
+            <a href="#contact" class="btn btn-primary btn-sm">下一节：客服</a>
+          </p>
+        </section>
+
+        <section id="contact" class="help-section">
+          <h2>联系客服</h2>
+          <div class="help-card">
+            <p>邮箱：<strong>qtvq@qtvq.cn</strong></p>
+            <ul>
+              <li>任意页脚点 <strong>客户邮箱</strong>，可写文字并上传最多 4 张截图。</li>
+              <li>也可直接发邮件至 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，邮件客户端可附图片。</li>
+              <li>建议留下回复邮箱；勿发送银行卡密码、验证码等敏感信息。</li>
+            </ul>
+            <button type="button" class="btn btn-primary" data-open-contact>打开留言窗口</button>
+          </div>
+          <p class="help-nav-row">
+            <a href="#member" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="#privacy" class="btn btn-primary btn-sm">下一节：隐私</a>
+          </p>
+        </section>
+
+        <section id="privacy" class="help-section">
+          <h2>隐私说明</h2>
+          <div class="help-card">
+            <p>页脚点 <strong><a href="privacy.html">隐私说明</a></strong> 可查看完整《隐私政策》，涵盖信息收集、Cookie、第三方服务、存储期限、您的权利及未成年人保护等。</p>
+            <ul>
+              <li>本产品以匿名设备编号（clientId）识别额度，<strong>不要求</strong>注册手机号或身份证。</li>
+              <li>提问内容用于 AI 答复；请勿在对话中填写银行卡密码、验证码等敏感信息。</li>
+              <li>行使查阅、删除、注销等权利，请发邮件至 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>。</li>
+            </ul>
+            <a href="privacy.html" class="btn btn-primary btn-sm">阅读完整隐私政策</a>
+          </div>
+          <p class="help-nav-row">
+            <a href="#contact" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="#download" class="btn btn-primary btn-sm">下一节：客户端</a>
+          </p>
+        </section>
+
+        <section id="download" class="help-section">
+          <h2>客户端下载</h2>
+          <div class="help-card">
+            <p>页脚点 <strong><a href="download.html">客户端下载</a></strong> 可查看各端入口：</p>
+            <ul>
+              <li><strong>手机 App</strong>：Android、iOS（App Store）、鸿蒙 HarmonyOS</li>
+              <li><strong>小程序</strong>：微信、支付宝、抖音</li>
+              <li><strong>H5 网页</strong>：浏览器直接访问 <a href="https://qtvq.cn">qtvq.cn</a>（已上线）</li>
+            </ul>
+            <p>除 H5 外，各端 App 与小程序<strong>陆续上架</strong>；未开放前按钮显示「即将上线」，上架后在 <code>js/download-config.js</code> 配置链接即可生效。</p>
+            <a href="download.html" class="btn btn-primary btn-sm">前往下载页</a>
+          </div>
+          <p class="help-nav-row">
+            <a href="#privacy" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="#404" class="btn btn-primary btn-sm">下一节：404</a>
+          </p>
+        </section>
+
+        <section id="404" class="help-section">
+          <h2>找不到页面怎么办</h2>
+          <div class="help-card">
+            <p>若链接失效或输错地址，会进入「这条路绕远了」提示页。</p>
+            <p>请点 <strong>返回 Q问</strong> 或 <strong>避坑大全</strong>，或顶栏切换模块；也可回到 <a href="help.html">使用帮助</a> 查路径。</p>
+          </div>
+          <p class="help-nav-row">
+            <a href="#contact" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="index.html" class="btn btn-primary btn-sm">返回首页</a>
+          </p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>使用帮助 · <a href="index.html">返回 Q问</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+    <p class="footer-support">
+      <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户邮箱 qtvq@qtvq.cn</a>
+      · <a href="help.html">使用帮助</a>
+      · <a href="privacy.html">隐私说明</a>
+      · <a href="download.html">客户端下载</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/help.js"></script>
+</body>
+</html>

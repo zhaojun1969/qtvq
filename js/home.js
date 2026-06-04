@@ -17,6 +17,7 @@ import {
 import { canAskNewQuestion } from './quota.js';
 import { openSubscribeModal, initSubscribeModal } from './subscribe.js';
 import { showLoading, hideLoading } from './loading.js';
+import { createVoiceRecorder, transcribeBlob, probeSpeechApi } from './voice-asr.js';
 
 let lastQuestion = '';
 
@@ -37,11 +38,52 @@ function initHotTopics() {
 function initStories() {
   const grid = document.getElementById('success-stories');
   if (!grid) return;
+  const input = document.getElementById('question-input');
+
   SUCCESS_STORIES.forEach((s) => {
     const card = document.createElement('article');
-    card.className = 'story-card';
-    card.innerHTML = `<span class="tag">${s.tag}</span><p>${s.text}</p>`;
+    card.className = 'story-card story-card-clickable';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute(
+      'aria-label',
+      s.prompt ? `查看案例并提问：${s.prompt}` : `查看案例：${s.tag}`
+    );
+    card.innerHTML = `<span class="tag">${s.tag}</span><p>${s.text}</p><span class="story-card-hint">点击填入相关问题 →</span>`;
+
+    const activate = () => {
+      if (s.prompt && input) {
+        input.value = s.prompt;
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('已填入相关问题，点「获取直线方案」即可');
+      } else {
+        showToast('请在上方输入框描述您的问题');
+      }
+    };
+
+    card.addEventListener('click', activate);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activate();
+      }
+    });
+
     grid.appendChild(card);
+  });
+}
+
+function initFeatureCards() {
+  document.querySelectorAll('.feature-card-link[href="#question-input"]').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('question-input');
+      if (!input) return;
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast('请描述您的情感困境，点「获取直线方案」');
+    });
   });
 }
 
@@ -51,31 +93,127 @@ function initVoiceInput() {
   if (!btn || !input) return;
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    btn.disabled = true;
-    btn.title = '当前浏览器不支持语音输入';
-    return;
-  }
+  const voiceRec = createVoiceRecorder();
+  let useServerAsr = false;
+  let webRec = null;
+  let webListening = false;
 
-  const rec = new SR();
-  rec.lang = 'zh-CN';
-  rec.interimResults = false;
-
-  btn.addEventListener('click', () => {
-    try {
-      rec.start();
-      showToast('请开始说话…');
-    } catch {
-      showToast('无法启动语音识别');
-    }
+  probeSpeechApi().then((ok) => {
+    useServerAsr = ok;
+    if (ok) btn.title = '语音输入（阿里云识别，点击开始/停止）';
+    else if (!SR) {
+      btn.disabled = true;
+      btn.title = '当前浏览器不支持语音输入';
+    } else btn.title = '语音输入（浏览器识别，国内可能不可用）';
   });
 
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    input.value = (input.value ? input.value + ' ' : '') + text;
+  const ERROR_MSG = {
+    'no-speech': '未检测到语音，请重试或改用手打',
+    'audio-capture': '无法访问麦克风，请检查权限',
+    'not-allowed': '麦克风未授权，请在地址栏允许后重试',
+    network: '浏览器语音网络不可用，请改用手打或配置阿里云 ASR',
+    SPEECH_NOT_CONFIGURED: '服务端语音识别未配置',
+    no_speech: '未识别到有效语音，请说清楚一些',
   };
 
-  rec.onerror = () => showToast('语音识别失败，请改用文字');
+  function setActive(active) {
+    btn.classList.toggle('voice-active', active);
+    btn.textContent = active ? '⏹ 停止' : '🎤 语音';
+  }
+
+  async function runServerAsr() {
+    setActive(true);
+    showToast('正在录音，说完再点停止…');
+    try {
+      await voiceRec.start();
+    } catch (err) {
+      setActive(false);
+      showToast('无法访问麦克风，请检查权限');
+      console.warn('[voice]', err);
+      return;
+    }
+
+    btn.onclick = async () => {
+      if (!voiceRec.isRecording()) return;
+      setActive(false);
+      showLoading('语音识别中…');
+      try {
+        const blob = await voiceRec.stop();
+        const text = await transcribeBlob(blob);
+        if (text) {
+          input.value = input.value ? `${input.value} ${text}` : text;
+          showToast('已填入语音识别结果');
+        }
+      } catch (err) {
+        const msg = ERROR_MSG[err.code] || err.message || '语音识别失败，请改用手打';
+        showToast(msg);
+        console.warn('[voice asr]', err);
+      } finally {
+        hideLoading();
+        bindMainClick();
+      }
+    };
+  }
+
+  function bindWebSpeech() {
+    if (!SR) return;
+    webRec = new SR();
+    webRec.lang = 'zh-CN';
+    webRec.interimResults = false;
+    webRec.continuous = false;
+
+    webRec.onstart = () => {
+      webListening = true;
+      setActive(true);
+      showToast('请开始说话…');
+    };
+    webRec.onresult = (e) => {
+      const text = e.results?.[0]?.[0]?.transcript?.trim();
+      if (text) {
+        input.value = input.value ? `${input.value} ${text}` : text;
+        showToast('已填入语音识别结果');
+      }
+    };
+    webRec.onerror = (e) => {
+      const code = e.error || 'unknown';
+      console.warn('[voice web]', code);
+      const msg = ERROR_MSG[code];
+      if (msg) showToast(msg);
+      else if (code !== 'aborted') showToast(`语音识别失败（${code}），请改用手打`);
+    };
+    webRec.onend = () => {
+      webListening = false;
+      setActive(false);
+      bindMainClick();
+    };
+  }
+
+  function bindMainClick() {
+    btn.onclick = async () => {
+      if (useServerAsr) {
+        await runServerAsr();
+        return;
+      }
+      if (!SR) {
+        showToast('当前浏览器不支持语音输入');
+        return;
+      }
+      if (webListening && webRec) {
+        webRec.stop();
+        return;
+      }
+      bindWebSpeech();
+      try {
+        webRec.start();
+      } catch (err) {
+        setActive(false);
+        showToast('无法启动语音识别，请改用手打');
+        console.warn('[voice web start]', err);
+      }
+    };
+  }
+
+  bindMainClick();
 }
 
 function appendMessage(text, type, withAdopt = false) {
@@ -225,6 +363,7 @@ document.getElementById('question-input')?.addEventListener('keydown', (e) => {
 
 initHotTopics();
 initStories();
+initFeatureCards();
 initVoiceInput();
 initSubscribeModal();
 syncQuotaFromServer();

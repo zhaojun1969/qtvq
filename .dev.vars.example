@@ -2,3 +2,33 @@
 # 生产环境在 Cloudflare Pages → Settings → Environment variables 配置
 
 PAYMENT_ADMIN_KEY=请替换为强随机密钥
+
+# OSS 动态数据备份（与 obs.env 一致，Secret 类型）
+# OSS_ACCESS_KEY_ID=
+# OSS_SECRET_ACCESS_KEY=
+# OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
+# OSS_BUCKET=qtvq
+# OSS_BACKUP_PREFIX=qtvq/backup/
+
+# ---- 联系客服 · 邮件通知（二选一）----
+
+# 方式 A：SMTP（推荐，阿里云/腾讯企业邮）
+MAIL_PROVIDER=smtp
+SMTP_HOST=smtp.qiye.aliyun.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=qtvq@qtvq.cn
+SMTP_PASS=请填写SMTP授权码或邮箱密码
+SMTP_FROM=qtvq@qtvq.cn
+SMTP_TO=qtvq@qtvq.cn
+
+# 方式 B：Resend HTTP API（需先在 Resend 验证发信域名）
+# MAIL_PROVIDER=resend
+# RESEND_API_KEY=re_xxxxxxxx
+# MAIL_FROM=Q问 <noreply@qtvq.cn>
+# MAIL_TO=qtvq@qtvq.cn
+
+# ---- 语音输入 · 阿里云一句话识别（NLS）----
+# 控制台：https://nls-portal.console.aliyun.com/
+# 创建项目 → 获取 AppKey；AccessKey 可与 OSS 共用
+# NLS_APP_KEY=你的NLS_AppKey
