@@ -37,6 +37,9 @@ $homeJs = Get-Content (Join-Path $stage "js/home.js") -Raw -Encoding UTF8
 if ($layout -notmatch 'initContactModal') { throw "layout.js 未含 initContactModal" }
 if ($homeJs -notmatch 'story-card-clickable') { throw "home.js 未含成功案例点击" }
 if ($homeJs -notmatch 'voice-asr') { throw "home.js 未接入 voice-asr" }
+$versionJs = Join-Path $stage "js/version.js"
+if (-not (Test-Path $versionJs)) { throw "缺少 js/version.js，请先 write-version.ps1" }
+if ((Get-Content $versionJs -Raw) -notmatch 'BUILD_SHA') { throw "version.js 格式异常" }
 if (-not (Select-String -Path (Join-Path $stage "index.html") -Pattern 'feature-card-link' -Quiet)) {
     throw "index.html 未含 feature-card-link"
 }

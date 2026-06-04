@@ -12,6 +12,9 @@ if [ ! -f "$ROOT/index.html" ]; then
   exit 1
 fi
 
+echo ">> 生成 js/version.js"
+bash "$ROOT/tools/scripts/write-version.sh"
+
 echo ">> 同步 $ROOT -> $DEST"
 sudo rsync -av --delete \
   --exclude='functions' \
@@ -37,6 +40,8 @@ test -f "$DEST/js/contact.js"
 test -f "$DEST/js/toast.js"
 test -f "$DEST/js/home.js"
 test -f "$DEST/js/voice-asr.js"
+test -f "$DEST/js/version.js"
+grep -q 'BUILD_SHA' "$DEST/js/version.js"
 grep -q 'qtvq-api.pages.dev' "$DEST/js/config.js"
 grep -q 'initContactModal' "$DEST/js/layout.js"
 grep -q 'feature-card-link' "$DEST/index.html"

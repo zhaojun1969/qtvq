@@ -57,7 +57,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $sshArgs = @()
 if (Test-Path $KeyFile) { $sshArgs += @("-i", $KeyFile) }
-$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; echo OK"
+$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; echo OK"
 $sshArgs += @($target, $remoteCmd)
 
 Write-Host ">> Extract on server at $Dest"
