@@ -1,7 +1,81 @@
 import { PLANS, COMPANY, getClientId } from './quota.js';
 import { submitPaymentRequest, showToast, syncQuotaFromServer } from './app.js';
+import { PAY_CHANNELS, detectPayEnv } from './pay-qr.js';
 
 let selectedPlan = 'month';
+
+function getSelectedPrice() {
+  return PLANS[selectedPlan]?.price ?? 288;
+}
+
+function openPayQrViewer(channelId) {
+  const ch = PAY_CHANNELS[channelId];
+  if (!ch) return;
+
+  const viewer = document.getElementById('pay-qr-viewer');
+  const price = getSelectedPrice();
+  const clientId = getClientId();
+
+  document.getElementById('pay-qr-viewer-title').textContent = `${ch.label} · 扫码付款`;
+  document.getElementById('pay-qr-viewer-price').textContent = `¥${price}`;
+  document.getElementById('pay-qr-viewer-client').textContent = clientId;
+  const img = document.getElementById('pay-qr-viewer-img');
+  img.src = ch.image;
+  img.alt = `${ch.label}收款码`;
+  document.getElementById('pay-qr-viewer-tip').textContent = ch.tip;
+
+  viewer?.classList.add('open');
+  viewer?.setAttribute('aria-hidden', 'false');
+
+  const env = detectPayEnv();
+  if (ch.openApp && (env.alipay && channelId.startsWith('alipay'))) {
+    setTimeout(() => {
+      try {
+        window.location.href = ch.openApp;
+      } catch {
+        /* 留在当前页展示二维码 */
+      }
+    }, 400);
+  }
+}
+
+function closePayQrViewer() {
+  const viewer = document.getElementById('pay-qr-viewer');
+  viewer?.classList.remove('open');
+  viewer?.setAttribute('aria-hidden', 'true');
+}
+
+function scrollToPaymentForm() {
+  closePayQrViewer();
+  const details = document.querySelector('.pay-bank-details');
+  if (details && !details.open) details.open = true;
+  document.getElementById('payment-form')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  showToast('请填写汇款信息并提交，便于核实开通会员');
+}
+
+function initPayQrGrid() {
+  document.getElementById('pay-qr-grid')?.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-pay-channel]');
+    if (!card) return;
+    openPayQrViewer(card.dataset.payChannel);
+  });
+
+  document.querySelectorAll('[data-close-pay-qr]').forEach((el) => {
+    el.addEventListener('click', closePayQrViewer);
+  });
+
+  document.getElementById('btn-copy-pay-client')?.addEventListener('click', () => {
+    const id = document.getElementById('pay-qr-viewer-client')?.textContent;
+    if (id) navigator.clipboard?.writeText(id).then(() => showToast('已复制设备编号'));
+  });
+
+  document.getElementById('btn-copy-pay-amount')?.addEventListener('click', () => {
+    const price = String(getSelectedPrice());
+    navigator.clipboard?.writeText(price).then(() => showToast(`已复制金额 ¥${price}`));
+  });
+
+  document.getElementById('btn-pay-done')?.addEventListener('click', scrollToPaymentForm);
+}
 
 function renderBankInfo() {
   const el = document.getElementById('bank-info');
@@ -25,6 +99,8 @@ function updatePlanUI() {
   const plan = PLANS[selectedPlan];
   const priceEl = document.getElementById('selected-plan-price');
   if (priceEl && plan) priceEl.textContent = `¥${plan.price}`;
+  const viewerPrice = document.getElementById('pay-qr-viewer-price');
+  if (viewerPrice && plan) viewerPrice.textContent = `¥${plan.price}`;
 }
 
 export function openSubscribeModal() {
@@ -104,4 +180,5 @@ export function initSubscribeModal() {
   });
 
   updatePlanUI();
+  initPayQrGrid();
 }

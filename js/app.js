@@ -1,6 +1,9 @@
 /** 我心永恒-Q问 主逻辑 */
 
-import { apiUrl } from './config.js';
+import { apiFetch, flushOfflineQueue } from './api-fetch.js';
+import { showToast } from './toast.js';
+
+export { showToast } from './toast.js';
 
 import {
   getClientId,
@@ -148,7 +151,7 @@ export function commitNewQuestionAsk() {
 export async function syncQuotaFromServer() {
   const clientId = getClientId();
   try {
-    const res = await fetch(apiUrl(`/api/quota?clientId=${encodeURIComponent(clientId)}`));
+    const res = await apiFetch(`/api/quota?clientId=${encodeURIComponent(clientId)}`);
     if (!res.ok) return;
     const data = await res.json();
     applyServerQuota(data);
@@ -184,7 +187,7 @@ export function applyServerQuota(data) {
 
 async function syncQuotaToServer(action) {
   const clientId = getClientId();
-  await fetch(apiUrl(`/api/quota?clientId=${encodeURIComponent(clientId)}`), {
+  await apiFetch(`/api/quota?clientId=${encodeURIComponent(clientId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, clientId }),
@@ -198,7 +201,7 @@ export async function submitPaymentRequest(payload) {
   saveUser(user);
   refreshQuotaUI(user);
   try {
-    const res = await fetch(apiUrl('/api/payment'), {
+    const res = await apiFetch('/api/payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, ...payload }),
@@ -226,7 +229,7 @@ export function applyServerSubscription(subscription, paymentPending) {
 export async function askAI(message, followUp = false) {
   const clientId = getClientId();
   try {
-    const res = await fetch(apiUrl('/api/chat'), {
+    const res = await apiFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, followUp, clientId }),
@@ -297,16 +300,4 @@ function mockAI(message, followUp) {
     wisdom: Math.min(5, Math.floor(message.length / 50) + 1),
     fallback: true,
   };
-}
-
-export function showToast(msg) {
-  let el = document.querySelector('.toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'toast';
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2500);
 }

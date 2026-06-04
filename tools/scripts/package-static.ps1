@@ -26,7 +26,8 @@ foreach ($item in $items) {
 }
 
 $required = @(
-    "js/layout.js", "js/contact.js", "js/toast.js", "js/home.js", "js/voice-asr.js"
+    "js/layout.js", "js/contact.js", "js/toast.js", "js/home.js", "js/voice-asr.js",
+    "js/data.js", "js/pay-qr.js", "help.html", "download.html", "privacy.html"
 )
 foreach ($rel in $required) {
     $p = Join-Path $stage $rel
@@ -43,6 +44,11 @@ if ((Get-Content $versionJs -Raw) -notmatch 'BUILD_SHA') { throw "version.js 格
 if (-not (Select-String -Path (Join-Path $stage "index.html") -Pattern 'feature-card-link' -Quiet)) {
     throw "index.html 未含 feature-card-link"
 }
+if (-not (Select-String -Path (Join-Path $stage "index.html") -Pattern 'footer-support' -Quiet)) {
+    throw "index.html 未含 footer-support"
+}
+$dataJs = Get-Content (Join-Path $stage "js/data.js") -Raw -Encoding UTF8
+if ($dataJs -notmatch 'prompt:') { throw "data.js 未含成功案例 prompt" }
 
 & tar -czf $tar -C $stage .
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue

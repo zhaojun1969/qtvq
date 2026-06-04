@@ -1,8 +1,10 @@
 import { mountLogo } from './logo.js';
 import { getClientId } from './quota.js';
 import { getUser, saveUser, refreshStatUI, syncQuotaFromServer } from './app.js';
+import { initContactModal } from './contact.js';
+import { flushOfflineQueue } from './api-fetch.js';
 
-const PAGES = { index: 'index.html', pitfalls: 'pitfalls.html', profile: 'profile.html' };
+const PAGES = { index: 'index.html', pitfalls: 'pitfalls.html', profile: 'profile.html', help: 'help.html' };
 
 function initPioneerSlot() {
   const user = getUser();
@@ -46,15 +48,20 @@ function setActiveNav() {
 }
 
 getClientId();
+initContactModal();
 mountLogo();
 initPioneerSlot();
 initMobileNav();
 setActiveNav();
 syncQuotaFromServer();
 refreshStatUI();
+flushOfflineQueue().catch(() => {});
 
 if (document.querySelector('[data-quota-status]')) {
-  setInterval(() => refreshStatUI(), 60000);
+  setInterval(() => {
+    refreshStatUI();
+    flushOfflineQueue().catch(() => {});
+  }, 60000);
 }
 
 export { PAGES };

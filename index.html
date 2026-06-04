@@ -80,20 +80,21 @@
     <section class="features">
       <h2 class="section-title">两大核心服务</h2>
       <div class="feature-grid">
-        <article class="feature-card">
+        <a href="#question-input" class="feature-card feature-card-link" id="feature-qask">
           <h4>Q智慧问答</h4>
           <p>AI 实时对话，基于情感心理学语料与真实案例，给出可执行的行动步骤。「再问一步」直达具体措辞。</p>
-        </article>
-        <article class="feature-card">
+          <span class="feature-link">开始提问 →</span>
+        </a>
+        <a href="pitfalls.html" class="feature-card feature-card-link">
           <h4>爱情避坑大全</h4>
           <p>50 个典型情感坑，含测验、行动卡、音视频。相亲/暧昧/异地/彩礼/出轨等场景直线方案。</p>
-          <a href="pitfalls.html" class="feature-link">进入避坑大全 →</a>
-        </article>
-        <article class="feature-card">
+          <span class="feature-link">进入避坑大全 →</span>
+        </a>
+        <a href="profile.html" class="feature-card feature-card-link">
           <h4>缘服务 · 高认知匹配</h4>
           <p>基于提问与浏览记录，推荐适合类型与常见坑。学完专题可生成「缘分直线卡」分享给心仪对象。</p>
-          <a href="profile.html" class="feature-link">进入我的缘值 →</a>
-        </article>
+          <span class="feature-link">进入我的缘值 →</span>
+        </a>
       </div>
     </section>
 
@@ -107,13 +108,39 @@
     <div class="modal-backdrop" data-close-subscribe></div>
     <div class="modal-box modal-box-wide subscribe-modal-box">
       <h3>办理 Q问 会员 · 不限次数提问</h3>
-      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后需对公汇款，<strong>核实到账后方可解禁</strong>。</p>
+      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后可<strong>扫码支付</strong>或银行汇款，核实到账后解禁。</p>
       <div class="plan-grid">
         <button type="button" class="plan-card plan-selected" data-plan="month">月卡<br><strong>¥288</strong></button>
         <button type="button" class="plan-card" data-plan="quarter">季卡<br><strong>¥788</strong></button>
         <button type="button" class="plan-card" data-plan="year">年卡<br><strong>¥2888</strong></button>
       </div>
-      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥288</span>（请按所选套餐金额汇款）</p>
+      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥288</span> · 扫码时请按此金额支付</p>
+
+      <div class="pay-section">
+        <h4 class="pay-section-title">扫码支付 · 点击二维码放大</h4>
+        <p class="modal-hint pay-section-hint">先选套餐，再点下方收款码，用对应 App 扫一扫完成付款；备注请填设备编号（弹窗内可复制）。</p>
+        <div class="pay-qr-grid" id="pay-qr-grid">
+          <button type="button" class="pay-qr-card" data-pay-channel="wechat" aria-label="微信支付">
+            <img src="assets/payment/qr-wechat.png" alt="微信支付收款码" width="160" height="220" loading="lazy">
+            <span class="pay-qr-label">微信支付</span>
+          </button>
+          <button type="button" class="pay-qr-card" data-pay-channel="alipay-shop" aria-label="支付宝">
+            <img src="assets/payment/qr-alipay-shop.png" alt="支付宝收款码" width="160" height="220" loading="lazy">
+            <span class="pay-qr-label">支付宝</span>
+          </button>
+          <button type="button" class="pay-qr-card" data-pay-channel="alipay-scan" aria-label="支付宝扫一扫">
+            <img src="assets/payment/qr-alipay-scan.png" alt="支付宝扫一扫" width="160" height="220" loading="lazy">
+            <span class="pay-qr-label">支付宝 · 扫一扫</span>
+          </button>
+          <button type="button" class="pay-qr-card" data-pay-channel="unionpay" aria-label="云闪付工商银行">
+            <img src="assets/payment/qr-unionpay-icbc.png" alt="云闪付工商银行收款码" width="160" height="220" loading="lazy">
+            <span class="pay-qr-label">云闪付 / 工商银行</span>
+          </button>
+        </div>
+      </div>
+
+      <details class="pay-bank-details">
+        <summary class="pay-bank-summary">或 对公银行汇款</summary>
       <div id="bank-info"></div>
       <p class="modal-hint payment-legal">收款方：我心永恒（北京）网络科技有限公司。汇款后请提交信息，我司核对工商银行到账记录无误后开通会员，不开通自动退款请联系客服。</p>
       <form id="payment-form">
@@ -126,15 +153,42 @@
           <button type="submit" class="btn btn-primary">我已汇款，提交核实</button>
         </div>
       </form>
+      </details>
+    </div>
+  </div>
+
+  <div id="pay-qr-viewer" class="modal pay-qr-viewer" aria-hidden="true">
+    <div class="modal-backdrop" data-close-pay-qr></div>
+    <div class="modal-box pay-qr-viewer-box">
+      <h3 id="pay-qr-viewer-title">扫码支付</h3>
+      <p class="pay-qr-viewer-amount">应付金额：<strong id="pay-qr-viewer-price">¥288</strong></p>
+      <p class="modal-hint">设备编号（建议写入备注）：<code id="pay-qr-viewer-client"></code>
+        <button type="button" class="btn-copy" id="btn-copy-pay-client">复制</button>
+      </p>
+      <div class="pay-qr-viewer-img-wrap">
+        <img id="pay-qr-viewer-img" src="" alt="收款二维码">
+      </div>
+      <p id="pay-qr-viewer-tip" class="modal-hint pay-qr-viewer-tip"></p>
+      <div class="modal-actions pay-qr-viewer-actions">
+        <button type="button" class="btn btn-secondary" data-close-pay-qr>关闭</button>
+        <button type="button" class="btn btn-secondary" id="btn-copy-pay-amount">复制金额</button>
+        <button type="button" class="btn btn-primary" id="btn-pay-done">我已完成支付</button>
+      </div>
     </div>
   </div>
 
   <footer class="site-footer">
     <p class="footer-line">
-      <span>域名 qtvq.cn · Q Thought, Voice, Question</span>
+      <span>域名 qtvq.cn · Q Thought, Voice, Question · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>qtvq@qtvq.cn</a></span>
       <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
     </p>
-    <p><a href="pitfalls.html">避坑大全</a> · <a href="profile.html">我的缘值</a> · 不存储真实姓名/联系方式</p>
+    <p class="footer-support">
+      <a href="help.html">使用帮助</a>
+      · <a href="privacy.html">隐私说明</a>
+      · <a href="download.html">客户端下载</a>
+      · <a href="pitfalls.html">避坑大全</a>
+      · <a href="profile.html">我的缘值</a>
+    </p>
   </footer>
 
   <script type="module" src="js/layout.js"></script>
