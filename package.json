@@ -30,6 +30,7 @@
     "speech:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-speech-secrets.ps1",
     "build:rag": "node tools/scripts/build-rag-index.js",
     "package:static": "powershell -ExecutionPolicy Bypass -File tools/scripts/package-static.ps1",
+    "upload:static-obs": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-static-obs.ps1",
     "uni:install": "cd apps/qtvq-uni && npm install",
     "uni:dev:h5": "cd apps/qtvq-uni && npm run dev:h5",
     "uni:dev:mp-weixin": "cd apps/qtvq-uni && npm run dev:mp-weixin",
