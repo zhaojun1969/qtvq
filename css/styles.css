@@ -1316,6 +1316,39 @@ a.feature-card-link:focus-visible {
   margin-bottom: 0.65rem;
 }
 
+.pay-online-section {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 107, 129, 0.35);
+  background: rgba(255, 107, 129, 0.08);
+}
+
+.btn-wechat-online {
+  width: 100%;
+}
+
+.pay-online-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+}
+
+.pay-qr-viewer-order {
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+.pay-qr-viewer-status {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--pink-light);
+  margin: 0.35rem 0 0;
+}
+
+.pay-qr-viewer-status.is-paid {
+  color: #7bed9f;
+}
+
 .pay-qr-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

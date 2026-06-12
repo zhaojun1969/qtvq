@@ -146,7 +146,7 @@ function renderSubscription() {
     const p = user.paymentPending;
     el.textContent = `已提交 ${p.planLabel || PLANS[p.plan]?.label || ''} 汇款核实（¥${p.amount}）。核对工行到账后将解禁，设备编号：${p.clientId || '见会员弹窗'}`;
   } else {
-    el.textContent = `${formatQuotaStatusText(user)}。超出后可办理月卡 ¥288 / 季卡 ¥788 / 年卡 ¥2888。`;
+    el.textContent = `${formatQuotaStatusText(user)}。超出后可办理月卡 ¥28 / 季卡 ¥78 / 年卡 ¥288。`;
   }
 }
 

@@ -27,6 +27,9 @@ sudo rsync -av --delete \
   --exclude='obs.env' \
   "$ROOT/" "$DEST/"
 
+echo ">> 域名校验文件 -> 网站根目录"
+bash "$ROOT/tools/scripts/copy-verify-root.sh" "$DEST"
+
 sudo chown -R www-data:www-data "$DEST"
 sudo find "$DEST" -type d -exec chmod 755 {} \;
 sudo find "$DEST" -type f -exec chmod 644 {} \;

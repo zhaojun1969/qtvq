@@ -67,11 +67,27 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID" \
 
 ## 4. 部署
 
+**Windows（推荐，读取 `cf.env`）：**
+
+```powershell
+cd d:\qtvq
+copy cf.env.example cf.env
+# 编辑 cf.env 填入 CLOUDFLARE_API_TOKEN
+npm run deploy:api-only    # 仅 API
+npm run deploy:all         # API + 静态（需 SSH）
+```
+
+**Ubuntu：**
+
 ```bash
 cd /opt/qtvq
+export CLOUDFLARE_API_TOKEN="粘贴新Token"
+export CLOUDFLARE_ACCOUNT_ID="bb7eb342a5cfde7c0a84cd9bd519a859"
 npm install
 npm run deploy
 ```
+
+> 勿在 `wrangler.toml` 写 `account_id`（Pages 不支持）。Account ID 放 `cf.env` 或环境变量即可。
 
 ---
 

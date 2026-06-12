@@ -11,9 +11,9 @@ export const COMPANY = {
 };
 
 export const PLANS = {
-  month: { id: 'month', label: '月卡', price: 288, days: 30 },
-  quarter: { id: 'quarter', label: '季卡', price: 788, days: 90 },
-  year: { id: 'year', label: '年卡', price: 2888, days: 365 },
+  month: { id: 'month', label: '月卡', price: 28, days: 30 },
+  quarter: { id: 'quarter', label: '季卡', price: 78, days: 90 },
+  year: { id: 'year', label: '年卡', price: 288, days: 365 },
 };
 
 const CLIENT_KEY = 'qtvq_client_id';

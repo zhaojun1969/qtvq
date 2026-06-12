@@ -8,9 +8,9 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const KV_PREFIX = 'client:';
 
 const PLANS = {
-  month: { label: '月卡', price: 288, days: 30 },
-  quarter: { label: '季卡', price: 788, days: 90 },
-  year: { label: '年卡', price: 2888, days: 365 },
+  month: { label: '月卡', price: 28, days: 30 },
+  quarter: { label: '季卡', price: 78, days: 90 },
+  year: { label: '年卡', price: 288, days: 365 },
 };
 
 const memory = new Map();
@@ -50,6 +50,12 @@ async function saveRecord(env, clientId, rec) {
     await kv.put(kvKey(clientId), JSON.stringify(rec));
   } else {
     memory.set(clientId, rec);
+  }
+  try {
+    const { backupClientRecord } = await import('./oss-backup.js');
+    await backupClientRecord(env, clientId, rec);
+  } catch {
+    /* OSS 未配置时不阻塞主流程 */
   }
 }
 

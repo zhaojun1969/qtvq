@@ -27,13 +27,14 @@
   },
   "quickapp": {},
   "mp-weixin": {
-    "appid": "",
+    "appid": "wx489fbca28401e4e0",
     "setting": {
       "urlCheck": true,
       "es6": true,
       "minified": true
     },
     "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents",
     "permission": {
       "scope.record": {
         "desc": "用于语音输入提问"
@@ -41,7 +42,9 @@
     }
   },
   "mp-alipay": {
-    "usingComponents": true
+    "appid": "",
+    "usingComponents": true,
+    "component2": true
   },
   "mp-toutiao": {
     "usingComponents": true

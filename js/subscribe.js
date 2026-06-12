@@ -1,14 +1,49 @@
 import { PLANS, COMPANY, getClientId } from './quota.js';
-import { submitPaymentRequest, showToast, syncQuotaFromServer } from './app.js';
+import { submitPaymentRequest, showToast, syncQuotaFromServer, applyServerSubscription } from './app.js';
 import { PAY_CHANNELS, detectPayEnv } from './pay-qr.js';
+import { createWechatPayOrder, pollWechatPayOrder } from './payment-wechat.js';
+import { qrCodeImageUrl } from './qr-render.js';
 
 let selectedPlan = 'month';
+let stopOrderPoll = null;
 
 function getSelectedPrice() {
-  return PLANS[selectedPlan]?.price ?? 288;
+  return PLANS[selectedPlan]?.price ?? 28;
+}
+
+function setViewerMeta({ title, price, clientId, tip, orderText, statusText, statusPaid }) {
+  document.getElementById('pay-qr-viewer-title').textContent = title;
+  document.getElementById('pay-qr-viewer-price').textContent = `¥${price}`;
+  document.getElementById('pay-qr-viewer-client').textContent = clientId;
+  document.getElementById('pay-qr-viewer-tip').textContent = tip || '';
+
+  const orderEl = document.getElementById('pay-qr-viewer-order');
+  if (orderEl) {
+    if (orderText) {
+      orderEl.textContent = orderText;
+      orderEl.hidden = false;
+    } else {
+      orderEl.textContent = '';
+      orderEl.hidden = true;
+    }
+  }
+
+  const statusEl = document.getElementById('pay-qr-viewer-status');
+  if (statusEl) {
+    if (statusText) {
+      statusEl.textContent = statusText;
+      statusEl.hidden = false;
+      statusEl.classList.toggle('is-paid', !!statusPaid);
+    } else {
+      statusEl.textContent = '';
+      statusEl.hidden = true;
+      statusEl.classList.remove('is-paid');
+    }
+  }
 }
 
 function openPayQrViewer(channelId) {
+  stopOnlinePoll();
   const ch = PAY_CHANNELS[channelId];
   if (!ch) return;
 
@@ -16,19 +51,23 @@ function openPayQrViewer(channelId) {
   const price = getSelectedPrice();
   const clientId = getClientId();
 
-  document.getElementById('pay-qr-viewer-title').textContent = `${ch.label} · 扫码付款`;
-  document.getElementById('pay-qr-viewer-price').textContent = `¥${price}`;
-  document.getElementById('pay-qr-viewer-client').textContent = clientId;
+  setViewerMeta({
+    title: `${ch.label} · 扫码付款`,
+    price,
+    clientId,
+    tip: ch.tip,
+  });
+
   const img = document.getElementById('pay-qr-viewer-img');
   img.src = ch.image;
   img.alt = `${ch.label}收款码`;
-  document.getElementById('pay-qr-viewer-tip').textContent = ch.tip;
+  img.hidden = false;
 
   viewer?.classList.add('open');
   viewer?.setAttribute('aria-hidden', 'false');
 
   const env = detectPayEnv();
-  if (ch.openApp && (env.alipay && channelId.startsWith('alipay'))) {
+  if (ch.openApp && env.alipay && channelId.startsWith('alipay')) {
     setTimeout(() => {
       try {
         window.location.href = ch.openApp;
@@ -39,7 +78,134 @@ function openPayQrViewer(channelId) {
   }
 }
 
+function stopOnlinePoll() {
+  if (stopOrderPoll) {
+    stopOrderPoll();
+    stopOrderPoll = null;
+  }
+}
+
+function openDynamicPayViewer({ codeUrl, orderId, jsapi, stub, message }) {
+  stopOnlinePoll();
+  const viewer = document.getElementById('pay-qr-viewer');
+  const price = getSelectedPrice();
+  const clientId = getClientId();
+  const img = document.getElementById('pay-qr-viewer-img');
+
+  if (stub || !codeUrl) {
+    setViewerMeta({
+      title: '微信在线支付 · 暂未开通',
+      price,
+      clientId,
+      tip: message || '商户 API 未配置，请使用下方静态收款码或银行汇款。',
+      orderText: orderId ? `订单号：${orderId}（stub）` : '',
+    });
+    img.hidden = true;
+    img.src = '';
+    viewer?.classList.add('open');
+    viewer?.setAttribute('aria-hidden', 'false');
+    return;
+  }
+
+  setViewerMeta({
+    title: '微信在线支付 · 扫码付款',
+    price,
+    clientId,
+    tip: '请用微信扫一扫下方二维码；支付成功后本页将自动刷新会员状态。',
+    orderText: `订单号：${orderId}`,
+    statusText: '等待支付中…',
+  });
+
+  img.src = qrCodeImageUrl(codeUrl, 280);
+  img.alt = '微信支付订单二维码';
+  img.hidden = false;
+
+  viewer?.classList.add('open');
+  viewer?.setAttribute('aria-hidden', 'false');
+
+  if (jsapi && detectPayEnv().wechat) {
+    invokeWechatJsapi(jsapi).then(() => {
+      setViewerMeta({
+        title: '微信在线支付',
+        price,
+        clientId,
+        tip: '请在微信内完成支付。',
+        orderText: `订单号：${orderId}`,
+        statusText: '支付处理中…',
+      });
+    }).catch(() => {
+      /* 用户取消或失败，继续展示二维码 */
+    });
+  }
+
+  stopOrderPoll = pollWechatPayOrder(orderId, {
+    onPaid: (data) => {
+      if (data.quota?.subscription) {
+        applyServerSubscription(data.quota.subscription, data.quota.paymentPending);
+      }
+      setViewerMeta({
+        title: '支付成功',
+        price,
+        clientId,
+        tip: '会员已开通，可关闭窗口继续提问。',
+        orderText: `订单号：${orderId}`,
+        statusText: '✓ 支付成功，会员已开通',
+        statusPaid: true,
+      });
+      showToast('会员已开通');
+      syncQuotaFromServer();
+    },
+    onError: () => {
+      /* 轮询偶发失败忽略 */
+    },
+  });
+}
+
+function invokeWechatJsapi(jsapi) {
+  return new Promise((resolve, reject) => {
+    const params = {
+      appId: jsapi.appId,
+      timeStamp: jsapi.timeStamp,
+      nonceStr: jsapi.nonceStr,
+      package: jsapi.package,
+      signType: jsapi.signType || 'RSA',
+      paySign: jsapi.paySign,
+    };
+    const onBridgeReady = () => {
+      window.WeixinJSBridge.invoke('getBrandWCPayRequest', params, (res) => {
+        if (res.err_msg === 'get_brand_wcpay_request:ok') resolve(res);
+        else reject(new Error(res.err_msg || '支付未完成'));
+      });
+    };
+    if (typeof window.WeixinJSBridge === 'undefined') {
+      document.addEventListener('WeixinJSBridgeReady', onBridgeReady, { once: true });
+    } else {
+      onBridgeReady();
+    }
+  });
+}
+
+async function startWechatOnlinePay() {
+  const btn = document.getElementById('btn-wechat-online-pay');
+  if (btn) btn.disabled = true;
+  try {
+    const channel = detectPayEnv().wechat ? 'jsapi' : 'native';
+    const data = await createWechatPayOrder(selectedPlan, channel);
+    if (data.stub && !data.codeUrl && !data.jsapi) {
+      showToast(data.message || '在线支付尚未配置，请用静态收款码');
+      openDynamicPayViewer(data);
+      return;
+    }
+    openDynamicPayViewer(data);
+  } catch (e) {
+    showToast(e.message || '创建订单失败');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function closePayQrViewer() {
+  stopOnlinePoll();
   const viewer = document.getElementById('pay-qr-viewer');
   viewer?.classList.remove('open');
   viewer?.setAttribute('aria-hidden', 'true');
@@ -59,6 +225,8 @@ function initPayQrGrid() {
     if (!card) return;
     openPayQrViewer(card.dataset.payChannel);
   });
+
+  document.getElementById('btn-wechat-online-pay')?.addEventListener('click', startWechatOnlinePay);
 
   document.querySelectorAll('[data-close-pay-qr]').forEach((el) => {
     el.addEventListener('click', closePayQrViewer);
@@ -119,6 +287,7 @@ export function openSubscribeModal() {
 }
 
 export function closeSubscribeModal() {
+  stopOnlinePoll();
   document.getElementById('subscribe-modal')?.classList.remove('open');
 }
 

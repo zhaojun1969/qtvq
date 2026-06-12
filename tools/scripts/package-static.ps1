@@ -18,12 +18,14 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 $items = @(
     "index.html", "pitfalls.html", "profile.html", "help.html", "privacy.html", "download.html", "404.html",
-    "css", "js", "assets",
+    "css", "js", "assets", "logo",
     "robots.txt", "sitemap.xml", "_headers", "_redirects"
 )
 foreach ($item in $items) {
     if (Test-Path $item) { Copy-Item $item (Join-Path $stage $item) -Recurse -Force }
 }
+
+& (Join-Path $PSScriptRoot "copy-verify-root.ps1") -Stage $stage -Root $Root
 
 $required = @(
     "js/layout.js", "js/contact.js", "js/toast.js", "js/home.js", "js/voice-asr.js",

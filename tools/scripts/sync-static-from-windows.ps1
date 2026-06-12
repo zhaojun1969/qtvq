@@ -36,6 +36,8 @@ foreach ($item in $items) {
     if (Test-Path $item) { Copy-Item $item (Join-Path $stage $item) -Recurse -Force }
 }
 
+& (Join-Path $PSScriptRoot "copy-verify-root.ps1") -Stage $stage -Root $Root
+
 $tar = Join-Path $env:TEMP "qtvq-static.tgz"
 if (Test-Path $tar) { Remove-Item $tar -Force }
 & tar -czf $tar -C $stage .

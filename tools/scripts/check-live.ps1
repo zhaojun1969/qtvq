@@ -38,10 +38,10 @@ Write-Host "=== QTVQ live check (local HEAD: $localSha) ===" -ForegroundColor Cy
 $all = $true
 $all = (Test-Url "web home" "$Web/" 200 ".") -and $all
 $all = (Test-Url "web config.js" "$Web/js/config.js" 200 "qtvq-api") -and $all
-$all = (Test-Url "web app apiUrl" "$Web/js/app.js" 200 "apiUrl") -and $all
+$all = (Test-Url "web app apiFetch" "$Web/js/app.js" 200 "apiFetch") -and $all
 $all = (Test-Url "web contact.js" "$Web/js/contact.js" 200 "initContactModal") -and $all
 $all = (Test-Url "web index footer" "$Web/index.html" 200 "footer-support") -and $all
-$all = (Test-Url "web download" "$Web/download.html" 200 "客户端") -and $all
+$all = (Test-Url "web download" "$Web/download.html" 200 "download-config") -and $all
 $all = (Test-Url "api payment" "$Api/api/payment" 200 "company") -and $all
 $all = (Test-Url "api quota GET" "$Api/api/quota?clientId=check_live" 200 "remaining") -and $all
 $all = (Test-Url "api health" "$Api/api/health" 200 "qtvq-api") -and $all
@@ -49,17 +49,17 @@ $all = (Test-PostQuotaBody) -and $all
 
 try {
     $ver = Invoke-WebRequest "$Web/js/version.js" -UseBasicParsing -TimeoutSec 15
-    if ($ver.Content -match "BUILD_SHA\s*=\s*'([^']+)'") {
+    if ($ver.Content -match 'BUILD_SHA\s*=\s*''([a-f0-9]+)''') {
         $remoteSha = $Matches[1]
         $match = ($remoteSha -eq $localSha)
-        Write-Host ("[static version] remote=$remoteSha local=$localSha " + $(if ($match) { "MATCH" } else { "OUT OF DATE" })) -ForegroundColor $(if ($match) { "Green" } else { "Yellow" })
+        Write-Host ('[static version] remote=' + $remoteSha + ' local=' + $localSha + ' ' + $(if ($match) { 'MATCH' } else { 'OUT OF DATE' })) -ForegroundColor $(if ($match) { 'Green' } else { 'Yellow' })
         if (-not $match) { $all = $false }
     } else {
-        Write-Host "[static version] no version.js on CDN - run sync:static" -ForegroundColor Yellow
+        Write-Host '[static version] no version.js on CDN - run sync:static' -ForegroundColor Yellow
         $all = $false
     }
 } catch {
-    Write-Host "[static version] no version.js on CDN - run sync:static" -ForegroundColor Yellow
+    Write-Host '[static version] no version.js on CDN - run sync:static' -ForegroundColor Yellow
     $all = $false
 }
 

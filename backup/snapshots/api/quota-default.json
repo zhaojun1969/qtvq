@@ -1,0 +1,16 @@
+{
+  "unlimited": false,
+  "used": 0,
+  "remaining": 5,
+  "limit": 5,
+  "resetAt": null,
+  "subscription": null,
+  "paymentPending": null,
+  "plans": {
+    "month": { "label": "月卡", "price": 28, "days": 30 },
+    "quarter": { "label": "季卡", "price": 78, "days": 90 },
+    "year": { "label": "年卡", "price": 288, "days": 365 }
+  },
+  "storage": "oss-backup",
+  "source": "oss-backup"
+}

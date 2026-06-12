@@ -21,23 +21,29 @@
     "github:publish": "powershell -ExecutionPolicy Bypass -File tools/scripts/publish-github.ps1",
     "context:build": "powershell -ExecutionPolicy Bypass -File tools/scripts/build-context-bundle.ps1",
     "context:upload": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-obs.ps1",
-    "sync:obs": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-obs.ps1",
+    "sync:obs": "powershell -ExecutionPolicy Bypass -File tools/scripts/sync-obs.ps1",
     "backup:publish": "python tools/scripts/publish-backup-snapshots.py",
     "sync:obsidian": "powershell -ExecutionPolicy Bypass -File tools/scripts/sync-obsidian.ps1",
     "git:push-all": "powershell -ExecutionPolicy Bypass -File tools/scripts/push-all.ps1",
     "check:live": "powershell -ExecutionPolicy Bypass -File tools/scripts/check-live.ps1",
     "mail:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-mail-secrets.ps1",
+    "wechat:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-wechat-secrets.ps1",
     "speech:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-speech-secrets.ps1",
     "build:rag": "node tools/scripts/build-rag-index.js",
+    "logo:export": "node tools/scripts/export-logo-png.js",
     "package:static": "powershell -ExecutionPolicy Bypass -File tools/scripts/package-static.ps1",
     "upload:static-obs": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-static-obs.ps1",
     "uni:install": "cd apps/qtvq-uni && npm install",
     "uni:dev:h5": "cd apps/qtvq-uni && npm run dev:h5",
     "uni:dev:mp-weixin": "cd apps/qtvq-uni && npm run dev:mp-weixin",
+    "uni:dev:mp-alipay": "cd apps/qtvq-uni && npm run dev:mp-alipay",
+    "uni:build:weixin": "cd apps/qtvq-uni && npm run build:mp-weixin",
+    "uni:build:alipay": "cd apps/qtvq-uni && npm run build:mp-alipay",
     "kv:create": "npx wrangler kv namespace create QTVQ_KV && npx wrangler kv namespace create QTVQ_KV --preview",
     "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "wrangler": "^4.96.0"
   }
 }

@@ -1,0 +1,7 @@
+{
+  "project": "qtvq-api",
+  "source": "oss-backup",
+  "aiBound": false,
+  "kvBound": true,
+  "hint": "Cloudflare 不可用时的备份健康检查"
+}

@@ -1,19 +1,21 @@
 /**
- * Cloudflare Pages Function — Q智慧问答
- * 部署后绑定 Workers AI，模型推荐 @cf/meta/llama-3-8b-instruct
+ * Cloudflare Pages Function — Q智慧问答 + RAG 避坑检索
  */
 
 import { canAsk, recordAsk, getQuota } from '../lib/quota-store.js';
 import { corsPreflight, jsonResponse } from '../lib/http.js';
+import { retrievePitfalls, isRagReady } from '../lib/rag.js';
+
 const SYSTEM_PROMPT = `你是「我心永恒-Q问」的情感智慧顾问。你的风格是「避坑+直线解决」：
 - 不说鸡汤，不给模糊安慰
 - 用3步以内给出可执行的行动方案
 - 指出常见陷阱与代价
 - 保护隐私，不索要真实姓名/联系方式
-- 回答简洁有力，中文回复`;
+- 回答简洁有力，中文回复
+- 若提供了【检索到的相关避坑案例】，必须优先参考案例中的直线方案，可点名相关陷阱`;
 
-const KNOWLEDGE = `
-避坑知识库摘要：
+const KNOWLEDGE_FALLBACK = `
+避坑知识库摘要（兜底）：
 - 网恋：未见面不转账、不投资、要视频验证、防杀猪盘
 - 暧昧：3个月期限、直接确认关系、防备胎与养鱼
 - 冷暴力：发底线沟通、到期止损、不反复道歉
@@ -21,22 +23,29 @@ const KNOWLEDGE = `
 - 出轨：明确边界、原谅需行动、二次出轨离开
 `;
 
-function buildSystemPrompt(message) {
+function buildSystemPrompt(message, ragContext) {
   let extra = '';
   if (/借钱|转账|投资/.test(message)) extra = '重点：网恋金钱陷阱，绝不转账。';
   else if (/暧昧|备胎/.test(message)) extra = '重点：暧昧期限与确认关系。';
   else if (/冷暴力|已读不回/.test(message)) extra = '重点：底线沟通与止损。';
   else if (/彩礼|见家长|结婚/.test(message)) extra = '重点：婚恋家庭边界与书面约定。';
   else if (/出轨/.test(message)) extra = '重点：边界与行动，非口头道歉。';
-  return SYSTEM_PROMPT + KNOWLEDGE + (extra ? '\n' + extra : '');
+
+  const knowledge = ragContext
+    ? `\n\n【检索到的相关避坑案例】\n${ragContext}\n\n请结合以上真实案例回答，必要时引用案例标题。`
+    : KNOWLEDGE_FALLBACK;
+
+  return SYSTEM_PROMPT + knowledge + (extra ? '\n' + extra : '');
 }
 
 const AI_MODELS = [
+  '@cf/zai-org/glm-4.7-flash',
+  '@cf/qwen/qwen3-30b-a3b-fp8',
   '@cf/meta/llama-3.1-8b-instruct',
   '@cf/meta/llama-3-8b-instruct',
 ];
 
-async function runAI(env, message, userContent) {
+async function runAI(env, systemContent, userContent) {
   if (!env.AI) return { reply: null, reason: 'AI_NOT_BOUND' };
 
   let lastError = null;
@@ -44,7 +53,7 @@ async function runAI(env, message, userContent) {
     try {
       const response = await env.AI.run(model, {
         messages: [
-          { role: 'system', content: buildSystemPrompt(message) },
+          { role: 'system', content: systemContent },
           { role: 'user', content: userContent },
         ],
         max_tokens: 512,
@@ -52,6 +61,7 @@ async function runAI(env, message, userContent) {
       const reply =
         response?.response ||
         response?.result?.response ||
+        response?.choices?.[0]?.message?.content ||
         (typeof response === 'string' ? response : null);
       if (reply) return { reply, model };
     } catch (err) {
@@ -75,7 +85,6 @@ export async function onRequestOptions(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // 简易速率限制（生产环境建议用 KV）
   const ip = request.headers.get('CF-Connecting-IP') || 'local';
   if (!checkRate(ip)) {
     return jsonResponse(request, { error: '请求过于频繁，请稍后再试' }, 429);
@@ -121,7 +130,9 @@ export async function onRequestPost(context) {
     : message.trim();
 
   try {
-    const ai = await runAI(env, message, userContent);
+    const rag = await retrievePitfalls(env, message.trim());
+    const systemContent = buildSystemPrompt(message, rag.context);
+    const ai = await runAI(env, systemContent, userContent);
     let reply = ai.reply;
     let fallback = false;
     let fallbackReason = null;
@@ -140,6 +151,11 @@ export async function onRequestPost(context) {
       wisdom: fallback ? 1 : Math.min(5, Math.floor(message.length / 50) + 1),
       followUpHint: '点击「再问一步」获取更具体的行动措辞',
       quota: await getQuota(env, cid),
+      rag: {
+        ready: isRagReady(),
+        method: rag.method,
+        hits: rag.hits?.map((h) => ({ id: h.id, title: h.title, category: h.category })) || [],
+      },
       ...(fallback ? { fallback: true, fallbackReason, aiError: ai.error || null } : {}),
     });
   } catch (err) {

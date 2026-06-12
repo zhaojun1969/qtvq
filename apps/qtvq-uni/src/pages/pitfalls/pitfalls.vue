@@ -16,7 +16,8 @@
       <view class="modal-box card" @click.stop>
         <text class="modal-title">{{ detail.title }}</text>
         <text class="modal-body">{{ detailSteps }}</text>
-        <button class="btn-primary" @click="detail = null">知道了</button>
+        <button class="btn-primary" @click="askAbout(detail)">用 Q问 咨询此坑</button>
+        <button class="btn-secondary modal-close" @click="detail = null">知道了</button>
       </view>
     </view>
   </view>
@@ -41,6 +42,19 @@ const STEPS = {
 function openDetail(item) {
   detail.value = item;
   detailSteps.value = STEPS[item.id] || '详见 Web 版避坑大全完整内容。';
+}
+
+function askAbout(item) {
+  const prompts = {
+    1: '网恋没见面就借钱该借吗？',
+    2: '暧昧半年不确认关系怎么办？',
+    3: '对方冷暴力已读不回怎么办？',
+    4: '彩礼大额支付前要注意什么？',
+    5: '发现出轨后只有道歉没有行动怎么办？',
+  };
+  const q = prompts[item.id] || item.title;
+  uni.setStorageSync('qtvq_prefill', q);
+  uni.switchTab({ url: '/pages/index/index' });
 }
 </script>
 
@@ -125,5 +139,10 @@ function openDetail(item) {
   line-height: 1.6;
   margin-bottom: 24rpx;
   color: #f5f5f7;
+}
+
+.modal-close {
+  margin-top: 16rpx;
+  width: 100%;
 }
 </style>

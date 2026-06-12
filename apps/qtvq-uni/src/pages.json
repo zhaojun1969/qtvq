@@ -23,6 +23,30 @@
         "navigationBarBackgroundColor": "#0f0e17",
         "navigationBarTextStyle": "white"
       }
+    },
+    {
+      "path": "pages/subscribe/subscribe",
+      "style": {
+        "navigationBarTitleText": "办理会员",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/contact/contact",
+      "style": {
+        "navigationBarTitleText": "联系客服",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/webview/webview",
+      "style": {
+        "navigationBarTitleText": "详情",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
     }
   ],
   "globalStyle": {

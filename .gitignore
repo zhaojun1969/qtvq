@@ -16,4 +16,7 @@ Thumbs.db
 .vscode/
 .tools/
 dist/
+cf.env
 obs.env
+js/version.js
+obsidian/

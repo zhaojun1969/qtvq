@@ -2,6 +2,7 @@ import { corsPreflight, jsonResponse } from '../lib/http.js';
 import { isMailConfigured } from '../lib/mail.js';
 import { isRagReady } from '../lib/rag.js';
 import { isNlsConfigured } from '../lib/aliyun-nls.js';
+import { getWechatPayConfig, isWechatPayConfigured } from '../lib/wechat-pay.js';
 
 const PROBE_MODELS = [
   '@cf/zai-org/glm-4.7-flash',
@@ -20,6 +21,8 @@ export async function onRequest(context) {
     mailConfigured: isMailConfigured(env),
     ragReady: isRagReady(),
     speechConfigured: isNlsConfigured(env),
+    wechatPayConfigured: isWechatPayConfigured(env),
+    wechatMchId: getWechatPayConfig(env).mchId || null,
     aiProbe: null,
     aiError: null,
     hint: null,

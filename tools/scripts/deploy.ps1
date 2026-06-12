@@ -10,10 +10,26 @@ $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root
 
+. (Join-Path $PSScriptRoot "load-cf-env.ps1") | Out-Null
+if (-not $env:CLOUDFLARE_ACCOUNT_ID) {
+    $env:CLOUDFLARE_ACCOUNT_ID = "bb7eb342a5cfde7c0a84cd9bd519a859"
+}
+
 function Test-WranglerAuth {
-    $out = & npx wrangler whoami 2>&1 | Out-String
     if ($env:CLOUDFLARE_API_TOKEN) { return $true }
-    return ($out -notmatch 'not authenticated')
+    $null = & npx wrangler whoami 2>&1 | Out-String
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Invoke-Wrangler {
+    param([string[]]$Args)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $out = & npx @Args 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { Write-Host $out; throw "wrangler failed (exit $code)" }
+    return $out
 }
 
 Write-Host "=== QTVQ Pages Deploy ===" -ForegroundColor Cyan
@@ -39,15 +55,12 @@ if (-not (Test-Path ".dev.vars")) {
 }
 
 Write-Host ">> Deploying to Cloudflare Pages ($ProjectName) ..."
-$deployOut = & npx wrangler pages deploy . --project-name=$ProjectName 2>&1 | Out-String
-Write-Host $deployOut
-if ($LASTEXITCODE -ne 0 -and $deployOut -match 'Project not found|8000007') {
-    Write-Host ">> Creating Pages project $ProjectName ..."
-    & npx wrangler pages project create $ProjectName --production-branch=main
-    $deployOut = & npx wrangler pages deploy . --project-name=$ProjectName 2>&1 | Out-String
-    Write-Host $deployOut
-}
-if ($LASTEXITCODE -ne 0) { throw "Deploy failed." }
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& npx wrangler pages deploy . --project-name=$ProjectName --commit-dirty=true
+$code = $LASTEXITCODE
+$ErrorActionPreference = $prev
+if ($code -ne 0) { throw "Deploy failed (exit $code)" }
 
 Write-Host ""
 Write-Host "Deploy OK. Verify in Dashboard:" -ForegroundColor Green

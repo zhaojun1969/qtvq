@@ -110,15 +110,20 @@
       <h3>办理 Q问 会员 · 不限次数提问</h3>
       <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后可<strong>扫码支付</strong>或银行汇款，核实到账后解禁。</p>
       <div class="plan-grid">
-        <button type="button" class="plan-card plan-selected" data-plan="month">月卡<br><strong>¥288</strong></button>
-        <button type="button" class="plan-card" data-plan="quarter">季卡<br><strong>¥788</strong></button>
-        <button type="button" class="plan-card" data-plan="year">年卡<br><strong>¥2888</strong></button>
+        <button type="button" class="plan-card plan-selected" data-plan="month">月卡<br><strong>¥28</strong></button>
+        <button type="button" class="plan-card" data-plan="quarter">季卡<br><strong>¥78</strong></button>
+        <button type="button" class="plan-card" data-plan="year">年卡<br><strong>¥288</strong></button>
       </div>
-      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥288</span> · 扫码时请按此金额支付</p>
+      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥28</span> · 扫码时请按此金额支付</p>
+
+      <div class="pay-online-section">
+        <button type="button" id="btn-wechat-online-pay" class="btn btn-primary btn-wechat-online">微信在线支付（自动到账）</button>
+        <p class="modal-hint pay-online-hint">PC 推荐：生成专属订单二维码，支付成功后自动开通会员，无需人工核实。</p>
+      </div>
 
       <div class="pay-section">
-        <h4 class="pay-section-title">扫码支付 · 点击二维码放大</h4>
-        <p class="modal-hint pay-section-hint">先选套餐，再点下方收款码，用对应 App 扫一扫完成付款；备注请填设备编号（弹窗内可复制）。</p>
+        <h4 class="pay-section-title">静态收款码 · 点击放大</h4>
+        <p class="modal-hint pay-section-hint">或使用下方收款码手动扫码；需手填金额与设备编号，并提交核实。</p>
         <div class="pay-qr-grid" id="pay-qr-grid">
           <button type="button" class="pay-qr-card" data-pay-channel="wechat" aria-label="微信支付">
             <img src="assets/payment/qr-wechat.png" alt="微信支付收款码" width="160" height="220" loading="lazy">
@@ -161,13 +166,15 @@
     <div class="modal-backdrop" data-close-pay-qr></div>
     <div class="modal-box pay-qr-viewer-box">
       <h3 id="pay-qr-viewer-title">扫码支付</h3>
-      <p class="pay-qr-viewer-amount">应付金额：<strong id="pay-qr-viewer-price">¥288</strong></p>
+      <p class="pay-qr-viewer-amount">应付金额：<strong id="pay-qr-viewer-price">¥28</strong></p>
       <p class="modal-hint">设备编号（建议写入备注）：<code id="pay-qr-viewer-client"></code>
         <button type="button" class="btn-copy" id="btn-copy-pay-client">复制</button>
       </p>
       <div class="pay-qr-viewer-img-wrap">
         <img id="pay-qr-viewer-img" src="" alt="收款二维码">
       </div>
+      <p id="pay-qr-viewer-order" class="modal-hint pay-qr-viewer-order" hidden></p>
+      <p id="pay-qr-viewer-status" class="pay-qr-viewer-status" hidden></p>
       <p id="pay-qr-viewer-tip" class="modal-hint pay-qr-viewer-tip"></p>
       <div class="modal-actions pay-qr-viewer-actions">
         <button type="button" class="btn btn-secondary" data-close-pay-qr>关闭</button>

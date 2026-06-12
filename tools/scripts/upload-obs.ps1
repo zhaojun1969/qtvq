@@ -17,7 +17,13 @@ $zip = Get-ChildItem "dist\qtvq-context-*.zip" | Sort-Object LastWriteTime -Desc
 if (-not $zip) { throw "No zip produced" }
 
 Write-Host ">> Upload $($zip.Name) ..."
-python -m pip install esdk-obs-python -q 2>$null
+# pip 会把 notice 写到 stderr；在 Stop 模式下会误触发 NativeCommandError
+$pipCheck = python -m pip show esdk-obs-python 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ">> Install esdk-obs-python ..."
+    $null = python -m pip install esdk-obs-python -q 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "pip install esdk-obs-python failed (exit $LASTEXITCODE)" }
+}
 python (Join-Path $Root "tools\scripts\upload-obs.py") $zip.FullName
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Done. Object in bucket prefix from obs.env (OBS_PREFIX)" -ForegroundColor Green

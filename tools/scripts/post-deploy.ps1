@@ -48,6 +48,17 @@ if (Test-Path ".dev.vars") {
             $nlsVal | & npx wrangler pages secret put NLS_APP_KEY --project-name=$Project
         }
     }
+    $wechatKeys = @('WECHAT_MCH_ID','WECHAT_APP_ID','WECHAT_API_V3_KEY','WECHAT_MCH_SERIAL','WECHAT_MCH_PRIVATE_KEY','WECHAT_PAY_NOTIFY_URL','WECHAT_PLATFORM_PUBLIC_KEY')
+    foreach ($key in $wechatKeys) {
+        $wline = $lines | Where-Object { $_ -match "^${key}=" } | Select-Object -First 1
+        if ($wline -match "^${key}=(.+)$") {
+            $wval = $Matches[1].Trim()
+            if ($wval -and $wval -notmatch '^#|请填写|请替换|xxxxxxxx') {
+                Write-Host ">> Upload $key ..."
+                $wval | & npx wrangler pages secret put $key --project-name=$Project
+            }
+        }
+    }
 } else {
     Write-Host "Skip secrets: no .dev.vars (copy from .dev.vars.example)" -ForegroundColor Yellow
 }
