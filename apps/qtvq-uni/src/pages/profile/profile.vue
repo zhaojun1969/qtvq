@@ -26,6 +26,7 @@
       <text class="section-title">提问额度</text>
       <text class="quota">{{ quotaText }}</text>
       <button class="btn-primary btn-block" @click="goSubscribe">办理会员不限次</button>
+      <button class="btn-secondary btn-block" @click="goAccount">我的账户 · 打款查询</button>
     </view>
 
     <view class="card menu">
@@ -77,6 +78,10 @@ const clientIdShort = computed(() => {
 
 function goSubscribe() {
   uni.navigateTo({ url: '/pages/subscribe/subscribe' });
+}
+
+function goAccount() {
+  uni.navigateTo({ url: '/pages/account/account' });
 }
 
 function openWeb(page) {

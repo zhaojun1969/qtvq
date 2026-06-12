@@ -25,6 +25,14 @@
       }
     },
     {
+      "path": "pages/account/account",
+      "style": {
+        "navigationBarTitleText": "我的账户",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/subscribe/subscribe",
       "style": {
         "navigationBarTitleText": "办理会员",

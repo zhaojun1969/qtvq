@@ -8,15 +8,15 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const KV_PREFIX = 'client:';
 
 const PLANS = {
-  month: { label: '月卡', price: 28, days: 30 },
-  quarter: { label: '季卡', price: 78, days: 90 },
-  year: { label: '年卡', price: 288, days: 365 },
+  month: { label: '月卡', price: 29, days: 30 },
+  quarter: { label: '季卡', price: 79, days: 90 },
+  year: { label: '年卡', price: 299, days: 365 },
 };
 
 const memory = new Map();
 
 function defaultClient() {
-  return { timestamps: [], subscription: null, paymentPending: null };
+  return { timestamps: [], subscription: null, paymentPending: null, paymentHistory: [] };
 }
 
 function getKv(env) {
@@ -77,6 +77,7 @@ function buildQuota(rec, now = Date.now()) {
     resetAt: oldest ? oldest + WINDOW_MS : null,
     subscription: rec.subscription,
     paymentPending: rec.paymentPending,
+    paymentHistory: rec.paymentHistory || [],
     plans: PLANS,
   };
 }
@@ -122,8 +123,10 @@ export async function submitPayment(env, clientId, data) {
     payerName: data.payerName,
     paidAt: data.paidAt,
     remark: data.remark,
+    phone: data.phone || null,
     status: 'pending',
     submittedAt: Date.now(),
+    clientId,
   };
   await saveRecord(env, clientId, rec);
   return rec.paymentPending;
@@ -133,6 +136,15 @@ export async function activatePayment(env, clientId, planId) {
   const plan = PLANS[planId];
   if (!plan || !validClientId(clientId)) return false;
   const rec = await loadRecord(env, clientId);
+  if (rec.paymentPending) {
+    rec.paymentHistory = rec.paymentHistory || [];
+    rec.paymentHistory.unshift({
+      ...rec.paymentPending,
+      status: 'active',
+      activatedAt: Date.now(),
+    });
+    rec.paymentHistory = rec.paymentHistory.slice(0, 20);
+  }
   const base = Math.max(Date.now(), rec.subscription?.activeUntil || 0);
   rec.subscription = {
     plan: planId,

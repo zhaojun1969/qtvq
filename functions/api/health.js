@@ -2,6 +2,8 @@ import { corsPreflight, jsonResponse } from '../lib/http.js';
 import { isMailConfigured } from '../lib/mail.js';
 import { isRagReady } from '../lib/rag.js';
 import { isNlsConfigured } from '../lib/aliyun-nls.js';
+import { isWechatMpLoginConfigured } from '../lib/wechat-mp.js';
+import { isWechatOpenLoginConfigured } from '../lib/wechat-open.js';
 import { getWechatPayConfig, isWechatPayConfigured } from '../lib/wechat-pay.js';
 
 const PROBE_MODELS = [
@@ -22,6 +24,8 @@ export async function onRequest(context) {
     ragReady: isRagReady(),
     speechConfigured: isNlsConfigured(env),
     wechatPayConfigured: isWechatPayConfigured(env),
+    wechatMpLoginConfigured: isWechatMpLoginConfigured(env),
+    wechatOpenLoginConfigured: isWechatOpenLoginConfigured(env),
     wechatMchId: getWechatPayConfig(env).mchId || null,
     aiProbe: null,
     aiError: null,

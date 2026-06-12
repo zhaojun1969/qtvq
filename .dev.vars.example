@@ -34,7 +34,7 @@ SMTP_TO=qtvq@qtvq.cn
 # NLS_APP_KEY=你的NLS_AppKey
 
 # ---- 微信支付 V3（见 docs/PAYMENT-WECHAT-API.md）----
-WECHAT_MCH_ID=1746766627
+WECHAT_MCH_ID=1113936939
 WECHAT_PAY_NOTIFY_URL=https://qtvq-api.pages.dev/api/payment/wechat/notify
 # 以下在 pay.weixin.qq.com → 账户中心 → API 安全 / 产品中心 获取后填写
 # WECHAT_APP_ID=                    # 小程序或公众号 AppID，须与商户号绑定
@@ -42,3 +42,8 @@ WECHAT_PAY_NOTIFY_URL=https://qtvq-api.pages.dev/api/payment/wechat/notify
 # WECHAT_MCH_SERIAL=                  # 商户 API 证书序列号
 # WECHAT_MCH_PRIVATE_KEY=             # 商户私钥 PEM（可单行，\\n 换行）
 # WECHAT_PLATFORM_PUBLIC_KEY=         # 平台公钥（验签回调，生产建议）
+# WECHAT_MINI_APP_SECRET=             # 小程序 AppSecret（微信登录 / 找回密码，微信公众平台 → 开发管理 → 开发设置）
+# ---- 微信开放平台 · 网站应用扫码登录 ----
+# WECHAT_OPEN_APP_ID=wxc4b560055c1978dc   # 开放平台网站应用「Q问」
+# WECHAT_OPEN_APP_SECRET=             # 网站应用 AppSecret
+# WECHAT_OPEN_REDIRECT_URI=https://qtvq.cn/account.html

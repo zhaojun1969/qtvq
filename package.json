@@ -28,6 +28,7 @@
     "check:live": "powershell -ExecutionPolicy Bypass -File tools/scripts/check-live.ps1",
     "mail:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-mail-secrets.ps1",
     "wechat:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-wechat-secrets.ps1",
+    "wechat:test-sign": "node tools/scripts/test-wechat-sign.mjs",
     "speech:secrets": "powershell -ExecutionPolicy Bypass -File tools/scripts/upload-speech-secrets.ps1",
     "build:rag": "node tools/scripts/build-rag-index.js",
     "logo:export": "node tools/scripts/export-logo-png.js",

@@ -8,7 +8,7 @@ let selectedPlan = 'month';
 let stopOrderPoll = null;
 
 function getSelectedPrice() {
-  return PLANS[selectedPlan]?.price ?? 28;
+  return PLANS[selectedPlan]?.price ?? 29;
 }
 
 function setViewerMeta({ title, price, clientId, tip, orderText, statusText, statusPaid }) {
@@ -260,6 +260,25 @@ function renderBankInfo() {
   `;
 }
 
+function renderPlanCards() {
+  const grid = document.getElementById('plan-grid');
+  if (!grid) return;
+  grid.innerHTML = Object.values(PLANS)
+    .map(
+      (p) =>
+        `<button type="button" class="plan-card${p.id === selectedPlan ? ' plan-selected' : ''}" data-plan="${p.id}">${p.label}<br><strong>¥${p.price}</strong></button>`,
+    )
+    .join('');
+  grid.querySelectorAll('[data-plan]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedPlan = btn.dataset.plan;
+      updatePlanUI();
+      const amountInput = document.querySelector('#payment-form input[name="amount"]');
+      if (amountInput) amountInput.value = String(PLANS[selectedPlan].price);
+    });
+  });
+}
+
 function updatePlanUI() {
   document.querySelectorAll('[data-plan]').forEach((btn) => {
     btn.classList.toggle('plan-selected', btn.dataset.plan === selectedPlan);
@@ -275,6 +294,7 @@ export function openSubscribeModal() {
   const modal = document.getElementById('subscribe-modal');
   if (!modal) return;
   renderBankInfo();
+  renderPlanCards();
   const idEl = document.getElementById('pay-client-id');
   if (idEl) idEl.textContent = getClientId();
   const amountInput = document.querySelector('#payment-form input[name="amount"]');
@@ -299,14 +319,7 @@ export function initSubscribeModal() {
     el.addEventListener('click', closeSubscribeModal);
   });
 
-  document.querySelectorAll('[data-plan]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      selectedPlan = btn.dataset.plan;
-      updatePlanUI();
-      const amountInput = document.querySelector('#payment-form input[name="amount"]');
-      if (amountInput) amountInput.value = String(PLANS[selectedPlan].price);
-    });
-  });
+  renderPlanCards();
 
   modal.addEventListener('click', (e) => {
     const copyBtn = e.target.closest('[data-copy]');

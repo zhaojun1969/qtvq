@@ -30,6 +30,20 @@ for f in "$ROOT"/MP_verify*.txt; do
   copied=$((copied + 1))
 done
 
+# 根目录小体积校验 txt（开放平台 / 业务域名，排除 robots.txt）
+for f in "$ROOT"/*.txt; do
+  [ -f "$f" ] || continue
+  base="$(basename "$f")"
+  [ "$base" = "robots.txt" ] && continue
+  size=$(wc -c < "$f" | tr -d ' ')
+  [ "$size" -gt 256 ] && continue
+  if [ ! -f "$DEST/$base" ]; then
+    sudo cp -f "$f" "$DEST/$base"
+    echo ">> verify root: $base"
+    copied=$((copied + 1))
+  fi
+done
+
 if [ "$copied" -eq 0 ]; then
   echo ">> 无校验文件（将 MP_verify*.txt 放入 verify/ 后重试）"
 else

@@ -7,9 +7,9 @@
   "subscription": null,
   "paymentPending": null,
   "plans": {
-    "month": { "label": "月卡", "price": 28, "days": 30 },
-    "quarter": { "label": "季卡", "price": 78, "days": 90 },
-    "year": { "label": "年卡", "price": 288, "days": 365 }
+    "month": { "label": "月卡", "price": 29, "days": 30 },
+    "quarter": { "label": "季卡", "price": 79, "days": 90 },
+    "year": { "label": "年卡", "price": 299, "days": 365 }
   },
   "storage": "oss-backup",
   "source": "oss-backup"

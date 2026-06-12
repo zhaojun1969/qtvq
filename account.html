@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="登录注册 · 查看会员与打款核实状态">
+  <title>我的账户 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <style>
+    .account-main { max-width: 640px; margin: 0 auto; padding: 1rem; }
+    .account-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .account-tabs button { flex: 1; }
+    .account-tabs button.active { background: var(--accent, #6c5ce7); color: #fff; }
+    .account-panel { background: var(--bg-card, #1a1a2e); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .pay-status-card { border: 1px solid rgba(108,92,231,.35); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; font-size: 0.9rem; }
+    .pay-status-card.is-active { border-color: rgba(123,237,159,.5); }
+    .pay-status-card.is-pending { border-color: rgba(245,158,11,.5); }
+    .pay-history { list-style: none; padding: 0; margin: 0; }
+    .pay-history li { padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 0.85rem; color: var(--text-muted, #a0a0b0); }
+    .account-meta { font-size: 0.85rem; color: var(--text-muted, #a0a0b0); margin: 0.25rem 0; }
+    .wechat-hint { background: rgba(7,193,96,.12); border: 1px solid rgba(7,193,96,.35); border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; margin: 0.75rem 0; }
+    .link-forgot { font-size: 0.85rem; margin-top: 0.5rem; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="profile.html">我的缘值</a>
+        <a href="account.html" class="active">我的账户</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+        <span class="stat-badge">直线 <strong data-line-value>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="account-main">
+    <h1 class="hero-tagline" style="text-align:center;margin-bottom:1rem">我的账户</h1>
+    <p class="modal-hint" style="text-align:center;margin-bottom:1.5rem">注册登录后，可在任意设备查看<strong>打款核实</strong>与<strong>会员开通</strong>状态（月卡 ¥29 · 季卡 ¥79 · 年卡 ¥299）。</p>
+
+    <section id="guest-panel" data-auth-guest>
+      <div class="account-tabs">
+        <button type="button" id="tab-login" class="btn btn-secondary active">登录</button>
+        <button type="button" id="tab-register" class="btn btn-secondary">注册</button>
+        <button type="button" id="tab-forgot" class="btn btn-secondary">忘记密码</button>
+      </div>
+
+      <div class="wechat-hint">
+        <strong>PC 推荐：微信扫码登录</strong>（开放平台网站应用，免记密码）<br>
+        下方绿色按钮扫码即可；与小程序账号通过 UnionID 自动打通（须同一开放平台主体）。
+      </div>
+      <div class="modal-actions" style="margin-bottom:1rem">
+        <button type="button" id="btn-wechat-open-login" class="btn btn-primary" style="background:#07c160;border-color:#07c160">微信扫码登录</button>
+      </div>
+
+      <div class="account-panel" id="login-panel">
+        <form id="login-form">
+          <label>手机号<input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" required autocomplete="username"></label>
+          <label>密码<input name="password" type="password" minlength="6" maxlength="64" placeholder="至少 6 位" required autocomplete="current-password"></label>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">登录</button>
+          </div>
+          <button type="button" class="link-btn link-forgot" id="go-forgot">忘记密码？</button>
+        </form>
+      </div>
+
+      <div class="account-panel" id="forgot-panel" hidden>
+        <h3 style="margin-top:0">找回密码</h3>
+        <ol class="help-list modal-hint" style="padding-left:1.1rem;line-height:1.7">
+          <li><strong>已绑定微信</strong>：填写手机号与新密码，点「微信扫码验证并重置」。</li>
+          <li><strong>小程序用户</strong>：也可在小程序「我的账户 → 忘记密码」操作。</li>
+          <li><strong>未绑定微信</strong>：邮件联系 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，或请客服在核实页重置。</li>
+        </ol>
+        <form id="forgot-form">
+          <label>注册手机号<input name="phone" type="tel" maxlength="11" required></label>
+          <label>新密码<input name="newPassword" type="password" minlength="6" required></label>
+          <label>确认新密码<input name="newPassword2" type="password" minlength="6" required></label>
+          <div class="modal-actions">
+            <button type="button" id="btn-wechat-open-reset" class="btn btn-primary" style="background:#07c160;border-color:#07c160">微信扫码验证并重置</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-panel" id="register-panel" hidden>
+        <form id="register-form">
+          <label>手机号<input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" required autocomplete="username"></label>
+          <label>密码<input name="password" type="password" minlength="6" maxlength="64" placeholder="至少 6 位" required autocomplete="new-password"></label>
+          <label>确认密码<input name="password2" type="password" minlength="6" maxlength="64" placeholder="再次输入密码" required autocomplete="new-password"></label>
+          <p class="modal-hint">注册即绑定当前浏览器设备编号，付款后在此页可立即查看核实进度。</p>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">注册</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="user-panel" data-auth-logged hidden>
+      <div class="account-panel">
+        <h3>账户信息</h3>
+        <p class="account-meta">手机号：<strong id="acc-phone"></strong></p>
+        <p class="account-meta">设备编号：<code id="acc-client-id"></code></p>
+        <p class="account-meta" id="acc-quota"></p>
+        <div class="modal-actions">
+          <button type="button" id="btn-subscribe" class="btn btn-primary">办理 / 续费会员</button>
+          <button type="button" id="btn-change-pwd" class="btn btn-secondary">修改密码</button>
+          <button type="button" id="btn-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+      </div>
+
+      <div class="account-panel" id="change-pwd-panel" hidden>
+        <h3 style="margin-top:0">修改密码</h3>
+        <form id="change-pwd-form">
+          <label id="old-pwd-wrap">原密码<input name="oldPassword" type="password" autocomplete="current-password"></label>
+          <label>新密码<input name="newPassword" type="password" minlength="6" required autocomplete="new-password"></label>
+          <label>确认新密码<input name="newPassword2" type="password" minlength="6" required autocomplete="new-password"></label>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">保存新密码</button>
+            <button type="button" id="btn-cancel-pwd" class="btn btn-secondary">取消</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="account-panel">
+        <h3>打款与会员状态</h3>
+        <div id="pay-status-area"></div>
+      </div>
+
+      <div class="account-panel">
+        <h3>历史开通记录</h3>
+        <ul id="pay-history" class="pay-history"></ul>
+        <p id="pay-history-empty" class="modal-hint">暂无记录</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span><a href="index.html">返回 Q问</a> · <a href="profile.html">我的缘值</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/account.js"></script>
+</body>
+</html>

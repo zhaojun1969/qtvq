@@ -50,16 +50,24 @@ https://qtvq.cn
 **微信业务域名校验（必做）：**
 
 1. 微信公众平台 → 开发 → 开发管理 → 开发设置 → **业务域名** → 添加 `qtvq.cn`
-2. 下载校验文件（如 `MP_verify_xxxxxxxx.txt`）
-3. 放入仓库 **`verify/`** 目录（或项目根目录）
-4. 同步到服务器根目录：
+2. 下载校验文件（本项目为 **`pO8yu0YU22.txt`**，内容为 32 位 hex）
+3. 已放入 `verify/pO8yu0YU22.txt`，同步到服务器根目录
+4. 服务器执行：`cd /opt/qtvq && git pull && bash tools/scripts/sync-static.sh`
+5. 浏览器确认：`https://qtvq.cn/pO8yu0YU22.txt` → `bbbb6c592fbd78c00beaa494f3943ba2`
+6. 微信后台点击「验证」→ 通过后继续下方 **第 3.1 节**
 
-```bash
-cd /opt/qtvq && git pull origin main && bash tools/scripts/sync-static.sh
-```
+### 3.1 验证通过后的下一步
 
-5. 浏览器访问确认：`https://qtvq.cn/MP_verify_xxxxxxxx.txt` 能打开且内容与下载一致
-6. 回到微信后台点击「验证」
+| 步骤 | 位置 | 配置 |
+|------|------|------|
+| ① request 合法域名 | 小程序后台 → 服务器域名 | `https://qtvq-api.pages.dev` |
+| ② 业务域名 | 同上（应已显示 qtvq.cn 已验证） | `qtvq.cn` |
+| ③ 同步静态站 | 服务器 | `bash tools/scripts/sync-static.sh`（含 account.html） |
+| ④ 小程序 Secret | `.dev.vars` → `npm run wechat:secrets` | `WECHAT_MINI_APP_SECRET` |
+| ⑤ 开放平台回调域 | [open.weixin.qq.com](https://open.weixin.qq.com/) → 网站应用 Q问 | 授权回调域 `qtvq.cn` |
+| ⑥ 绑定小程序 | 开放平台 → 绑定 `wx489fbca28401e4e0` | PC 与小程序同一账号 |
+| ⑦ 自测 | PC | [qtvq.cn/account.html](https://qtvq.cn/account.html) 微信扫码登录 |
+| ⑧ 自测 | 小程序 | 我的账户 → 微信一键登录；办理会员 → 在线支付 |
 
 支付宝类似：下载校验文件 → 放入 `verify/` → 同步 → 在后台验证。
 

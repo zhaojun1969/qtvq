@@ -1,17 +1,28 @@
-import {
-  submitPayment,
-  activatePayment,
-  getQuota,
-  listPendingPayments,
-} from '../lib/quota-store.js';
+import { submitPayment, activatePayment, getQuota, listPendingPayments } from '../lib/quota-store.js';
+import { listRecentOrders } from '../lib/order-store.js';
+import { resolveSession } from '../lib/auth-store.js';
 import { corsPreflight, jsonResponse } from '../lib/http.js';
-
 const COMPANY = {
   name: '我心永恒（北京）网络科技有限公司',
   account: '0200251109200028909',
   cardNo: '9558830200002033769',
   bank: '中国工商银行北京海淀西区马连洼支行',
 };
+
+function bearerToken(request) {
+  const h = request.headers.get('Authorization') || '';
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+async function authPhone(env, request) {
+  const token = bearerToken(request);
+  if (!token) return null;
+  const resolved = await resolveSession(env, token);
+  if (!resolved) return null;
+  const p = resolved.user.phone;
+  return `${p.slice(0, 3)}****${p.slice(-4)}`;
+}
 
 function checkAdmin(env, adminKey) {
   const key = env.PAYMENT_ADMIN_KEY || env.ADMIN_KEY;
@@ -29,6 +40,11 @@ export async function onRequest(context) {
       if (!checkAdmin(env, adminKey)) return jsonResponse(request, { error: '无权限' }, 403);
       const list = await listPendingPayments(env);
       return jsonResponse(request, { company: COMPANY, ...list });
+    }
+    if (url.searchParams.get('list') === 'orders') {
+      if (!checkAdmin(env, adminKey)) return jsonResponse(request, { error: '无权限' }, 403);
+      const orders = await listRecentOrders(env);
+      return jsonResponse(request, orders);
     }
     return jsonResponse(request, { company: COMPANY });
   }
@@ -63,12 +79,14 @@ export async function onRequest(context) {
     return jsonResponse(request, { error: '请填写完整汇款信息' }, 400);
   }
 
+  const phone = await authPhone(env, request);
   const result = await submitPayment(env, clientId, {
     plan,
     payerName: String(payerName).slice(0, 40),
     paidAt: String(paidAt).slice(0, 40),
     amount: Number(amount),
     remark: String(remark || '').slice(0, 80),
+    phone,
   });
 
   if (result?.error) return jsonResponse(request, { error: result.error }, 400);

@@ -144,9 +144,9 @@ function renderSubscription() {
     el.textContent = `已开通 ${user.subscription.label || PLANS[user.subscription.plan]?.label}，不限次数提问，有效期至 ${until}`;
   } else if (user.paymentPending?.status === 'pending') {
     const p = user.paymentPending;
-    el.textContent = `已提交 ${p.planLabel || PLANS[p.plan]?.label || ''} 汇款核实（¥${p.amount}）。核对工行到账后将解禁，设备编号：${p.clientId || '见会员弹窗'}`;
+    el.textContent = `已提交 ${p.planLabel || PLANS[p.plan]?.label || ''} 汇款核实（¥${p.amount}）。核对到账后将解禁 · 也可在「我的账户」查看进度`;
   } else {
-    el.textContent = `${formatQuotaStatusText(user)}。超出后可办理月卡 ¥28 / 季卡 ¥78 / 年卡 ¥288。`;
+    el.textContent = `${formatQuotaStatusText(user)}。超出后可办理月卡 ¥29 / 季卡 ¥79 / 年卡 ¥299。`;
   }
 }
 

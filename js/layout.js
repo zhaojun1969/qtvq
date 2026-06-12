@@ -3,8 +3,20 @@ import { getClientId } from './quota.js';
 import { getUser, saveUser, refreshStatUI, syncQuotaFromServer } from './app.js';
 import { initContactModal } from './contact.js';
 import { flushOfflineQueue } from './api-fetch.js';
+import { fetchAccountMe, isLoggedIn, refreshAuthNav } from './auth.js';
 
-const PAGES = { index: 'index.html', pitfalls: 'pitfalls.html', profile: 'profile.html', help: 'help.html' };
+const PAGES = { index: 'index.html', pitfalls: 'pitfalls.html', profile: 'profile.html', account: 'account.html', help: 'help.html' };
+
+function initAuthNav() {
+  const nav = document.querySelector('.nav-main');
+  if (!nav || nav.querySelector('[data-nav-account]')) return;
+  const a = document.createElement('a');
+  a.href = 'account.html';
+  a.setAttribute('data-nav-account', '');
+  a.innerHTML = '<span data-auth-label>登录 / 注册</span>';
+  nav.appendChild(a);
+  refreshAuthNav();
+}
 
 function initPioneerSlot() {
   const user = getUser();
@@ -48,12 +60,14 @@ function setActiveNav() {
 }
 
 getClientId();
+initAuthNav();
 initContactModal();
 mountLogo();
 initPioneerSlot();
 initMobileNav();
 setActiveNav();
 syncQuotaFromServer();
+if (isLoggedIn()) fetchAccountMe().catch(() => {});
 refreshStatUI();
 flushOfflineQueue().catch(() => {});
 

@@ -3,7 +3,9 @@
 微信 / 支付宝配置 **业务域名** 或 **服务器域名** 时，会提供校验文件，需能通过以下 URL 访问（放在站点根目录，不要放在子文件夹）：
 
 ```
-https://qtvq.cn/MP_verify_xxxxxxxx.txt     （微信常见）
+https://qtvq.cn/MP_verify_xxxxxxxx.txt     （微信小程序常见）
+https://qtvq.cn/pO8yu0YU22.txt             （微信开放平台 / 业务域名）
+https://qtvq.cn/EgTqXy3q41.txt
 https://qtvq.cn/xxxxxxxx.html              （支付宝常见）
 ```
 

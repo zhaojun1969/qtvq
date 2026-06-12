@@ -1,10 +1,12 @@
 import { apiUrl } from './config.js';
+import { authHeader } from '../utils/auth.js';
 
 export function request(options) {
   return new Promise((resolve, reject) => {
     uni.request({
       ...options,
       url: options.url,
+      header: { ...authHeader(), ...(options.header || {}) },
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
@@ -31,11 +33,11 @@ export function get(path, data) {
   return request({ url: apiUrl(path + qs), method: 'GET' });
 }
 
-export function post(path, data) {
+export function post(path, data, extraHeader = {}) {
   return request({
     url: apiUrl(path),
     method: 'POST',
-    header: { 'Content-Type': 'application/json' },
+    header: { 'Content-Type': 'application/json', ...extraHeader },
     data,
   });
 }

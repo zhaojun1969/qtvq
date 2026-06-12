@@ -108,13 +108,9 @@
     <div class="modal-backdrop" data-close-subscribe></div>
     <div class="modal-box modal-box-wide subscribe-modal-box">
       <h3>办理 Q问 会员 · 不限次数提问</h3>
-      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后可<strong>扫码支付</strong>或银行汇款，核实到账后解禁。</p>
-      <div class="plan-grid">
-        <button type="button" class="plan-card plan-selected" data-plan="month">月卡<br><strong>¥28</strong></button>
-        <button type="button" class="plan-card" data-plan="quarter">季卡<br><strong>¥78</strong></button>
-        <button type="button" class="plan-card" data-plan="year">年卡<br><strong>¥288</strong></button>
-      </div>
-      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥28</span> · 扫码时请按此金额支付</p>
+      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后可<strong>扫码支付</strong>或银行汇款。建议先 <a href="account.html">注册登录</a>，付款后可在「我的账户」查看核实进度。</p>
+      <div class="plan-grid" id="plan-grid"></div>
+      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥29</span> · 扫码时请按此金额支付</p>
 
       <div class="pay-online-section">
         <button type="button" id="btn-wechat-online-pay" class="btn btn-primary btn-wechat-online">微信在线支付（自动到账）</button>
@@ -166,7 +162,7 @@
     <div class="modal-backdrop" data-close-pay-qr></div>
     <div class="modal-box pay-qr-viewer-box">
       <h3 id="pay-qr-viewer-title">扫码支付</h3>
-      <p class="pay-qr-viewer-amount">应付金额：<strong id="pay-qr-viewer-price">¥28</strong></p>
+      <p class="pay-qr-viewer-amount">应付金额：<strong id="pay-qr-viewer-price">¥29</strong></p>
       <p class="modal-hint">设备编号（建议写入备注）：<code id="pay-qr-viewer-client"></code>
         <button type="button" class="btn-copy" id="btn-copy-pay-client">复制</button>
       </p>

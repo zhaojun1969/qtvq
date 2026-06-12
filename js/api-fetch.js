@@ -128,9 +128,17 @@ export async function flushOfflineQueue() {
 export async function apiFetch(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const primary = apiUrl(path);
+  const headers = { ...(options.headers || {}) };
+  try {
+    const token = localStorage.getItem('qtvq_auth_token');
+    if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* ignore */
+  }
+  const reqOptions = { ...options, headers };
 
   try {
-    const res = await fetchWithTimeout(primary, options, timeoutForPath(path));
+    const res = await fetchWithTimeout(primary, reqOptions, timeoutForPath(path));
     if (res.ok || method !== 'GET') return res;
   } catch {
     if (method !== 'GET') {

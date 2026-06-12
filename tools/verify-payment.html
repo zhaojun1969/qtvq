@@ -7,34 +7,69 @@
   <title>汇款核实 · 我心永恒 Q问（内部）</title>
   <link rel="stylesheet" href="../css/styles.css">
   <style>
-    body { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    body { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
     .staff-panel { background: var(--bg-card, #1a1a2e); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-    .pending-item { border: 1px solid rgba(108,92,231,.35); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; font-size: 0.85rem; }
-    .pending-item button { margin-top: 0.5rem; }
+    .pending-item, .order-item { border: 1px solid rgba(108,92,231,.35); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; font-size: 0.85rem; }
+    .pending-item button, .order-item button { margin-top: 0.5rem; }
     pre { background: #111; padding: 1rem; overflow: auto; font-size: 0.8rem; border-radius: 8px; }
     .warn { color: #f59e0b; font-size: 0.85rem; }
+    .help-list { font-size: 0.85rem; color: var(--text-muted, #a0a0b0); line-height: 1.6; padding-left: 1.1rem; }
+    .status-paid { color: #7bed9f; }
+    .status-pending { color: #f59e0b; }
   </style>
 </head>
 <body>
-  <h1>汇款核实（工作人员）</h1>
-  <p class="warn">内部页面，请勿对外公开链接。核对<strong>工商银行</strong>到账后再解禁。</p>
+  <h1>会员收款核实（工作人员）</h1>
+  <p class="warn">内部页面，请勿对外公开。用户<strong>无需注册</strong>，凭浏览器「设备编号」<code>q_xxx</code> 识别身份。</p>
 
   <section class="staff-panel">
-    <h2>待核实列表</h2>
-    <button type="button" id="btn-refresh" class="btn btn-secondary">刷新待核实</button>
+    <h2>怎么查谁付了钱？</h2>
+    <ol class="help-list">
+      <li><strong>扫码 / 银行汇款（人工核实）</strong>：用户付款后点「我已汇款，提交核实」→ 下方「待核实列表」会出现记录；对照微信/支付宝/工行到账后点「核实通过」。</li>
+      <li><strong>微信在线支付（自动）</strong>：开通 Native 后支付成功会自动开通；可在「在线订单」查看；也可登录<a href="https://pay.weixin.qq.com/" target="_blank" rel="noopener">微信支付商户平台</a> → 交易中心。</li>
+      <li><strong>只有钱、没有提交</strong>：看付款备注里的设备编号，在「手动核实」填入该 <code>q_xxx</code> 与套餐解禁。</li>
+      <li><strong>套餐价格</strong>：月卡 ¥29 · 季卡 ¥79 · 年卡 ¥299（与网站一致）。</li>
+      <li><strong>用户账号</strong>：客户可在 <a href="../account.html">我的账户</a> 注册登录后查看打款核实；待核实列表会显示绑定手机号。</li>
+    </ol>
+  </section>
+
+  <section class="staff-panel">
+    <h2>管理密钥</h2>
+    <label>管理密钥<input id="admin-key" type="password" autocomplete="off" placeholder="PAYMENT_ADMIN_KEY"></label>
+    <p class="warn">密钥在 Cloudflare Pages 环境变量 <code>PAYMENT_ADMIN_KEY</code>，与本地 <code>.dev.vars</code> 一致。</p>
+  </section>
+
+  <section class="staff-panel">
+    <h2>待核实汇款（用户已提交）</h2>
+    <button type="button" id="btn-refresh-pending" class="btn btn-secondary">刷新</button>
     <div id="pending-list"></div>
+  </section>
+
+  <section class="staff-panel">
+    <h2>在线支付订单（微信 Native 等）</h2>
+    <button type="button" id="btn-refresh-orders" class="btn btn-secondary">刷新</button>
+    <div id="orders-list"></div>
+  </section>
+
+  <section class="staff-panel">
+    <h2>重置用户密码（客服）</h2>
+    <form id="reset-pwd-form">
+      <label>注册手机号<input name="phone" type="tel" maxlength="11" required placeholder="11 位手机号"></label>
+      <label>新密码<input name="newPassword" type="password" minlength="6" required placeholder="至少 6 位"></label>
+      <button type="submit" class="btn btn-secondary">客服重置密码</button>
+    </form>
+    <p class="warn">用户忘记密码且未绑定微信时使用；请告知用户新密码并建议登录后在小程序绑定微信。</p>
   </section>
 
   <section class="staff-panel">
     <h2>手动核实</h2>
     <form id="form">
-      <label>管理密钥<input name="adminKey" type="password" required autocomplete="off"></label>
-      <label>用户设备编号<input name="clientId" required placeholder="q_xxx"></label>
+      <label>用户设备编号<input name="clientId" required placeholder="q_xxx（见用户付款备注）"></label>
       <label>套餐
         <select name="plan">
-          <option value="month">月卡 ¥28</option>
-          <option value="quarter">季卡 ¥78</option>
-          <option value="year">年卡 ¥288</option>
+          <option value="month">月卡 ¥29</option>
+          <option value="quarter">季卡 ¥79</option>
+          <option value="year">年卡 ¥299</option>
         </select>
       </label>
       <button type="submit" class="btn btn-primary">核实通过并解禁</button>
@@ -48,14 +83,27 @@
 
     const out = document.getElementById('out');
     const pendingList = document.getElementById('pending-list');
+    const ordersList = document.getElementById('orders-list');
+    const keyInput = document.getElementById('admin-key');
     let savedKey = sessionStorage.getItem('qtvq_admin_key') || '';
+
+    if (savedKey && keyInput) keyInput.value = savedKey;
+
+    function getKey() {
+      const key = keyInput?.value?.trim() || savedKey;
+      if (key) {
+        sessionStorage.setItem('qtvq_admin_key', key);
+        savedKey = key;
+      }
+      return key;
+    }
 
     function log(data) {
       out.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     }
 
     async function loadPending() {
-      const key = document.querySelector('[name="adminKey"]')?.value || savedKey;
+      const key = getKey();
       if (!key) {
         pendingList.innerHTML = '<p class="warn">请先填写管理密钥</p>';
         return;
@@ -65,8 +113,6 @@
         const res = await fetch(apiUrl(`/api/payment?list=pending&adminKey=${encodeURIComponent(key)}`));
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || res.status);
-        sessionStorage.setItem('qtvq_admin_key', key);
-        savedKey = key;
         if (!data.items?.length) {
           pendingList.innerHTML = `<p>暂无待核实（存储：${data.storage || '—'}）</p>`;
           return;
@@ -75,40 +121,99 @@
           <div class="pending-item">
             <div><strong>${item.clientId}</strong> · ${item.planLabel || item.plan} · ¥${item.amount}</div>
             <div>汇款人：${item.payerName} · 时间：${item.paidAt}</div>
-            <div>备注：${item.remark || '—'}</div>
+            <div>备注：${item.remark || '—'}${item.phone ? ` · 账号：${item.phone}` : ''}</div>
             <button type="button" class="btn btn-primary btn-quick-verify" data-id="${item.clientId}" data-plan="${item.plan}">核实通过</button>
           </div>
         `).join('');
         pendingList.querySelectorAll('.btn-quick-verify').forEach((btn) => {
-          btn.addEventListener('click', () => verify(btn.dataset.id, btn.dataset.plan, key));
+          btn.addEventListener('click', () => verify(btn.dataset.id, btn.dataset.plan));
         });
       } catch (e) {
         pendingList.innerHTML = `<p class="warn">${e.message}</p>`;
       }
     }
 
-    async function verify(clientId, plan, adminKey) {
+    async function loadOrders() {
+      const key = getKey();
+      if (!key) {
+        ordersList.innerHTML = '<p class="warn">请先填写管理密钥</p>';
+        return;
+      }
+      ordersList.innerHTML = '加载中…';
+      try {
+        const res = await fetch(apiUrl(`/api/payment?list=orders&adminKey=${encodeURIComponent(key)}`));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+        if (!data.items?.length) {
+          ordersList.innerHTML = `<p>暂无在线订单（存储：${data.storage || '—'}）</p>`;
+          return;
+        }
+        ordersList.innerHTML = data.items.slice(0, 30).map((o) => `
+          <div class="order-item">
+            <div><strong>${o.clientId}</strong> · ${o.planLabel || o.plan} · ¥${o.amount}
+              · <span class="${o.status === 'paid' ? 'status-paid' : 'status-pending'}">${o.status}</span></div>
+            <div>订单：${o.orderId} · 渠道：${o.channel || '—'}</div>
+            <div>微信单号：${o.platformTradeNo || '—'}</div>
+            ${o.status === 'paid' ? '' : `<button type="button" class="btn btn-primary btn-order-verify" data-id="${o.clientId}" data-plan="${o.plan}">手动解禁</button>`}
+          </div>
+        `).join('');
+        ordersList.querySelectorAll('.btn-order-verify').forEach((btn) => {
+          btn.addEventListener('click', () => verify(btn.dataset.id, btn.dataset.plan));
+        });
+      } catch (e) {
+        ordersList.innerHTML = `<p class="warn">${e.message}</p>`;
+      }
+    }
+
+    async function verify(clientId, plan) {
+      const key = getKey();
+      if (!key) return log('请先填写管理密钥');
       log('提交中…');
       const res = await fetch(apiUrl('/api/payment'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', adminKey, clientId, plan }),
+        body: JSON.stringify({ action: 'verify', adminKey: key, clientId, plan }),
       });
       const data = await res.json();
       log(data);
-      if (res.ok) loadPending();
+      if (res.ok) {
+        loadPending();
+        loadOrders();
+      }
     }
 
-    document.getElementById('btn-refresh')?.addEventListener('click', loadPending);
+    document.getElementById('btn-refresh-pending')?.addEventListener('click', loadPending);
+    document.getElementById('btn-refresh-orders')?.addEventListener('click', loadOrders);
     document.getElementById('form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
-      await verify(fd.get('clientId'), fd.get('plan'), fd.get('adminKey'));
+      await verify(fd.get('clientId'), fd.get('plan'));
+    });
+
+    document.getElementById('reset-pwd-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = getKey();
+      if (!key) return log('请先填写管理密钥');
+      const fd = new FormData(e.target);
+      log('重置密码中…');
+      const res = await fetch(apiUrl('/api/auth'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'adminResetPassword',
+          adminKey: key,
+          phone: fd.get('phone')?.toString().trim(),
+          newPassword: fd.get('newPassword')?.toString(),
+        }),
+      });
+      const data = await res.json();
+      log(data);
+      if (res.ok) e.target.reset();
     });
 
     if (savedKey) {
-      const input = document.querySelector('[name="adminKey"]');
-      if (input) input.value = savedKey;
+      loadPending();
+      loadOrders();
     }
   </script>
 </body>

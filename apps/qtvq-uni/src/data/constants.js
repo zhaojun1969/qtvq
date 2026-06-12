@@ -31,9 +31,9 @@ export const SUCCESS_STORIES = [
 ];
 
 export const PLANS = [
-  { id: 'month', label: '月卡', price: 28 },
-  { id: 'quarter', label: '季卡', price: 78 },
-  { id: 'year', label: '年卡', price: 288 },
+  { id: 'month', label: '月卡', price: 29 },
+  { id: 'quarter', label: '季卡', price: 79 },
+  { id: 'year', label: '年卡', price: 299 },
 ];
 
 export const WEB_BASE = 'https://qtvq.cn';
