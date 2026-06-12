@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>微信登录中… | 我心永恒 Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:60vh">
+  <p class="modal-hint">微信登录处理中，请稍候…</p>
+  <script type="module">
+    import { getClientId } from './js/quota.js';
+    import { handleWechatOpenCallback } from './js/auth.js';
+    import { showToast } from './js/toast.js';
+
+    getClientId();
+    handleWechatOpenCallback()
+      .then((data) => {
+        if (data) showToast('登录成功');
+        location.replace('account.html');
+      })
+      .catch((e) => {
+        showToast(e.message || '微信登录失败');
+        setTimeout(() => location.replace('account.html'), 1500);
+      });
+  </script>
+</body>
+</html>

@@ -46,4 +46,4 @@ WECHAT_PAY_NOTIFY_URL=https://qtvq-api.pages.dev/api/payment/wechat/notify
 # ---- 微信开放平台 · 网站应用扫码登录 ----
 # WECHAT_OPEN_APP_ID=wxc4b560055c1978dc   # 开放平台网站应用「Q问」
 # WECHAT_OPEN_APP_SECRET=             # 网站应用 AppSecret
-# WECHAT_OPEN_REDIRECT_URI=https://qtvq.cn/account.html
+# WECHAT_OPEN_REDIRECT_URI=https://qtvq.cn/wechat-callback.html

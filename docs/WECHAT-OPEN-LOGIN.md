@@ -47,7 +47,7 @@ cd /opt/qtvq && git pull && bash tools/scripts/sync-static.sh
 # 网站应用（PC 扫码登录）— 与 WECHAT_APP_ID（小程序/支付）不同
 WECHAT_OPEN_APP_ID=wxc4b560055c1978dc
 WECHAT_OPEN_APP_SECRET=你的网站应用AppSecret
-WECHAT_OPEN_REDIRECT_URI=https://qtvq.cn/account.html
+WECHAT_OPEN_REDIRECT_URI=https://qtvq.cn/wechat-callback.html
 
 # 小程序登录（可选，小程序一键登录）
 WECHAT_APP_ID=wx489fbca28401e4e0
@@ -109,9 +109,43 @@ https://qtvq.cn/account.html
 
 ## 6. 常见错误
 
+### `redirect_uri 参数错误`（扫码页白屏）
+
+按顺序检查：
+
+1. **网站应用是否审核通过**  
+   [open.weixin.qq.com](https://open.weixin.qq.com/) → 网站应用 **Q问** → 状态须为 **已上线/审核通过**。未通过审核时常见此报错。
+
+2. **授权回调域**（只填域名，不要 `https://` 和路径）  
+   ```
+   qtvq.cn
+   ```
+   不要填 `www.qtvq.cn`（除非网站用 www 访问）、不要填 `account.html`。
+
+3. **redirect_uri 与代码一致**（须 https，与 Secret 中一致）  
+   ```
+   https://qtvq.cn/wechat-callback.html
+   ```
+   不要用 `account.html` 作回调（已改为专用 `wechat-callback.html`）。
+
+4. **网站应用开发资料**  
+   - 网站地址：`https://qtvq.cn`  
+   - AppID：`wxc4b560055c1978dc`
+
+5. **更新 Secret 后重新部署**  
+   ```powershell
+   npm run wechat:secrets
+   npm run deploy:api-only
+   ```
+
+6. **自检 API 返回的 loginUrl**  
+   ```bash
+   curl -s "https://qtvq-api.pages.dev/api/auth/wechat/open" | jq .redirectUri
+   ```
+   应显示 `https://qtvq.cn/wechat-callback.html`
+
 | 现象 | 原因 |
 |------|------|
-| `redirect_uri 参数错误` | 回调 URI 与开放平台登记不一致 |
 | `wechatOpenLoginConfigured: false` | Secrets 未上传或变量名拼错 |
 | 扫码后两个账号 | 小程序未绑定同一开放平台，缺少 unionid |
 | `10003` | 授权回调域未填 `qtvq.cn` |
@@ -123,4 +157,4 @@ https://qtvq.cn/account.html
 - `functions/lib/wechat-open.js` — qrconnect / OAuth2
 - `functions/api/auth/wechat/open.js` — 登录 / 找回密码
 - `js/auth.js` — 前端跳转与回调
-- `account.html` — 扫码登录 UI
+- `wechat-callback.html` — OAuth 回调页（微信跳回此页）

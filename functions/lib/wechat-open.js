@@ -7,7 +7,7 @@ export function getWechatOpenConfig(env) {
   return {
     appId: env.WECHAT_OPEN_APP_ID || '',
     secret: env.WECHAT_OPEN_APP_SECRET || '',
-    redirectUri: env.WECHAT_OPEN_REDIRECT_URI || 'https://qtvq.cn/account.html',
+    redirectUri: env.WECHAT_OPEN_REDIRECT_URI || 'https://qtvq.cn/wechat-callback.html',
   };
 }
 
@@ -16,17 +16,12 @@ export function isWechatOpenLoginConfigured(env) {
   return !!(c.appId && c.secret && c.redirectUri);
 }
 
-/** 供前端跳转的扫码登录 URL（redirect_uri 须与开放平台登记完全一致） */
+/** 供前端跳转的扫码登录 URL（redirect_uri 须与开放平台授权回调域一致） */
 export function buildQrConnectUrl(env, state = 'qtvq') {
   const c = getWechatOpenConfig(env);
-  const params = new URLSearchParams({
-    appid: c.appId,
-    redirect_uri: c.redirectUri,
-    response_type: 'code',
-    scope: 'snsapi_login',
-    state,
-  });
-  return `https://open.weixin.qq.com/connect/qrconnect?${params.toString()}#wechat_redirect`;
+  const redirect = encodeURIComponent(c.redirectUri);
+  const params = `appid=${c.appId}&redirect_uri=${redirect}&response_type=code&scope=snsapi_login&state=${encodeURIComponent(state)}`;
+  return `https://open.weixin.qq.com/connect/qrconnect?${params}#wechat_redirect`;
 }
 
 export async function codeToOpenAccess(env, code) {

@@ -28,7 +28,7 @@ $stage = Join-Path $env:TEMP "qtvq-static-$(Get-Date -Format 'yyyyMMddHHmmss')"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 $items = @(
-    "index.html", "account.html", "pitfalls.html", "profile.html", "help.html", "privacy.html", "download.html", "404.html",
+    "index.html", "account.html", "wechat-callback.html", "pitfalls.html", "profile.html", "help.html", "privacy.html", "download.html", "404.html",
     "css", "js", "assets",
     "robots.txt", "sitemap.xml", "_headers", "_redirects"
 )
