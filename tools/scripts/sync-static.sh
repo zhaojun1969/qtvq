@@ -22,10 +22,28 @@ sudo rsync -av --delete \
   --exclude='node_modules' \
   --exclude='.wrangler' \
   --exclude='.dev.vars' \
+  --exclude='.dev.vsrs' \
+  --exclude='.dev.vars.*' \
+  --exclude='cf.env' \
+  --exclude='obs.env' \
+  --exclude='tmp-*.json' \
+  --exclude='tmp-*.js' \
+  --exclude='dist' \
   --exclude='tools' \
   --exclude='context' \
-  --exclude='obs.env' \
+  --exclude='apps' \
+  --exclude='backup' \
+  --exclude='logo' \
+  --exclude='packages' \
   "$ROOT/" "$DEST/"
+
+# 若历史同步误拷了密钥文件，从公网目录删除
+for leak in cf.env obs.env .dev.vars .dev.vsrs; do
+  if [ -f "$DEST/$leak" ]; then
+    echo ">> 警告：删除公网目录中的敏感文件 $leak"
+    sudo rm -f "$DEST/$leak"
+  fi
+done
 
 echo ">> 域名校验文件 -> 网站根目录"
 bash "$ROOT/tools/scripts/copy-verify-root.sh" "$DEST"
