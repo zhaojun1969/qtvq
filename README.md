@@ -4,7 +4,8 @@
 
 ## 功能概览
 
-- **Q问**：文字/语音提问、再问一步、采纳建议、智能 mock/Workers AI；**24 小时最多 5 次免费提问**，超出可办月卡/季卡/年卡（对公汇款核实后不限次）
+- **Q问**：文字/语音提问、再问一步、采纳建议、智能 mock/Workers AI；**24 小时最多 5 次免费提问**，超出可办月卡/季卡/年卡（**¥29 / ¥79 / ¥299**；微信在线支付或对公汇款核实后不限次）
+- **我的账户**：手机号注册登录、打款核实进度、**PC 微信扫码登录**（[account.html](https://qtvq.cn/account.html)）
 - **避坑大全**：50 条案例、场景/代价筛选、搜索、测验、行动卡 PNG、音视频弹层、高阶专题、提交教训
 - **我的缘值**：缘认知匹配、缘分直线卡、解锁权益、定制报告下载、Q缘连线
 - **Logo**：粉紫渐变圆环 + 艺术字「问」+ 右下 Q 点一捺
@@ -25,6 +26,8 @@ npm run dev
 
 完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。  
 多端 App / 小程序方案见 **[docs/MULTI-PLATFORM.md](docs/MULTI-PLATFORM.md)**。  
+PC 微信扫码登录见 **[docs/WECHAT-OPEN-LOGIN.md](docs/WECHAT-OPEN-LOGIN.md)**。  
+微信支付见 **[docs/PAYMENT-WECHAT-API.md](docs/PAYMENT-WECHAT-API.md)**。  
 发布到 GitHub / Gitee 见 **[docs/GIT-PRIVATE.md](docs/GIT-PRIVATE.md)**、Gitee 首次 **[docs/GITEE-SETUP.md](docs/GITEE-SETUP.md)**（**务必私有**）。双推：`npm run git:push-all`  
 上下文备份 OBS 见 **[docs/OBS.md](docs/OBS.md)**（`npm run context:upload` / `pnpm sync:obs`）。  
 Cloudflare 动态数据 OSS 备份与降级见 **[docs/OSS-BACKUP.md](docs/OSS-BACKUP.md)**。
@@ -48,6 +51,8 @@ npm run deploy    # 部署到 qtvq-api.pages.dev
 | 路径 | 说明 |
 |------|------|
 | index.html | 首页 Q问 |
+| account.html | 我的账户（登录 / 微信扫码 / 打款查询） |
+| wechat-callback.html | 微信开放平台 OAuth 回调页 |
 | pitfalls.html | 避坑大全 |
 | profile.html | 我的缘值 |
 | js/data.js + data-extra.js | 50 条案例数据 |
@@ -57,6 +62,8 @@ npm run deploy    # 部署到 qtvq-api.pages.dev
 | js/config.js | API 基址（qtvq.cn → qtvq-api） |
 | functions/lib/cors.js | 跨域允许 qtvq.cn |
 | functions/api/payment.js | 汇款登记与工作人员核实 |
+| functions/api/auth.js | 注册 / 登录 / 改密 |
+| js/auth.js + js/account.js | 账户页与微信扫码 |
 | js/quota.js + js/subscribe.js | 额度逻辑与会员弹窗 |
 
 ## 品牌色

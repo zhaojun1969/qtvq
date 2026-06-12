@@ -62,16 +62,16 @@ https://qtvq.cn
 |------|------|------|
 | ① request 合法域名 | 小程序后台 → 服务器域名 | `https://qtvq-api.pages.dev` |
 | ② 业务域名 | 同上（应已显示 qtvq.cn 已验证） | `qtvq.cn` |
-| ③ 同步静态站 | 服务器 | `bash tools/scripts/sync-static.sh`（含 account.html） |
+| ③ 同步静态站 | 服务器 | `sync-static.sh`（含 `account.html`、`wechat-callback.html`） |
 | ④ 小程序 Secret | `.dev.vars` → `npm run wechat:secrets` | `WECHAT_MINI_APP_SECRET` |
-| ⑤ 开放平台回调域 | [open.weixin.qq.com](https://open.weixin.qq.com/) → 网站应用 Q问 | 授权回调域 `qtvq.cn` |
+| ⑤ 开放平台 | [open.weixin.qq.com](https://open.weixin.qq.com/) → 网站应用 Q问 | 审核通过；授权回调域 `qtvq.cn`；redirect `wechat-callback.html` |
 | ⑥ 绑定小程序 | 开放平台 → 绑定 `wx489fbca28401e4e0` | PC 与小程序同一账号 |
-| ⑦ 自测 | PC | [qtvq.cn/account.html](https://qtvq.cn/account.html) 微信扫码登录 |
-| ⑧ 自测 | 小程序 | 我的账户 → 微信一键登录；办理会员 → 在线支付 |
+| ⑦ 自测 PC | [qtvq.cn/account.html](https://qtvq.cn/account.html) | ✅ 微信扫码登录（2026-06-12 已通） |
+| ⑧ 自测小程序 | 我的账户 → 微信一键登录 | 需配 `WECHAT_MINI_APP_SECRET` |
 
 支付宝类似：下载校验文件 → 放入 `verify/` → 同步 → 在后台验证。
 
-详细说明见项目根目录 [`verify/README.md`](../../verify/README.md)
+详细说明见项目根目录 [`verify/README.md`](../../verify/README.md)、PC 扫码登录见 [`docs/WECHAT-OPEN-LOGIN.md`](../../docs/WECHAT-OPEN-LOGIN.md)。
 
 ## 4. 功能清单
 
@@ -83,6 +83,7 @@ https://qtvq.cn
 | 热点 / 成功案例墙 | ✅ | ✅ |
 | 语音输入（阿里云 ASR） | ✅ | ✅ |
 | 联系客服留言 | ✅ | ✅ |
+| 我的账户 / 微信登录 | ✅ PC 扫码 · 小程序待 Secret | ✅ |
 | 帮助 / 隐私 web-view | ✅ | ✅ |
 
 ## 5. 打包上传

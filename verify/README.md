@@ -4,10 +4,12 @@
 
 ```
 https://qtvq.cn/MP_verify_xxxxxxxx.txt     （微信小程序常见）
-https://qtvq.cn/pO8yu0YU22.txt             （微信开放平台 / 业务域名）
+https://qtvq.cn/pO8yu0YU22.txt             （小程序业务域名 / 开放平台业务域名）
 https://qtvq.cn/EgTqXy3q41.txt
 https://qtvq.cn/xxxxxxxx.html              （支付宝常见）
 ```
+
+**说明**：小程序「业务域名」与开放平台「网站应用授权回调域」是两套配置。PC 扫码登录见 `docs/WECHAT-OPEN-LOGIN.md`（回调页 `wechat-callback.html`，授权回调域 `qtvq.cn`）。
 
 ## 操作步骤
 

@@ -2,7 +2,7 @@
 
 | 目录 | 说明 | 状态 |
 |------|------|------|
-| `qtvq-uni/` | uni-app MVP（三 Tab + API） | ✅ 已初始化 |
+| `qtvq-uni/` | uni-app MVP（三 Tab + 账户 + API） | ✅ 已初始化 |
 | `../packages/api-client/` | 共享 API 协议（可选） | 待建 |
 
 完整方案见 **[docs/MULTI-PLATFORM.md](../docs/MULTI-PLATFORM.md)**。
@@ -15,9 +15,11 @@ https://qtvq-api.pages.dev
 
 ## 首期目标
 
-1. 微信小程序 MVP：Q问 + 额度 + 避坑列表  
+1. 微信小程序 MVP：Q问 + 额度 + 避坑 + 账户页  
 2. 与 Web 共用 `clientId` 规则（`q_` 前缀 + 随机）  
-3. 支付首期仍展示对公账户（与 H5 一致），Native 支付在第 4 期
+3. PC / H5：微信 Native 在线支付 + 对公汇款核实并存；PC 微信扫码登录已上线  
+
+微信配置见 `apps/qtvq-uni/docs/WEIXIN-ALIPAY.md`、`docs/WECHAT-OPEN-LOGIN.md`、`docs/PAYMENT-WECHAT-API.md`。
 
 ## 创建 uni-app 工程（本地）
 

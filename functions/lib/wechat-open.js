@@ -1,6 +1,9 @@
 /**
  * 微信开放平台 · 网站应用扫码登录（qrconnect + OAuth2）
  * 文档：https://developers.weixin.qq.com/doc/oplatform/Website_App/WeChat_Login/Wechat_Login.html
+ *
+ * 生产：AppID wxc4b560055c1978dc，redirect_uri https://qtvq.cn/wechat-callback.html
+ * 开放平台须审核通过，授权回调域 qtvq.cn（仅域名模式）；详见 docs/WECHAT-OPEN-LOGIN.md
  */
 
 export function getWechatOpenConfig(env) {
