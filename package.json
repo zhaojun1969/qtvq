@@ -42,6 +42,7 @@
     "uni:dev:mp-alipay": "cd apps/qtvq-uni && npm run dev:mp-alipay",
     "uni:build:weixin": "cd apps/qtvq-uni && npm run build:mp-weixin",
     "uni:build:alipay": "cd apps/qtvq-uni && npm run build:mp-alipay",
+    "uni:sync-static": "node tools/scripts/sync-uni-static.js",
     "kv:create": "npx wrangler kv namespace create QTVQ_KV && npx wrangler kv namespace create QTVQ_KV --preview",
     "preview": "npx wrangler pages dev . --port 8788 --local-protocol=http"
   },

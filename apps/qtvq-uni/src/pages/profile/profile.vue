@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="card profile-head">
-      <image class="logo" src="/static/logo-108.png" mode="aspectFit" />
+      <image class="logo" src="@/static/logo-108.png" mode="aspectFit" />
       <text class="name">我心永恒 · Q问</text>
       <text class="id">设备编号 {{ clientIdShort }}</text>
       <text class="platform">{{ platformName }}</text>
@@ -54,7 +54,7 @@
 
     <view class="card">
       <text class="section-title">关于</text>
-      <text class="about">qtvq.cn · 京ICP备19045082号\nAPI: qtvq-api.pages.dev</text>
+      <text class="about">qtvq.cn · 京ICP备19045082号\n版本 {{ appVersion }} · 会员 ¥29/79/299\nAPI: qtvq-api.pages.dev</text>
     </view>
   </view>
 </template>
@@ -65,12 +65,13 @@ import { getClientId } from '../../utils/clientId.js';
 import { getUser, formatQuotaText } from '../../utils/user.js';
 import { fetchQuota } from '../../api/quota.js';
 import { platformLabel } from '../../utils/platform.js';
-import { WEB_BASE } from '../../data/constants.js';
+import { WEB_BASE, APP_VERSION } from '../../data/constants.js';
 
 const clientId = ref('');
 const user = ref(getUser());
 const quotaText = ref('加载中…');
 const platformName = platformLabel();
+const appVersion = APP_VERSION;
 const clientIdShort = computed(() => {
   const id = clientId.value || '';
   return id.length > 16 ? `${id.slice(0, 16)}…` : id;

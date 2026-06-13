@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="hero card">
-      <image class="logo" src="/static/logo-108.png" mode="aspectFit" />
+      <image class="logo" src="@/static/logo-108.png" mode="aspectFit" />
       <text class="tagline">写下你的爱情难题，我教你直线走</text>
       <text class="sub">避坑 + 直线解决 · {{ platformName }}</text>
     </view>

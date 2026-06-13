@@ -36,4 +36,7 @@ export const PLANS = [
   { id: 'year', label: '年卡', price: 299 },
 ];
 
+/** 与 manifest versionName 同步，便于核对是否为新包 */
+export const APP_VERSION = '1.0.1';
+
 export const WEB_BASE = 'https://qtvq.cn';

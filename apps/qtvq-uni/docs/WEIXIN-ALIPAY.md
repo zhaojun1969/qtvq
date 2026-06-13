@@ -71,7 +71,7 @@ https://qtvq.cn
 
 支付宝类似：下载校验文件 → 放入 `verify/` → 同步 → 在后台验证。
 
-详细说明见项目根目录 [`verify/README.md`](../../verify/README.md)、PC 扫码登录见 [`docs/WECHAT-OPEN-LOGIN.md`](../../docs/WECHAT-OPEN-LOGIN.md)。
+详细说明见 [`docs/WECHAT-MINI-LOGIN.md`](../../docs/WECHAT-MINI-LOGIN.md)（小程序 Secret + UnionID 逐步配置）。
 
 ## 4. 功能清单
 
@@ -83,18 +83,39 @@ https://qtvq.cn
 | 热点 / 成功案例墙 | ✅ | ✅ |
 | 语音输入（阿里云 ASR） | ✅ | ✅ |
 | 联系客服留言 | ✅ | ✅ |
-| 我的账户 / 微信登录 | ✅ PC 扫码 · 小程序待 Secret | ✅ |
+| 我的账户 / 微信登录 | ✅ PC 扫码 · 小程序配 Secret 后可用 | ✅ |
 | 帮助 / 隐私 web-view | ✅ | ✅ |
 
 ## 5. 打包上传
 
+**源码改价/改 Logo 后，必须重新编译并上传，手机上的旧包不会自动更新。**
+
 ```bash
-npm run build:mp-weixin   # 输出 dist/build/mp-weixin
-npm run build:mp-alipay   # 输出 dist/build/mp-alipay
+# 项目根目录（Windows 或已装 Node 的机器）
+npm run uni:sync-static          # logo/ → 小程序 static（可选）
+cd apps/qtvq-uni
+npm run build:mp-weixin          # 输出 dist/build/mp-weixin
 ```
 
-微信开发者工具 → 上传 → 提交审核  
-支付宝开发者工具 → 上传 → 提交审核
+微信开发者工具：
+
+1. **导入目录**必须是 `apps/qtvq-uni/dist/build/mp-weixin`（不是 `dist/dev`，也不是 `/opt/qtvq` 服务器目录）
+2. 菜单 **工具 → 清缓存 → 全部清除**（可选）
+3. **预览 / 真机调试**：仅本机扫码，不等于线上更新
+4. **上传** → 填写版本说明（如 `1.0.1 套餐29/79/299`）
+5. [mp.weixin.qq.com](https://mp.weixin.qq.com/) → **管理 → 版本管理** → 选刚上传的版本设为 **体验版** 或提交 **审核发布**
+
+**如何确认已是新版本：**
+
+- 小程序 **缘值** Tab → 底部「关于」应显示 **版本 1.0.1 · 会员 ¥29/79/299**
+- **办理会员** 页三档价格为 **¥29 / ¥79 / ¥299**
+- 首页/缘值顶栏应显示 **Logo 圆环「问」**
+
+**小程序列表图标（微信搜索看到的头像）**：在 mp 后台 **设置 → 基本设置 → 小程序头像** 上传 `logo/108-108.png` 或 `512-512.png`，与 App 内 Logo 是分开配置的。
+
+```bash
+npm run build:mp-alipay   # 支付宝：dist/build/mp-alipay
+```
 
 ## 6. 审核注意
 

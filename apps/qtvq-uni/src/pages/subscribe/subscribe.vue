@@ -117,7 +117,7 @@ const clientId = ref('');
 const form = ref({ payerName: '', amount: '', remark: '' });
 let stopPoll = null;
 
-const selectedPrice = computed(() => plans.find((p) => p.id === selected.value)?.price || 28);
+const selectedPrice = computed(() => plans.find((p) => p.id === selected.value)?.price || 29);
 
 function selectPlan(id) {
   selected.value = id;
