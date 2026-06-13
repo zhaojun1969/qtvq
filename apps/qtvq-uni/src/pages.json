@@ -3,6 +3,7 @@
     {
       "path": "pages/index/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "Q问",
         "navigationBarBackgroundColor": "#0f0e17",
         "navigationBarTextStyle": "white"

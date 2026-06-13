@@ -2,8 +2,8 @@
   "name": "我心永恒 Q问",
   "appid": "__UNI__QTVQ001",
   "description": "情感避坑 + AI 智慧问答",
-  "versionName": "1.0.1",
-  "versionCode": "101",
+  "versionName": "1.0.2",
+  "versionCode": "102",
   "transformPx": false,
   "app-plus": {
     "usingComponents": true,

@@ -1,67 +1,91 @@
 <template>
   <view class="page">
-    <view class="hero card">
-      <image class="logo" src="@/static/logo-108.png" mode="aspectFit" />
-      <text class="tagline">写下你的爱情难题，我教你直线走</text>
-      <text class="sub">避坑 + 直线解决 · {{ platformName }}</text>
+    <!-- 顶栏：Logo + Q问（与系统导航同一行位置） -->
+    <view class="custom-nav" :style="{ paddingTop: statusBarPx + 'px', height: navTotalPx + 'px' }">
+      <view class="nav-inner" :style="{ height: navBarPx + 'px' }">
+        <image class="nav-logo" src="@/static/logo-108.png" mode="aspectFit" />
+        <view class="nav-text">
+          <text class="nav-title">Q问</text>
+          <text class="nav-sub">我心永恒 · qtvq.cn</text>
+        </view>
+      </view>
     </view>
 
-    <scroll-view v-if="hotTopics.length" scroll-x class="hot-scroll" show-scrollbar="false">
-      <view class="hot-row">
-        <view v-for="(t, i) in hotTopics" :key="i" class="hot-chip" @click="fillQuestion(t.text)">
-          <text>{{ t.text }}</text>
+    <view class="page-body" :style="{ paddingTop: navTotalPx + 'px' }">
+      <scroll-view v-if="hotTopics.length" scroll-x class="hot-scroll" show-scrollbar="false">
+        <view class="hot-row">
+          <view v-for="(t, i) in hotTopics" :key="i" class="hot-chip" @click="fillQuestion(t.text)">
+            <text>{{ t.text }}</text>
+          </view>
         </view>
-      </view>
-    </scroll-view>
+      </scroll-view>
 
-    <scroll-view scroll-y class="messages" :scroll-top="scrollTop">
-      <view v-if="messages.length === 0" class="welcome">
-        👋 你好，我是 Q 智慧顾问。描述情感困境，我会给你直线方案。
-      </view>
-      <view
-        v-for="(m, i) in messages"
-        :key="i"
-        :class="['msg', m.role === 'user' ? 'msg-user' : 'msg-ai']"
-      >
-        <text>{{ m.text }}</text>
-      </view>
-      <view v-if="loading" class="msg msg-ai">思考中…</view>
-    </scroll-view>
-
-    <scroll-view v-if="stories.length" scroll-x class="stories-scroll" show-scrollbar="false">
-      <view class="stories-row">
-        <view v-for="(s, i) in stories" :key="i" class="story-card" @click="fillQuestion(s.prompt)">
-          <text class="story-tag">{{ s.tag }}</text>
-          <text class="story-text">{{ s.text }}</text>
+      <scroll-view scroll-y class="messages" :scroll-top="scrollTop">
+        <view v-if="messages.length === 0" class="welcome-panel">
+          <text class="welcome-title">👋 你好，我是 Q 智慧顾问</text>
+          <text class="welcome-desc">描述你的情感困境，我会给出直线行动方案（匿名提问，不存真实姓名）</text>
+          <view class="guide-box">
+            <text class="guide-head">怎么用？</text>
+            <text v-for="(step, i) in usageSteps" :key="i" class="guide-step">{{ i + 1 }}. {{ step }}</text>
+          </view>
+          <text class="example-head">试试这些问题（点一下填入输入框）：</text>
+          <view class="example-list">
+            <view
+              v-for="(q, i) in exampleQuestions"
+              :key="i"
+              class="example-item"
+              @click="fillQuestion(q)"
+            >
+              <text>{{ q }}</text>
+            </view>
+          </view>
         </view>
-      </view>
-    </scroll-view>
-
-    <view class="input-area card">
-      <textarea
-        v-model="question"
-        class="input"
-        placeholder="例如：暧昧半年对方不确认关系，我该怎么办？"
-        :maxlength="500"
-        auto-height
-      />
-      <view class="actions">
-        <button
-          class="btn-secondary voice-btn"
-          size="mini"
-          :class="{ recording: voiceRecording }"
-          @click="onVoice"
+        <view
+          v-for="(m, i) in messages"
+          :key="i"
+          :class="['msg', m.role === 'user' ? 'msg-user' : 'msg-ai']"
         >
-          {{ voiceRecording ? '⏹ 停止' : '🎤 语音' }}
-        </button>
-        <button class="btn-primary" size="mini" :disabled="loading" @click="onAsk">获取直线方案</button>
-        <button class="btn-secondary" size="mini" :disabled="!canFollowUp || loading" @click="onFollowUp">
-          再问一步
-        </button>
-      </view>
-      <view class="quota-row">
-        <text class="quota">{{ quotaText }}</text>
-        <text class="link" @click="goSubscribe">办理会员</text>
+          <text>{{ m.text }}</text>
+        </view>
+        <view v-if="loading" class="msg msg-ai">思考中…</view>
+      </scroll-view>
+
+      <scroll-view v-if="stories.length" scroll-x class="stories-scroll" show-scrollbar="false">
+        <view class="stories-row">
+          <view v-for="(s, i) in stories" :key="i" class="story-card" @click="fillQuestion(s.prompt)">
+            <text class="story-tag">{{ s.tag }}</text>
+            <text class="story-text">{{ s.text }}</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="input-area card">
+        <textarea
+          v-model="question"
+          class="input"
+          placeholder="例如：暧昧半年对方不确认关系，我该怎么办？"
+          :maxlength="500"
+          :auto-height="true"
+          :show-confirm-bar="false"
+        />
+        <view class="actions">
+          <button
+            class="btn-secondary voice-btn"
+            size="mini"
+            :class="{ recording: voiceRecording }"
+            @click="onVoice"
+          >
+            {{ voiceRecording ? '⏹ 停止' : '🎤 语音' }}
+          </button>
+          <button class="btn-primary" size="mini" :disabled="loading" @click="onAsk">获取直线方案</button>
+          <button class="btn-secondary" size="mini" :disabled="!canFollowUp || loading" @click="onFollowUp">
+            再问一步
+          </button>
+        </view>
+        <view class="quota-row">
+          <text class="quota">{{ quotaText }}</text>
+          <text class="link" @click="goSubscribe">办理会员</text>
+        </view>
       </view>
     </view>
   </view>
@@ -74,8 +98,12 @@ import { getClientId } from '../../utils/clientId.js';
 import { formatQuotaText, addStats } from '../../utils/user.js';
 import { askChat } from '../../api/chat.js';
 import { fetchQuota } from '../../api/quota.js';
-import { HOT_TOPICS, SUCCESS_STORIES } from '../../data/constants.js';
-import { platformLabel } from '../../utils/platform.js';
+import {
+  HOT_TOPICS,
+  SUCCESS_STORIES,
+  USAGE_STEPS,
+  EXAMPLE_QUESTIONS,
+} from '../../data/constants.js';
 import {
   checkSpeechAvailable,
   startRecording,
@@ -93,8 +121,31 @@ const voiceRecording = ref(false);
 const speechOk = ref(false);
 const hotTopics = HOT_TOPICS;
 const stories = SUCCESS_STORIES;
-const platformName = platformLabel();
+const usageSteps = USAGE_STEPS;
+const exampleQuestions = EXAMPLE_QUESTIONS;
+const statusBarPx = ref(20);
+const navBarPx = ref(44);
+const navTotalPx = ref(64);
 let lastQuestion = '';
+
+function initNavBar() {
+  const sys = uni.getSystemInfoSync();
+  const sb = sys.statusBarHeight || 20;
+  statusBarPx.value = sb;
+  let bar = 44;
+  // #ifdef MP-WEIXIN
+  try {
+    const menu = uni.getMenuButtonBoundingClientRect();
+    if (menu?.height) {
+      bar = (menu.top - sb) * 2 + menu.height;
+    }
+  } catch {
+    /* ignore */
+  }
+  // #endif
+  navBarPx.value = bar;
+  navTotalPx.value = sb + bar;
+}
 
 async function loadQuota() {
   try {
@@ -205,6 +256,7 @@ async function onVoice() {
 }
 
 onLoad((opts) => {
+  initNavBar();
   if (opts?.q) {
     question.value = decodeURIComponent(opts.q);
   }
@@ -223,6 +275,7 @@ onShow(() => {
 });
 
 onMounted(async () => {
+  initNavBar();
   loadQuota();
   speechOk.value = await checkSpeechAvailable();
 });
@@ -230,42 +283,60 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .page {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 24rpx;
+  min-height: 100vh;
+  background: #0f0e17;
+}
+
+.custom-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #0f0e17;
+  border-bottom: 1rpx solid rgba(108, 92, 231, 0.25);
   box-sizing: border-box;
 }
 
-.hero {
+.nav-inner {
+  display: flex;
+  align-items: center;
+  padding: 0 24rpx;
+  gap: 16rpx;
+}
+
+.nav-logo {
+  width: 56rpx;
+  height: 56rpx;
   flex-shrink: 0;
-  margin-bottom: 12rpx;
+}
+
+.nav-text {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
-.logo {
-  width: 72rpx;
-  height: 72rpx;
-  margin-bottom: 8rpx;
-}
-
-.tagline {
-  display: block;
-  font-size: 32rpx;
+.nav-title {
+  font-size: 34rpx;
   font-weight: 700;
-  background: linear-gradient(135deg, #ff6b81, #6c5ce7);
-  -webkit-background-clip: text;
-  color: transparent;
-  text-align: center;
+  color: #f5f5f7;
+  line-height: 1.2;
 }
 
-.sub {
-  display: block;
-  font-size: 22rpx;
+.nav-sub {
+  font-size: 20rpx;
   color: #a0a0b0;
-  margin-top: 8rpx;
+  line-height: 1.2;
+}
+
+.page-body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0 24rpx 24rpx;
+  box-sizing: border-box;
 }
 
 .hot-scroll,
@@ -319,15 +390,70 @@ onMounted(async () => {
 
 .messages {
   flex: 1;
-  min-height: 160rpx;
+  min-height: 120rpx;
   margin-bottom: 12rpx;
 }
 
-.welcome {
-  text-align: center;
+.welcome-panel {
+  text-align: left;
+  padding: 8rpx 4rpx 16rpx;
+}
+
+.welcome-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #ff8fa3;
+  margin-bottom: 8rpx;
+}
+
+.welcome-desc {
+  display: block;
+  font-size: 24rpx;
   color: #a0a0b0;
-  font-size: 26rpx;
-  padding: 24rpx 20rpx;
+  line-height: 1.5;
+  margin-bottom: 16rpx;
+}
+
+.guide-box {
+  background: rgba(108, 92, 231, 0.12);
+  border: 1rpx solid rgba(108, 92, 231, 0.35);
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.guide-head,
+.example-head {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #c8c8d8;
+  margin-bottom: 10rpx;
+}
+
+.guide-step {
+  display: block;
+  font-size: 24rpx;
+  color: #a0a0b0;
+  line-height: 1.55;
+  margin-bottom: 6rpx;
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.example-item {
+  padding: 14rpx 18rpx;
+  background: #242338;
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(255, 107, 129, 0.35);
+  font-size: 24rpx;
+  color: #c8c8d8;
+  line-height: 1.45;
 }
 
 .msg {
@@ -353,11 +479,13 @@ onMounted(async () => {
 
 .input-area {
   flex-shrink: 0;
+  margin-bottom: 0;
 }
 
 .input {
   width: 100%;
-  min-height: 120rpx;
+  min-height: 88rpx;
+  max-height: 200rpx;
   background: #0f0e17;
   border: 1rpx solid rgba(108, 92, 231, 0.4);
   border-radius: 16rpx;

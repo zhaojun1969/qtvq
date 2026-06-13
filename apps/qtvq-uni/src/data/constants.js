@@ -37,6 +37,20 @@ export const PLANS = [
 ];
 
 /** 与 manifest versionName 同步，便于核对是否为新包 */
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.0.2';
+
+/** Q问首页 · 空状态引导 */
+export const USAGE_STEPS = [
+  '点下方示例问题，或自己在输入框描述困境',
+  '点「获取直线方案」，看可执行的行动建议',
+  '想细化可点「再问一步」（不计入每日次数）',
+];
+
+export const EXAMPLE_QUESTIONS = [
+  '暧昧半年对方不确认关系，我该怎么办？',
+  '网恋没见面就借钱，该不该借？',
+  '对方冷暴力已读不回，第一条消息怎么发？',
+  '第一次见家长，礼物和话术怎么准备？',
+];
 
 export const WEB_BASE = 'https://qtvq.cn';
