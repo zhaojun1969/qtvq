@@ -1,0 +1,46 @@
+# QTVQ 新服务（路线 B）本地/内测编排
+#
+# 用法：
+#   cp .env.example .env       # 填 DASHSCOPE_API_KEY
+#   docker compose up -d mongo
+#   npm install && npm run import:pitfalls
+#   npm run dev
+#
+# 生产注意：
+# - 单节点 mongo 仅适合开发。要启用 Change Stream / 事务，需要 --replSet（见下方注释）。
+# - 本方案不依赖 Atlas Vector Search，因此不需要 Atlas，也就没有数据出境问题。
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: qtvq-mongo
+    restart: unless-stopped
+    # 需要副本集（Change Stream / 多文档事务）时改为：
+    #   command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    # 然后执行：docker exec -it qtvq-mongo mongosh --eval 'rs.initiate()'
+    ports:
+      - "127.0.0.1:27017:27017"   # 只监听本机，避免数据库直接暴露公网
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: qtvq-api-b
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/qtvq
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"     # 由上层 Nginx 反代到 /v1/，不直接对公网开放
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
