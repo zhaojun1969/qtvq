@@ -1,4 +1,4 @@
-# Post-deploy: upload secrets from .dev.vars, redeploy qtvq-api, smoke test
+﻿# Post-deploy: upload secrets from .dev.vars, redeploy qtvq-api, smoke test
 # Usage: powershell -ExecutionPolicy Bypass -File tools/scripts/post-deploy.ps1
 
 $ErrorActionPreference = "Stop"

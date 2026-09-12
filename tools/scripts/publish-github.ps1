@@ -1,4 +1,4 @@
-# Create GitHub repo and push (requires gh auth login)
+﻿# Create GitHub repo and push (requires gh auth login)
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/publish-github.ps1 [-RepoName qtvq] [-Private]
 
 param(

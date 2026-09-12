@@ -1,4 +1,4 @@
-# Copy verify/*.txt and MP_verify*.txt to static stage root
+﻿# Copy verify/*.txt and MP_verify*.txt to static stage root
 param(
     [Parameter(Mandatory = $true)][string]$Stage,
     [Parameter(Mandatory = $true)][string]$Root

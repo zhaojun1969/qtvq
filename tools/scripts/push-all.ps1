@@ -1,4 +1,4 @@
-# 一键推送 GitHub + Gitee（均需私有仓库）
+﻿# 一键推送 GitHub + Gitee（均需私有仓库）
 
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path

@@ -1,4 +1,4 @@
-# 打包项目上下文（文档 + 对话记录 + 源码，排除密钥）
+﻿# 打包项目上下文（文档 + 对话记录 + 源码，排除密钥）
 # 输出: dist/qtvq-context-YYYYMMDD-HHmmss.zip
 
 $ErrorActionPreference = "Stop"

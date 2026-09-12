@@ -1,4 +1,4 @@
-# Upload NLS speech secret from .dev.vars to Cloudflare Pages (qtvq-api)
+﻿# Upload NLS speech secret from .dev.vars to Cloudflare Pages (qtvq-api)
 # Usage: powershell -ExecutionPolicy Bypass -File tools/scripts/upload-speech-secrets.ps1
 
 $ErrorActionPreference = "Stop"

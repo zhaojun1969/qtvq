@@ -1,4 +1,4 @@
-# Create Cloudflare KV QTVQ_KV and update wrangler.toml
+﻿# Create Cloudflare KV QTVQ_KV and update wrangler.toml
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/setup-kv.ps1
 
 $ErrorActionPreference = "Stop"

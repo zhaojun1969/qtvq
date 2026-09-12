@@ -111,6 +111,8 @@ async function main() {
 
   const { connectDB, getDB, closeDB } = await import('../src/config/db.js');
   const { PITFALLS } = await import('../../js/data.js');
+  const { embedMany } = await import('../src/services/embed.js');
+  const { retrievePitfalls } = await import('../src/services/pitfalls.js');
 
   // app.js 在加载时就会连库并开始监听
   await import('../src/app.js');
@@ -122,25 +124,39 @@ async function main() {
   }
   await connectDB();
 
+  // 模型配置决定了走「真实 AI 路径」还是「确定性兜底路径」，断言随之切换
+  const models = health0.data?.models || {};
+  const embedOn = !!models.embed?.configured;
+  const llmOn = !!models.llm?.configured;
+  const expectDims = embedOn ? Number(models.embedDims || 1024) : 0;
+  console.log(`  向量 : ${embedOn ? `开 (${models.embed.model})` : '关 → 走字面相似度'}`);
+  console.log(`  对话 : ${llmOn ? `开 (${models.llm.model})` : '关 → 走确定性兜底'}`);
+  console.log(`  预期 : 资料向量 ${expectDims} 维；报告 ${llmOn ? '真实模型生成' : '兜底生成'}\n`);
+
   // ---- 语料：集合为空才写入，绝不覆盖已有向量 ----
   const pitfallCount = await getDB().collection('pitfalls').countDocuments();
   if (pitfallCount === 0) {
+    const texts = PITFALLS.map((p) => [p.category, p.title, p.lesson, p.steps].filter(Boolean).join(' '));
+    const vectors = embedOn ? await embedMany(texts) : new Array(PITFALLS.length).fill(null);
+    const vectorOk = vectors.filter(Boolean).length;
     await getDB()
       .collection('pitfalls')
       .insertMany(
-        PITFALLS.map((p) => ({
+        PITFALLS.map((p, i) => ({
           id: p.id,
           category: p.category,
           title: p.title,
           lesson: p.lesson || '',
           steps: p.steps || '',
-          vector: null,
-          vectorDims: 0,
+          vector: vectors[i] || null,
+          vectorDims: vectors[i] ? vectors[i].length : 0,
           createdAt: new Date(),
         })),
         { ordered: false },
       );
-    console.log(`  已写入 ${PITFALLS.length} 条避坑案例（无向量，走关键词兜底）\n`);
+    console.log(
+      `  已写入 ${PITFALLS.length} 条避坑案例（带向量 ${vectorOk} 条${embedOn ? '' : '；未配置 Embedding，走关键词兜底'}）\n`,
+    );
   } else {
     console.log(`  pitfalls 已有 ${pitfallCount} 条，跳过写入（不覆盖）\n`);
   }
@@ -195,7 +211,11 @@ async function main() {
   check('A 资料写入成功', pa.status === 200 && pa.json?.data?.user?.nickname === '阿哲', `status=${pa.status}`);
   check('A 向量重算被触发', pa.json?.data?.vectorUpdated === true);
   const dimsA = pa.json?.data?.vectorDims;
-  check('无密钥时向量为 0 维（降级而非报错）', dimsA === 0, `vectorDims=${dimsA}`);
+  check(
+    embedOn ? `资料向量为 ${expectDims} 维` : '未配置 Embedding 时向量为 0 维（降级而非报错）',
+    dimsA === expectDims,
+    `vectorDims=${dimsA}`,
+  );
 
   const pb = await req('PATCH', '/v1/profile/me', {
     token: tokB,
@@ -230,8 +250,20 @@ async function main() {
   check('三个维度都有分数', ['interest', 'personality', 'lifestyle'].every((k) => typeof g?.scores?.[k] === 'number'), JSON.stringify(g?.scores));
   check('综合分在 [0,1]', g?.overall >= 0 && g?.overall <= 1, `overall=${g?.overall}`);
   check('正文非空（兜底分支也必须有内容）', typeof g?.content === 'string' && g.content.length > 50, `len=${g?.content?.length}`);
-  check('标注为兜底生成', g?.fallback === true);
+  check(
+    llmOn ? '走真实模型生成（未兜底）' : '未配置对话模型时标注为兜底',
+    g?.fallback === !llmOn,
+    `fallback=${g?.fallback}${g?.llmError ? ` err=${g.llmError}` : ''}`,
+  );
+  if (llmOn) check('AI 正文长度合理（>200 字）', (g?.content || '').length > 200, `len=${g?.content?.length}`);
   check('引用了避坑案例', Array.isArray(g?.pitfalls) && g.pitfalls.length > 0, `hits=${g?.pitfalls?.length} via ${g?.retrieval}`);
+
+  if (embedOn) {
+    // 用一句明显相关的问法单独验证「向量检索」这条路真的通
+    const rv = await retrievePitfalls('网恋对象一直借钱要我转账，是不是杀猪盘', 3);
+    check('向量检索命中避坑案例', rv.method === 'vector' && rv.hits.length > 0, `method=${rv.method} hits=${rv.hits.length} top=${rv.hits[0]?.title || '-'}`);
+    check('检索结果语义相关（命中网恋类）', (rv.hits || []).some((h) => h.category === '网恋'), `cats=${(rv.hits || []).map((h) => h.category).join(',') || '-'}`);
+  }
   check('对方信息已脱敏快照', !!g?.target?.nickname && g.target.uid === E2E_UIDS[1]);
 
   const reportId = g?.reportId;

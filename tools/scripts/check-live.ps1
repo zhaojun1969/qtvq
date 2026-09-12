@@ -1,4 +1,4 @@
-# 上线自检 · qtvq.cn 静态 + qtvq-api（含版本与最新 API 特性）
+﻿# 上线自检 · qtvq.cn 静态 + qtvq-api（含版本与最新 API 特性）
 
 $ErrorActionPreference = "Continue"
 $Api = "https://qtvq-api.pages.dev"

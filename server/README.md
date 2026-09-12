@@ -63,6 +63,46 @@ E2E_ACK=1 MONGO_URI='mongodb://127.0.0.1:27017/qtvq' npm run test:e2e
 
 安全约定：用外部库时只删除自己创建的 `u_e2e_*` 文档，**绝不 drop 数据库**；`pitfalls` 集合已有数据时跳过写入，**不会覆盖你正式导入的向量**。
 
+## 与前端的对接（Nginx 同源反代，不要开公网端口）
+
+前端页面 `report.html` 通过 **同源** `/v1/...` 访问本服务，因此**不需要 CORS**，也不会有预检请求。
+在 `qtvq.cn` 的 Nginx server 块里加一段即可：
+
+```nginx
+# /etc/nginx/sites-available/qtvq.conf  （在 server { ... } 内）
+location /v1/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # 报告生成要等大模型，默认 60s 会 502
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+}
+```
+
+`proxy_read_timeout` 必须放大：生成一份 ¥20/¥50 档报告要跑 1000+ token，实测 20–40 秒，
+Nginx 默认 60s 看着够，但叠加排队和模型慢响应就会 502 —— 前端会看到「请求超时」。
+
+改完执行 `sudo nginx -t && sudo systemctl reload nginx`。
+
+对接要点（前端已按此实现，见 `js/report-api.js`）：
+
+| 项 | 说明 |
+|---|---|
+| 基址 | 生产用同源相对路径 `/v1/...`；本地 `python -m http.server 8080` 预览时自动指向 `127.0.0.1:3000` |
+| 鉴权 | 复用现站 token：`localStorage['qtvq_auth_token']`，服务端回源 `LEGACY_API_BASE/api/auth/me` 校验，**不需要重新登录** |
+| 超时 | 客户端对生成类接口用 90s 超时（普通接口 8s），与服务端/Nginx 的超时必须同时放大 |
+| 页面 | `report.html` + `js/report.js` + `js/report-api.js` + `js/report-share.js` + `css/report.css` |
+| 隐私 | `report.html` 带 `noindex, nofollow`；分享链接含 token 且展示个人资料，**不能被搜索引擎收录** |
+
+静态同步脚本已经把这 5 个文件加进清单与校验（`package-static.ps1`、`sync-static-from-windows.ps1`、`sync-static.sh`），
+漏传任何一个都会在打包阶段直接报错，而不是上线后白屏。
+
+
+
 ## 模型配置：两个实测踩到的坑
 
 ### 坑 1：百炼「仅使用免费额度」模式会让对话模型全部 403

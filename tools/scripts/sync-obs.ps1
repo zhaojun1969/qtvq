@@ -1,4 +1,4 @@
-# Sync context + docs to Obsidian vault, then upload context zip to OSS
+﻿# Sync context + docs to Obsidian vault, then upload context zip to OSS
 # Usage: npm run sync:obs  |  pnpm sync:obs
 
 $ErrorActionPreference = "Stop"

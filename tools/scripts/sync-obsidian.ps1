@@ -1,4 +1,4 @@
-# Sync qtvq Markdown docs to local Obsidian vault (obsidian/)
+﻿# Sync qtvq Markdown docs to local Obsidian vault (obsidian/)
 
 
 
@@ -45,11 +45,15 @@ $map = @(
     @{ Src = "docs/GITEE-SETUP.md"; Dest = "03-collab/GITEE-SETUP.md" },
 
     @{ Src = "docs/MULTI-PLATFORM.md"; Dest = "04-platform/MULTI-PLATFORM.md" },
-
+    @{ Src = "docs/MEMBERSHIP-RULES.md"; Dest = "04-platform/MEMBERSHIP-RULES.md" },
+    @{ Src = "docs/PAYMENT-WECHAT-API.md"; Dest = "04-platform/PAYMENT-WECHAT-API.md" },
+    @{ Src = "docs/WECHAT-MINI-LOGIN.md"; Dest = "04-platform/WECHAT-MINI-LOGIN.md" },
+    @{ Src = "docs/WECHAT-OPEN-LOGIN.md"; Dest = "04-platform/WECHAT-OPEN-LOGIN.md" },
     @{ Src = "apps/README.md"; Dest = "04-platform/apps-README.md" },
-
     @{ Src = "apps/qtvq-uni/README.md"; Dest = "04-platform/qtvq-uni-README.md" },
-
+    @{ Src = "apps/qtvq-uni/docs/MULTI-MINI-PROGRAM.md"; Dest = "04-platform/MULTI-MINI-PROGRAM.md" },
+    @{ Src = "apps/qtvq-uni/docs/NAV-DESIGN.md"; Dest = "04-platform/NAV-DESIGN.md" },
+    @{ Src = "apps/qtvq-uni/docs/WEIXIN-ALIPAY.md"; Dest = "04-platform/WEIXIN-ALIPAY.md" },
     @{ Src = "context/CONTEXT-SNAPSHOT.md"; Dest = "05-context/CONTEXT-SNAPSHOT.md" }
 
 )
@@ -164,10 +168,14 @@ Auto-synced from ``d:\qtvq`` via ``pnpm sync:obs``. Edits here may be overwritte
 
 ## Multi-platform
 
-
-
 - [[04-platform/MULTI-PLATFORM|Multi-platform]]
-
+- [[04-platform/MULTI-MINI-PROGRAM|四端小程序同 UI]]
+- [[04-platform/NAV-DESIGN|顶栏与 scroll 规范]]
+- [[04-platform/WEIXIN-ALIPAY|微信/支付宝开发]]
+- [[04-platform/MEMBERSHIP-RULES|会员开通/到期]]
+- [[04-platform/PAYMENT-WECHAT-API|微信支付 API]]
+- [[04-platform/WECHAT-MINI-LOGIN|小程序登录]]
+- [[04-platform/WECHAT-OPEN-LOGIN|PC 扫码登录]]
 - [[04-platform/qtvq-uni-README|uni-app]]
 
 

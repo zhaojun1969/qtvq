@@ -1,4 +1,4 @@
-# 加载 cf.env 到当前进程环境变量
+﻿# 加载 cf.env 到当前进程环境变量
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $cfEnv = Join-Path $Root "cf.env"
 if (-not (Test-Path $cfEnv)) { return $false }

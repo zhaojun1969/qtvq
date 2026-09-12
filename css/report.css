@@ -1,0 +1,506 @@
+/**
+ * 配对报告页专用样式
+ *
+ * 只新增本页需要的东西，复用 css/styles.css 里已有的设计令牌
+ * （--pink / --purple / --bg / --bg-card / --bg-elevated / --text / --text-muted /
+ *   --gradient / --radius / --shadow / --font）与通用 .btn 系列，
+ * 不去改动那份 1700 多行的主样式表，避免影响其它页面。
+ */
+
+.hidden {
+  display: none !important;
+}
+
+.report-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.report-hero {
+  text-align: center;
+  padding: 20px 0 28px;
+}
+
+.report-hero h1 {
+  font-size: 30px;
+  font-weight: 800;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.report-hero p {
+  color: var(--text-muted);
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+/* 后端不可用 / 未登录 等提示条 */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border-left: 4px solid var(--pink);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+.notice.notice-warn {
+  border-left-color: #f6c343;
+}
+
+.notice.notice-ok {
+  border-left-color: #2ecc71;
+}
+
+.notice code {
+  background: var(--bg-elevated);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.panel {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.panel > h2 {
+  font-size: 19px;
+  margin-bottom: 6px;
+}
+
+.panel-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 18px;
+  line-height: 1.7;
+}
+
+/* ---------- 资料表单 ---------- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  padding: 11px 13px;
+  font-size: 14px;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--pink);
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.gender-pick {
+  display: flex;
+  gap: 10px;
+}
+
+.gender-pick button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gender-pick button.active {
+  border-color: var(--pink);
+  background: linear-gradient(135deg, rgba(255, 107, 129, 0.18), rgba(108, 92, 231, 0.18));
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.completeness {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.completeness b {
+  color: var(--pink);
+}
+
+.completeness .miss {
+  color: #f6c343;
+}
+
+/* ---------- 档位 ---------- */
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tier-card {
+  background: var(--bg-elevated);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.tier-card:hover {
+  border-color: rgba(255, 107, 129, 0.5);
+}
+
+.tier-card.active {
+  border-color: var(--pink);
+  background: linear-gradient(135deg, rgba(255, 107, 129, 0.2), rgba(108, 92, 231, 0.2));
+}
+
+.tier-card .tier-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tier-card .tier-price {
+  color: var(--pink);
+  font-weight: 800;
+  font-size: 17px;
+  margin: 4px 0;
+}
+
+.tier-card .tier-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.tier-card .tier-free {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* ---------- 发起配对 ---------- */
+.invite-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.invite-row input {
+  flex: 1;
+  min-width: 240px;
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  padding: 11px 13px;
+  font-size: 13px;
+  font-family: var(--font);
+}
+
+.advanced-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font);
+  padding: 0;
+  margin-top: 14px;
+  text-decoration: underline;
+}
+
+/* ---------- 报告展示 ---------- */
+.report-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 8px 0 20px;
+}
+
+.person {
+  text-align: center;
+  min-width: 110px;
+}
+
+.person .avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--gradient);
+  overflow: hidden;
+}
+
+.person .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person .name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.person .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.score-block {
+  text-align: center;
+}
+
+.score-block .score {
+  font-size: 46px;
+  font-weight: 900;
+  color: var(--pink);
+  line-height: 1;
+}
+
+.score-block .score-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.score-block .tier-badge {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.dim-list {
+  margin: 20px 0;
+}
+
+.dim-row {
+  margin-bottom: 16px;
+}
+
+.dim-row .dim-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 7px;
+}
+
+.dim-row .dim-top .dim-val {
+  color: var(--pink);
+  font-weight: 700;
+}
+
+.dim-row .bar {
+  height: 10px;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dim-row .bar > div {
+  height: 100%;
+  background: var(--gradient);
+  border-radius: 6px;
+  transition: width 0.6s ease;
+}
+
+.dim-row .dim-basis {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.report-content {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.report-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.report-tags span {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.report-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--bg-elevated);
+}
+
+/* ---------- 列表 ---------- */
+.report-list {
+  display: grid;
+  gap: 12px;
+}
+
+.report-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.report-item:hover {
+  transform: translateX(4px);
+}
+
+.report-item .ri-main {
+  min-width: 0;
+}
+
+.report-item .ri-title {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-item .ri-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.report-item .ri-score {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--pink);
+  flex-shrink: 0;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 28px 10px;
+  line-height: 1.8;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -3px;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .report-page {
+    padding: 16px 14px 48px;
+  }
+  .panel {
+    padding: 18px;
+  }
+  .report-hero h1 {
+    font-size: 24px;
+  }
+  .score-block .score {
+    font-size: 38px;
+  }
+  .report-head {
+    gap: 14px;
+  }
+}

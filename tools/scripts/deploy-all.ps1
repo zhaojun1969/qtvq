@@ -1,4 +1,4 @@
-# 一键：部署 qtvq-api + 同步 qtvq.cn 静态
+﻿# 一键：部署 qtvq-api + 同步 qtvq.cn 静态
 # 前置：cf.env 含 CLOUDFLARE_API_TOKEN；SSH 可连阿里云（或跳过静态）
 
 param([switch]$SkipStatic)

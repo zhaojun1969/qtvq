@@ -1,4 +1,4 @@
-# KV setup (if needed) + Pages deploy
+﻿# KV setup (if needed) + Pages deploy
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 [-SkipKv]
 
 param(

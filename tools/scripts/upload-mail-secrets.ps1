@@ -1,4 +1,4 @@
-# Upload mail-related secrets from .dev.vars to Cloudflare Pages (qtvq-api)
+﻿# Upload mail-related secrets from .dev.vars to Cloudflare Pages (qtvq-api)
 # Usage: powershell -ExecutionPolicy Bypass -File tools/scripts/upload-mail-secrets.ps1
 
 $ErrorActionPreference = "Stop"

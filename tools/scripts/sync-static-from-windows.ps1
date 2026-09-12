@@ -1,4 +1,4 @@
-# Sync static files from Windows to Aliyun Nginx (no functions)
+﻿# Sync static files from Windows to Aliyun Nginx (no functions)
 # Requires SSH key or password; set QTVQ_SSH_* in cf.env
 
 param(
@@ -28,7 +28,7 @@ $stage = Join-Path $env:TEMP "qtvq-static-$(Get-Date -Format 'yyyyMMddHHmmss')"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 $items = @(
-    "index.html", "account.html", "wechat-callback.html", "pitfalls.html", "profile.html", "help.html", "privacy.html", "download.html", "404.html",
+    "index.html", "account.html", "wechat-callback.html", "pitfalls.html", "profile.html", "report.html", "help.html", "privacy.html", "download.html", "404.html",
     "css", "js", "assets",
     "robots.txt", "sitemap.xml", "_headers", "_redirects"
 )
@@ -59,7 +59,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $sshArgs = @()
 if (Test-Path $KeyFile) { $sshArgs += @("-i", $KeyFile) }
-$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; echo OK"
+$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; test -f '$Dest/report.html'; test -f '$Dest/js/report.js'; test -f '$Dest/js/report-api.js'; test -f '$Dest/js/report-share.js'; test -f '$Dest/css/report.css'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; grep -q 'js/report.js' '$Dest/report.html'; grep -q 'report.html' '$Dest/index.html'; echo OK"
 $sshArgs += @($target, $remoteCmd)
 
 Write-Host ">> Extract on server at $Dest"

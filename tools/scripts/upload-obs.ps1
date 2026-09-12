@@ -1,4 +1,4 @@
-# Build context zip and upload to OBS
+﻿# Build context zip and upload to OBS
 # Prereq: copy obs.env.example -> obs.env, pip install esdk-obs-python
 
 $ErrorActionPreference = "Stop"

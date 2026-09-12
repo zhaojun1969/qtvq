@@ -1,4 +1,4 @@
-# Bind qtvq.cn / www.qtvq.cn to Pages project qtvq (API)
+﻿# Bind qtvq.cn / www.qtvq.cn to Pages project qtvq (API)
 # DNS CNAME must exist in zone - if OAuth lacks DNS write, add records in Dashboard
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/bind-custom-domain.ps1
 

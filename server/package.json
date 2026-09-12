@@ -10,7 +10,8 @@
     "import:pitfalls": "node scripts/import-pitfalls.mjs",
     "check:imports": "node scripts/check-imports.mjs",
     "probe:models": "node scripts/probe-models.mjs",
-    "test:e2e": "node scripts/e2e-test.mjs"
+    "test:e2e": "node scripts/e2e-test.mjs",
+    "test:frontend": "node scripts/e2e-frontend.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

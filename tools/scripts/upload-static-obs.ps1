@@ -1,4 +1,4 @@
-# Upload dist/qtvq-static.tgz to OSS (qtvq/static/)
+﻿# Upload dist/qtvq-static.tgz to OSS (qtvq/static/)
 # Usage: npm run upload:static-obs
 
 $ErrorActionPreference = "Stop"

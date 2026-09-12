@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Q问配对报告：基于资料向量与真实避坑案例，给出契合度分析与沟通建议。">
+  <!-- 分享链接带 token 且含个人资料，绝不能被搜索引擎收录 -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>配对报告 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">
+          我心永恒
+          <span>Q问 · qtvq.cn</span>
+        </div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="report.html" class="active">配对报告</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="report-page">
+    <section class="report-hero">
+      <h1>配对报告</h1>
+      <p>不靠刷、不靠猜 —— 用资料语义与真实避坑案例，告诉你这段关系值不值得投入、下一步怎么走</p>
+    </section>
+
+    <!-- 后端未部署 / 未登录 / 资料未完善 等提示位 -->
+    <div id="notice-slot"></div>
+
+    <!-- 邀请落地：URL 带 ?invite=xxx 时显示 -->
+    <section id="invite-landing" class="panel hidden">
+      <h2>有人请你做一次配对</h2>
+      <p class="panel-hint" id="invite-from-hint"></p>
+      <div id="invite-from-card"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" id="btn-accept-invite">接受并生成配对报告</button>
+        <a class="btn btn-secondary" href="index.html">先算了</a>
+      </div>
+    </section>
+
+    <!-- 1. 我的资料 -->
+    <section class="panel" id="panel-profile">
+      <h2>1 · 我的资料</h2>
+      <p class="panel-hint">
+        配对报告的准确度几乎完全取决于资料。填完后服务端会把资料转成向量用于语义比对；
+        <strong>年龄限 18–80 岁</strong>，请勿在昵称或简介里填写手机号、微信号等联系方式。
+      </p>
+      <form id="profile-form" autocomplete="off">
+        <div class="form-grid">
+          <div class="field">
+            <label for="pf-nickname">昵称</label>
+            <input id="pf-nickname" name="nickname" maxlength="20" placeholder="例如：阿哲" required>
+          </div>
+          <div class="field">
+            <label>性别</label>
+            <div class="gender-pick" id="pf-gender">
+              <button type="button" data-gender="male">我是男生</button>
+              <button type="button" data-gender="female">我是女生</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="pf-age">年龄</label>
+            <input id="pf-age" name="age" type="number" min="18" max="80" placeholder="18–80">
+          </div>
+          <div class="field">
+            <label for="pf-city">城市</label>
+            <input id="pf-city" name="city" maxlength="20" placeholder="例如：北京">
+          </div>
+          <div class="field">
+            <label for="pf-job">职业</label>
+            <input id="pf-job" name="job" maxlength="30" placeholder="选填">
+          </div>
+          <div class="field">
+            <label for="pf-height">身高（cm）</label>
+            <input id="pf-height" name="height" type="number" min="120" max="240" placeholder="选填">
+          </div>
+          <div class="field full">
+            <label for="pf-tags">兴趣标签（逗号分隔，最多 10 个）</label>
+            <input id="pf-tags" name="tags" placeholder="音乐, 旅行, 咖啡">
+          </div>
+          <div class="field full">
+            <label for="pf-intro">一句话介绍自己</label>
+            <textarea id="pf-intro" name="intro" maxlength="200" placeholder="例如：喜欢安静也喜欢热闹，周末常去爬山"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btn-save-profile">保存资料</button>
+          <span class="completeness" id="profile-completeness"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- 2. 发起配对 -->
+    <section class="panel" id="panel-match">
+      <h2>2 · 和谁配对</h2>
+      <p class="panel-hint">
+        推荐用<strong>邀请链接</strong>：对方（哪怕还没注册）打开后填写资料，系统就会生成你们两人的配对报告。
+        报告归发起方所有，同时立刻给对方一个分享链接，双方看的是同一份。
+      </p>
+
+      <div class="invite-row">
+        <input id="invite-link" type="text" readonly placeholder="还没有邀请链接">
+        <button type="button" class="btn btn-primary" id="btn-create-invite">生成邀请链接</button>
+        <button type="button" class="btn btn-secondary" id="btn-copy-invite" disabled>复制</button>
+      </div>
+
+      <button type="button" class="advanced-toggle" id="btn-toggle-advanced">已有对方账号 ID？手动生成 →</button>
+
+      <div id="advanced-generate" class="hidden" style="margin-top:16px">
+        <div class="invite-row">
+          <input id="target-uid" type="text" placeholder="对方账号 ID（形如 u_xxxxxxx）">
+          <button type="button" class="btn btn-secondary" id="btn-generate-by-uid">生成配对报告</button>
+        </div>
+      </div>
+
+      <h3 style="font-size:15px;margin:22px 0 12px">报告精度</h3>
+      <div class="tier-grid" id="tier-grid"></div>
+      <p class="panel-hint" style="margin-bottom:0">
+        <strong>当前阶段不扣费</strong>：接口返回 <code>billing: "deferred"</code>，档位与价格已在服务端统一定义，
+        接入钱包后即按此表计费。
+      </p>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-list">刷新我的报告</button>
+        <span class="panel-hint" style="margin:0">把邀请链接发给 TA 后，对方填完资料即可在「我的报告」里看到结果。</span>
+      </div>
+    </section>
+
+    <!-- 3. 报告 -->
+    <section class="panel hidden" id="panel-report">
+      <h2>配对报告</h2>
+      <div id="report-body"></div>
+    </section>
+
+    <!-- 4. 列表 -->
+    <section class="panel" id="panel-list">
+      <h2>我的报告</h2>
+      <p class="panel-hint">最近生成的配对报告，点击可重新打开。</p>
+      <div id="report-list-body">
+        <div class="empty-state">加载中…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>域名 qtvq.cn · Q Thought, Voice, Question · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>qtvq@qtvq.cn</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+    <p class="footer-support">
+      <a href="help.html">使用帮助</a>
+      · <a href="privacy.html">隐私说明</a>
+      · <a href="pitfalls.html">避坑大全</a>
+      · <a href="profile.html">我的缘值</a>
+      · <a href="account.html">我的账户</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/report.js"></script>
+</body>
+</html>

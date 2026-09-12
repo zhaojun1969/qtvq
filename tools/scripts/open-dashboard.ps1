@@ -1,4 +1,4 @@
-# Open Cloudflare Pages project in browser
+﻿# Open Cloudflare Pages project in browser
 $urls = @(
     "https://dash.cloudflare.com/bb7eb342a5cfde7c0a84cd9bd519a859/pages/view/qtvq-api",
     "https://qtvq-api.pages.dev",

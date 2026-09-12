@@ -1,4 +1,4 @@
-# 写入 js/version.js（部署/同步前调用，便于线上核对版本）
+﻿# 写入 js/version.js（部署/同步前调用，便于线上核对版本）
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 Set-Location $Root

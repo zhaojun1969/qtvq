@@ -1,4 +1,4 @@
-# Upload WeChat Pay secrets from .dev.vars to Cloudflare Pages (qtvq-api)
+﻿# Upload WeChat Pay secrets from .dev.vars to Cloudflare Pages (qtvq-api)
 # Usage: powershell -ExecutionPolicy Bypass -File tools/scripts/upload-wechat-secrets.ps1
 
 $ErrorActionPreference = "Stop"

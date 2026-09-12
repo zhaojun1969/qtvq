@@ -50,79 +50,177 @@ async function loadQa(db, uid) {
     .toArray();
 }
 
+/** 生成 + 落库，供 /generate 与「接受邀请」共用，避免两条路径逻辑漂移 */
+async function buildAndStoreReport(db, uid, targetUid, tier, question = '') {
+  const { me, ta } = await loadUsers(db, uid, targetUid);
+  const [myQa, taQa] = await Promise.all([loadQa(db, me._id), loadQa(db, ta._id)]);
+
+  const generated = await generateReport({
+    me,
+    ta,
+    tier,
+    question: question ? String(question).slice(0, 500) : '',
+    myQa,
+    taQa,
+  });
+
+  const doc = {
+    uid: me._id,
+    targetUid: ta._id,
+    tier,
+    tierZh: TIERS[tier].zh,
+    price: TIERS[tier].price,
+    status: generated.fallback && !generated.content ? REPORT_STATUS.FAILED : REPORT_STATUS.READY,
+    overall: generated.overall,
+    scores: generated.scores,
+    labels: generated.labels,
+    basis: generated.basis,
+    content: generated.content,
+    pitfalls: generated.pitfalls,
+    retrieval: generated.retrieval,
+    fallback: generated.fallback,
+    model: generated.model,
+    provider: generated.provider,
+    llmError: generated.llmError || null,
+    meSnapshot: publicProfile(me),
+    targetSnapshot: publicProfile(ta),
+    question: question ? String(question).slice(0, 500) : '',
+    shareToken: null,
+    createdAt: new Date(),
+  };
+
+  const { insertedId } = await db.collection('reports').insertOne(doc);
+  return { reportId: insertedId, doc };
+}
+
+/** 统一的报告响应体 */
+function reportResponse(reportId, doc, extra = {}) {
+  return {
+    reportId: String(reportId),
+    tier: doc.tier,
+    tierZh: doc.tierZh,
+    price: doc.price,
+    billing: 'deferred',
+    overall: doc.overall,
+    scores: doc.scores,
+    labels: doc.labels,
+    basis: doc.basis,
+    content: doc.content,
+    pitfalls: doc.pitfalls,
+    retrieval: doc.retrieval,
+    fallback: doc.fallback,
+    model: doc.model,
+    provider: doc.provider,
+    // 走兜底时把上游真实错误一并返回，便于定位（模型未开通/免费额度用尽/超时）
+    llmError: doc.fallback ? doc.llmError || null : null,
+    me: doc.meSnapshot,
+    target: doc.targetSnapshot,
+    createdAt: doc.createdAt,
+    ...extra,
+  };
+}
+
+function validateTier(tier, fallbackTier = 'deep') {
+  const t = tier || fallbackTier;
+  if (!isValidTier(t)) throw badRequest(`无效档位：${t}`, 'E_BAD_TIER');
+  return t;
+}
+
+function validateQuestion(question) {
+  if (!question) return '';
+  const q = String(question);
+  if (q.length > 500) throw badRequest('问题过长（≤500 字）', 'E_QUESTION_LONG');
+  return q.slice(0, 500);
+}
+
 /** POST /v1/report/generate */
 router.post(
   '/generate',
   requireAuth,
   wrap(async (req, res) => {
-    const { targetUid, tier = 'deep', question = '' } = req.body || {};
+    const { targetUid, tier, question } = req.body || {};
     if (!targetUid) throw badRequest('缺少 targetUid', 'E_NO_TARGET');
-    if (!isValidTier(tier)) throw badRequest(`无效档位：${tier}`, 'E_BAD_TIER');
-    if (question && String(question).length > 500) throw badRequest('问题过长（≤500 字）', 'E_QUESTION_LONG');
 
     const db = getDB();
-    const { me, ta } = await loadUsers(db, req.uid, String(targetUid));
+    const { reportId, doc } = await buildAndStoreReport(
+      db,
+      req.uid,
+      String(targetUid),
+      validateTier(tier),
+      validateQuestion(question),
+    );
+    return ok(res, reportResponse(reportId, doc));
+  }),
+);
 
-    const [myQa, taQa] = await Promise.all([loadQa(db, me._id), loadQa(db, ta._id)]);
+/**
+ * GET /v1/report/invite/:token —— 公开：接受邀请前先看是谁邀请的
+ * 只返回对方的公开资料，不泄漏联系方式
+ */
+router.get(
+  '/invite/:token',
+  wrap(async (req, res) => {
+    const db = getDB();
+    const invite = await db.collection('invites').findOne({ token: String(req.params.token) });
+    if (!invite) throw notFound('邀请链接不存在或已失效');
+    const expired = invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now();
+    if (expired) throw badRequest('邀请链接已过期', 'E_INVITE_EXPIRED');
 
-    const generated = await generateReport({
-      me,
-      ta,
-      tier,
-      question: question ? String(question).slice(0, 500) : '',
-      myQa,
-      taQa,
-    });
-
-    const doc = {
-      uid: me._id,
-      targetUid: ta._id,
-      tier,
-      tierZh: TIERS[tier].zh,
-      price: TIERS[tier].price,
-      status: generated.fallback && !generated.content ? REPORT_STATUS.FAILED : REPORT_STATUS.READY,
-      overall: generated.overall,
-      scores: generated.scores,
-      labels: generated.labels,
-      basis: generated.basis,
-      content: generated.content,
-      pitfalls: generated.pitfalls,
-      retrieval: generated.retrieval,
-      fallback: generated.fallback,
-      model: generated.model,
-      provider: generated.provider,
-      llmError: generated.llmError || null,
-      meSnapshot: publicProfile(me),
-      targetSnapshot: publicProfile(ta),
-      question: question ? String(question).slice(0, 500) : '',
-      shareToken: null,
-      createdAt: new Date(),
-    };
-
-    const { insertedId } = await db.collection('reports').insertOne(doc);
+    const from = await db.collection('users').findOne({ _id: invite.fromUid });
+    if (!from) throw notFound('邀请人不存在或已注销');
 
     return ok(res, {
-      reportId: String(insertedId),
-      tier,
-      tierZh: TIERS[tier].zh,
-      price: TIERS[tier].price,
-      billing: 'deferred',
-      overall: doc.overall,
-      scores: doc.scores,
-      labels: doc.labels,
-      basis: doc.basis,
-      content: doc.content,
-      pitfalls: doc.pitfalls,
-      retrieval: doc.retrieval,
-      fallback: doc.fallback,
-      model: doc.model,
-      provider: doc.provider,
-      // 走兜底时把上游真实错误一并返回，便于定位（模型未开通/免费额度用尽/超时）
-      llmError: doc.fallback ? doc.llmError || null : null,
-      me: doc.meSnapshot,
-      target: doc.targetSnapshot,
-      createdAt: doc.createdAt,
+      inviteToken: invite.token,
+      from: publicProfile(from),
+      note: invite.note || '',
+      usedByUid: invite.usedByUid || null,
+      expiresAt: invite.expiresAt || null,
     });
+  }),
+);
+
+/**
+ * POST /v1/report/invite/:token/accept —— 接受邀请并生成报告
+ *
+ * 归属约定：报告归**邀请人**所有（与 /generate 一致：uid=发起方，target=接受方），
+ * 同时立刻签发 shareToken 返回给接受方，双方都能凭链接回看同一份报告。
+ * 这样不需要新增一套「共同所有权」权限模型。
+ */
+router.post(
+  '/invite/:token/accept',
+  requireAuth,
+  wrap(async (req, res) => {
+    const db = getDB();
+    const token = String(req.params.token);
+    const invite = await db.collection('invites').findOne({ token });
+    if (!invite) throw notFound('邀请链接不存在或已失效');
+    if (invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now()) {
+      throw badRequest('邀请链接已过期', 'E_INVITE_EXPIRED');
+    }
+    if (invite.fromUid === req.uid) throw badRequest('不能接受自己发出的邀请', 'E_INVITE_SELF');
+
+    const tier = validateTier((req.body || {}).tier);
+    const question = validateQuestion((req.body || {}).question);
+
+    const { reportId, doc } = await buildAndStoreReport(db, invite.fromUid, req.uid, tier, question);
+
+    const shareToken = newShareToken();
+    const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400000);
+    await db
+      .collection('reports')
+      .updateOne({ _id: reportId }, { $set: { shareToken, shareExpiresAt, updatedAt: new Date() } });
+    await db
+      .collection('invites')
+      .updateOne({ token }, { $set: { usedByUid: req.uid, usedAt: new Date() } });
+
+    return ok(
+      res,
+      reportResponse(reportId, doc, {
+        shareToken,
+        shareExpiresAt,
+        path: `/report.html?id=${String(reportId)}&share=${shareToken}`,
+      }),
+    );
   }),
 );
 
