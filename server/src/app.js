@@ -75,6 +75,42 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
+/**
+ * 连库带重试，且**不阻塞监听**。
+ *
+ * 之前是 `await connectDB()` 再 `listen`，结果是：MongoDB 不可用时进程直接退出，
+ * systemd 按 Restart=always 反复重启 —— 表现为 `systemctl is-active` 显示 active、
+ * 但端口完全没有响应，最容易被误判成「代码坏了」。
+ * 现在先监听再连库：`/v1/health` 会如实报 `mongo.connected: false`，一眼就能看出是数据库问题。
+ */
+let connectAttempt = 0;
+let dbReady = false;
+
+async function connectWithRetry() {
+  connectAttempt += 1;
+  try {
+    await connectDB();
+    dbReady = true;
+    console.log(`[boot] MongoDB 已连接：${env.mongoDb}`);
+  } catch (err) {
+    const delayMs = Math.min(30000, 2000 * connectAttempt);
+    console.error(`[boot] ❌ MongoDB 连接失败（第 ${connectAttempt} 次）：${err.message}`);
+    console.error(
+      `[boot]    ${Math.round(delayMs / 1000)}s 后重试。请依次检查：` +
+        ` 1) systemctl is-active mongod  ` +
+        `2) .env 里的 MONGO_URI=${env.mongoUri.replace(/\/\/[^@]*@/, '//***@')}` +
+        ` 3) 防火墙/安全组是否放通 27017`,
+    );
+    setTimeout(() => {
+      void connectWithRetry();
+    }, delayMs);
+  }
+}
+
+export function isDbReady() {
+  return dbReady;
+}
+
 async function main() {
   const status = providerStatus();
   console.log('[boot] 模型配置:', JSON.stringify(status));
@@ -85,12 +121,13 @@ async function main() {
     console.warn('[boot] ⚠️  对话模型未配置：报告将使用确定性兜底文案');
   }
 
-  await connectDB();
-  console.log(`[boot] MongoDB 已连接：${env.mongoDb}`);
-
+  // 先监听：保证 /v1/health 在数据库故障时依然可答
   const server = app.listen(env.port, () => {
     console.log(`🚀 QTVQ server (路线B 配对报告) on :${env.port}`);
+    console.log(`[boot] 健康检查：curl -s localhost:${env.port}/v1/health`);
   });
+
+  void connectWithRetry();
 
   const shutdown = async (signal) => {
     console.log(`[shutdown] ${signal}`);
