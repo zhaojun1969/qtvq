@@ -9,9 +9,9 @@
  * 若直接复用，一旦换了 provider 就会跨模型比较，相似度不可信。
  * （两者维度都是 1024，所以「维度对得上」不等于「空间一致」，务必重跑本脚本。）
  */
-import { connectDB, closeDB, getDB } from '../src/config/db.js';
+import { connectDB, closeDB } from '../src/config/db.js';
 import { env } from '../src/config/env.js';
-import { embedMany } from '../src/services/embed.js';
+import { embedMany, isEmbedConfigured } from '../src/services/embed.js';
 import { PITFALLS, CATEGORIES } from '../../js/data.js';
 
 function buildText(p) {
@@ -20,21 +20,33 @@ function buildText(p) {
 
 async function main() {
   console.log(`[import] 源案例数：${PITFALLS.length}，分类：${CATEGORIES.join('/')}`);
-  console.log(`[import] Embedding provider=${env.embedProvider} dims=${env.embedDims}`);
+
+  const configured = isEmbedConfigured();
+  console.log(`[import] Embedding provider=${env.embedProvider} dims=${env.embedDims} configured=${configured}`);
 
   const db = await connectDB();
   const col = db.collection('pitfalls');
 
-  const texts = PITFALLS.map(buildText);
-  const vectors = await embedMany(texts);
-  const ok = vectors.filter(Boolean).length;
-  console.log(`[import] 向量生成完成：${ok}/${texts.length}`);
+  let vectors = new Array(PITFALLS.length).fill(null);
+  if (configured) {
+    vectors = await embedMany(PITFALLS.map(buildText));
+    console.log(`[import] 向量生成完成：${vectors.filter(Boolean).length}/${vectors.length}`);
+  }
 
-  if (!ok) {
-    console.error('[import] 没有任何向量生成成功。请检查 DASHSCOPE_API_KEY（或所选 provider 的密钥）后重跑。');
-    console.error('[import] 已中止，未写入数据库 —— 避免写入无向量的半成品数据。');
+  const ok = vectors.filter(Boolean).length;
+
+  if (configured && !ok) {
+    // 配了密钥却一条都没成功，几乎一定是密钥/额度/网络问题，此时中止更好排查
+    console.error('[import] 已配置 Embedding 但全部失败，已中止且未写库。');
+    console.error('[import] 请检查 DASHSCOPE_API_KEY（或所选 provider 的密钥）后重跑。');
     await closeDB();
     process.exit(1);
+  }
+
+  if (!configured) {
+    console.warn('[import] ⚠️  未配置 Embedding：本次只写入文本，不写向量。');
+    console.warn('[import]    报告仍可用 —— 避坑检索会自动降级为关键词匹配（retrievePitfalls 的 keyword 分支）。');
+    console.warn('[import]    配置好密钥后重跑本脚本即可补上向量。');
   }
 
   const ops = PITFALLS.map((p, i) => ({

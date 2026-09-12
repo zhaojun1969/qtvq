@@ -108,6 +108,20 @@ async function callEmbed(texts) {
   }
 }
 
+/** 当前 provider 是否具备调用条件（用于区分「没配密钥」和「配了但调用失败」） */
+export function isEmbedConfigured() {
+  switch (env.embedProvider) {
+    case 'dashscope':
+      return !!env.dashscope.key;
+    case 'workers-ai':
+      return !!(env.cf.accountId && env.cf.token);
+    case 'openai':
+      return !!env.openai.key;
+    default:
+      return false;
+  }
+}
+
 /** 单条向量；失败返回 null，让上层走降级逻辑（不阻塞报告生成） */
 export async function embedOne(text) {
   const t = clampText(text);
