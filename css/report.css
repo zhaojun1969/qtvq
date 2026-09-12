@@ -75,6 +75,74 @@
   box-shadow: var(--shadow);
 }
 
+/* 余额条：让用户在点「生成」之前就知道会花多少、还剩多少 */
+.wallet-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.wallet-bar .wb-balance {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--pink);
+}
+
+.wallet-bar .grow {
+  flex: 1;
+}
+
+.wallet-bar a {
+  font-size: 13px;
+}
+
+/* 举报表单（内联展开，避免再引入一层弹窗） */
+.report-form {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+}
+
+.report-form .row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.report-form select,
+.report-form input,
+.report-form textarea {
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 11px;
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+}
+
+.report-form textarea {
+  width: 100%;
+  min-height: 62px;
+  resize: vertical;
+}
+
+.report-form select:focus,
+.report-form input:focus,
+.report-form textarea:focus {
+  border-color: var(--pink);
+}
+
 .panel > h2 {
   font-size: 19px;
   margin-bottom: 6px;

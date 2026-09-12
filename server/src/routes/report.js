@@ -10,9 +10,11 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { getDB } from '../config/db.js';
 import { REPORT_STATUS, TIERS, USER_STATUS, isValidTier } from '../constants.js';
-import { badRequest, notFound, ok, unauthorized, wrap } from '../lib/http.js';
+import { ApiError, badRequest, notFound, ok, unauthorized, wrap } from '../lib/http.js';
 import { requireAuth, resolveIdentity } from '../middleware/auth.js';
 import { generateReport, publicProfile } from '../services/report.js';
+import { assertSafe } from '../services/content-safety.js';
+import { quote, refund, spend } from '../services/wallet.js';
 
 const router = Router();
 
@@ -133,6 +135,88 @@ function validateQuestion(question) {
   return q.slice(0, 500);
 }
 
+/**
+ * 带计费的生成：报价 → 幂等扣款 → 生成 → 失败退回。
+ *
+ * **付款人与报告归属人是两个概念**，必须分开传：
+ *   - `/generate`：自己生成，两者都是本人；
+ *   - 接受邀请：**接受方付款**（是他点的生成），但**报告归邀请人**（与 /generate 的语义一致：
+ *     uid=发起方，target=接受方），随后签发 shareToken 让接受方也能看同一份。
+ * 混为一谈会让「谁付钱」和「报告归谁」两个问题互相污染。
+ *
+ * 顺序也是刻意的：
+ * 1. 先 `loadUsers` 校验目标存在 —— 不能扣了钱才发现对方不存在；
+ * 2. `spend` 用唯一索引做幂等，重复请求不会二次扣款；
+ * 3. 扣款成功后才生成；生成抛错则 `refund` 退给**付款人**并留痕，
+ *    **不留「扣了钱没报告」的静默状态**。
+ */
+async function chargeAndGenerate({
+  db,
+  ownerUid,
+  payerUid,
+  targetUid,
+  tier,
+  question,
+  membership,
+  idempotencyKey,
+}) {
+  const { me, ta } = await loadUsers(db, ownerUid, targetUid);
+
+  const bill = await quote({ uid: payerUid, tier, membership });
+  const paid = await spend(payerUid, bill.amount, {
+    reason: bill.reason,
+    idempotencyKey,
+    meta: { tier, targetUid: String(targetUid), ownerUid, payerUid, price: bill.price },
+  });
+
+  // 幂等重放：直接返回上一次的结果，而不是再生成一份（也更省钱）
+  if (paid.replayed) {
+    if (paid.failed) {
+      throw new ApiError(
+        402,
+        `余额不足：本次需要 ¥${bill.price.toFixed(2)}，当前余额 ¥${Number(paid.balance || 0).toFixed(2)}`,
+        'E_INSUFFICIENT_BALANCE',
+      );
+    }
+    const previousId = paid.entry?.ref;
+    if (previousId) {
+      const doc = await loadReportDoc(db, previousId);
+      if (doc) {
+        return { reportId: doc._id, doc, bill, replayed: true, charged: 0, balance: paid.entry?.balanceAfter ?? null };
+      }
+    }
+    throw new ApiError(409, '上一次同样的请求还在处理中，请稍后刷新', 'E_DUPLICATE_IN_FLIGHT');
+  }
+
+  try {
+    const { reportId, doc } = await buildAndStoreReport(db, ownerUid, targetUid, tier, question);
+    // 把报告 id 记到账本上，供重放时直接取回
+    if (idempotencyKey) {
+      await db.collection('wallet_ledger').updateOne({ idempotencyKey }, { $set: { ref: String(reportId) } });
+    }
+    return { reportId, doc, bill, replayed: false, charged: paid.charged, balance: paid.balance };
+  } catch (err) {
+    if (paid.charged > 0) {
+      await refund(payerUid, paid.charged, {
+        reason: 'refund',
+        ref: idempotencyKey || `auto:${Date.now()}:${payerUid}`,
+        meta: { tier, targetUid: String(targetUid), error: String(err?.message || err).slice(0, 200) },
+      }).catch((e) => console.error('[billing] 退款失败，需人工介入：', payerUid, paid.charged, e.message));
+    }
+    throw err;
+  }
+}
+
+async function loadReportDoc(db, reportId) {
+  try {
+    const { ObjectId } = await import('mongodb');
+    if (!ObjectId.isValid(String(reportId))) return null;
+    return await db.collection('reports').findOne({ _id: new ObjectId(String(reportId)) });
+  } catch {
+    return null;
+  }
+}
+
 /** POST /v1/report/generate */
 router.post(
   '/generate',
@@ -141,15 +225,39 @@ router.post(
     const { targetUid, tier, question } = req.body || {};
     if (!targetUid) throw badRequest('缺少 targetUid', 'E_NO_TARGET');
 
+    const t = validateTier(tier);
+    const q = validateQuestion(question);
+    if (q) await assertSafe(q, { field: 'question', label: '问题' });
+
+    const idempotencyKey =
+      String(req.body?.idempotencyKey || req.headers['x-idempotency-key'] || '').trim().slice(0, 80) || null;
+
     const db = getDB();
-    const { reportId, doc } = await buildAndStoreReport(
+    const { reportId, doc, bill, replayed, charged, balance } = await chargeAndGenerate({
       db,
-      req.uid,
-      String(targetUid),
-      validateTier(tier),
-      validateQuestion(question),
+      ownerUid: req.uid,
+      payerUid: req.uid,
+      targetUid: String(targetUid),
+      tier: t,
+      question: q,
+      membership: req.membership,
+      idempotencyKey,
+    });
+
+    return ok(
+      res,
+      reportResponse(reportId, doc, {
+        billing: {
+          enforce: bill.enforce,
+          reason: bill.reason,
+          label: bill.label,
+          price: bill.price,
+          charged: replayed ? 0 : charged ?? bill.amount,
+          balance: typeof balance === 'number' ? balance : null,
+          replayed: !!replayed,
+        },
+      }),
     );
-    return ok(res, reportResponse(reportId, doc));
   }),
 );
 
@@ -201,11 +309,24 @@ router.post(
 
     const tier = validateTier((req.body || {}).tier);
     const question = validateQuestion((req.body || {}).question);
+    if (question) await assertSafe(question, { field: 'question', label: '问题' });
 
-    const { reportId, doc } = await buildAndStoreReport(db, invite.fromUid, req.uid, tier, question);
+    // 谁点「生成」谁付钱：接受邀请的一方触发本次生成，因此由接受方扣款。
+    // 报告仍然归邀请人所有（下方逻辑不变），并立刻签发 shareToken 给接受方。
+    const { reportId, doc, bill, charged, balance } = await chargeAndGenerate({
+      db,
+      ownerUid: invite.fromUid,
+      payerUid: req.uid,
+      targetUid: req.uid,
+      tier,
+      question,
+      membership: req.membership,
+      idempotencyKey: `invite:${token}`,
+    });
 
-    const shareToken = newShareToken();
-    const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400000);
+    // 已有 shareToken 就复用：重复接受邀请时不能把上一次发出去的链接作废
+    const shareToken = doc.shareToken || newShareToken();
+    const shareExpiresAt = doc.shareExpiresAt || new Date(Date.now() + SHARE_TTL_DAYS * 86400000);
     await db
       .collection('reports')
       .updateOne({ _id: reportId }, { $set: { shareToken, shareExpiresAt, updatedAt: new Date() } });
@@ -219,6 +340,15 @@ router.post(
         shareToken,
         shareExpiresAt,
         path: `/report.html?id=${String(reportId)}&share=${shareToken}`,
+        billing: {
+          enforce: bill.enforce,
+          reason: bill.reason,
+          label: bill.label,
+          price: bill.price,
+          charged: charged ?? bill.amount,
+          balance: typeof balance === 'number' ? balance : null,
+          payer: 'accepter',
+        },
       }),
     );
   }),

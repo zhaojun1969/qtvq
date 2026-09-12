@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Q问 运营台</title>
+<style>
+  :root{
+    --pink:#ff6b81; --purple:#6c5ce7; --bg:#0f0e17; --card:#1a1928; --elev:#242338;
+    --text:#f5f5f7; --muted:#a0a0b0; --ok:#2ecc71; --warn:#f6c343; --err:#ff6b6b;
+    --radius:12px; --font:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6}
+  a{color:var(--pink)}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--elev);position:sticky;top:0;z-index:10}
+  header h1{font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--pink),var(--purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  header .grow{flex:1}
+  input,button,select{font-family:var(--font);font-size:13px;padding:8px 11px;border-radius:9px;border:1px solid var(--elev);background:var(--elev);color:var(--text);outline:none}
+  input:focus,select:focus{border-color:var(--pink)}
+  button{cursor:pointer;background:var(--elev);transition:filter .15s}
+  button:hover{filter:brightness(1.25)}
+  button.primary{background:linear-gradient(135deg,var(--pink),var(--purple));border-color:transparent;color:#fff;font-weight:600}
+  button.danger{color:var(--err)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  main{padding:20px;max-width:1280px;margin:0 auto}
+  nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  nav button.active{background:linear-gradient(135deg,rgba(255,107,129,.25),rgba(108,92,231,.25));border-color:var(--pink)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+  .card{background:var(--card);border-radius:var(--radius);padding:14px 16px}
+  .card .k{color:var(--muted);font-size:12px}
+  .card .v{font-size:22px;font-weight:800;margin-top:4px}
+  .panel{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:18px}
+  .panel h2{font-size:15px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--elev);vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+  td.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  .tag{display:inline-block;padding:2px 8px;border-radius:9px;background:var(--elev);color:var(--muted);font-size:11px;white-space:nowrap}
+  .tag.pending{background:rgba(246,195,67,.18);color:var(--warn)}
+  .tag.approved{background:rgba(46,204,113,.18);color:var(--ok)}
+  .tag.rejected{background:var(--elev);color:var(--muted)}
+  .tag.banned{background:rgba(255,107,107,.18);color:var(--err)}
+  .tag.invisible{background:rgba(160,160,176,.2);color:var(--muted)}
+  .tag.active{background:rgba(46,204,113,.18);color:var(--ok)}
+  .empty{color:var(--muted);padding:18px 4px;text-align:center}
+  .msg{padding:10px 14px;border-radius:9px;background:var(--elev);margin-bottom:14px;display:none}
+  .msg.show{display:block}
+  .msg.err{border-left:3px solid var(--err)}
+  .msg.ok{border-left:3px solid var(--ok)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .muted{color:var(--muted);font-size:12px}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>Q问 运营台</h1>
+  <input id="key" type="password" placeholder="运营口令（X-Admin-Key）" style="width:240px">
+  <button class="primary" id="connect">连接</button>
+  <button id="forget">清除口令</button>
+  <span class="grow"></span>
+  <span class="muted" id="status">未连接</span>
+</header>
+
+<main>
+  <div class="msg" id="msg"></div>
+
+  <nav>
+    <button data-tab="overview" class="active">概览</button>
+    <button data-tab="moderation">举报处理</button>
+    <button data-tab="users">用户与充值</button>
+    <button data-tab="ledger">流水</button>
+    <button data-tab="audit">审计日志</button>
+  </nav>
+
+  <!-- 概览 -->
+  <section id="tab-overview">
+    <div class="cards" id="overview-cards"><div class="card"><div class="k">加载中…</div></div></div>
+    <div class="panel">
+      <h2>内容安全</h2>
+      <div id="safety-info" class="muted">—</div>
+    </div>
+  </section>
+
+  <!-- 举报 -->
+  <section id="tab-moderation" hidden>
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <label class="muted">状态</label>
+        <select id="mod-status">
+          <option value="pending">待处理</option>
+          <option value="approved">已认定</option>
+          <option value="rejected">已驳回</option>
+          <option value="all">全部</option>
+        </select>
+        <button id="mod-refresh">刷新</button>
+        <span class="grow"></span>
+        <span class="muted" id="mod-stats"></span>
+      </div>
+      <table>
+        <thead><tr><th>时间</th><th>对象</th><th>原因</th><th>举报人</th><th>补充说明</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="mod-body"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 用户 -->
+  <section id="tab-users" hidden>
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <input id="user-q" placeholder="搜索 uid / 昵称 / 城市" style="width:260px">
+        <select id="user-status">
+          <option value="">全部状态</option>
+          <option value="active">active</option>
+          <option value="invisible">invisible</option>
+          <option value="banned">banned</option>
+        </select>
+        <button id="user-search" class="primary">搜索</button>
+      </div>
+      <table>
+        <thead><tr><th>uid</th><th>昵称</th><th>资料</th><th>向量</th><th>余额</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="user-body"><tr><td colspan="7" class="empty">输入条件后搜索</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel" id="user-detail-panel" hidden>
+      <h2>用户详情 <span class="muted" id="ud-uid"></span></h2>
+      <div id="user-detail"></div>
+    </div>
+  </section>
+
+  <!-- 流水 -->
+  <section id="tab-ledger" hidden>
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <button id="ledger-refresh">刷新</button>
+        <span class="muted">最近 100 条</span>
+      </div>
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>方向</th><th>金额</th><th>原因</th><th>关联单号</th><th>状态</th><th>余额</th></tr></thead>
+        <tbody id="ledger-body"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 审计 -->
+  <section id="tab-audit" hidden>
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px"><button id="audit-refresh">刷新</button></div>
+      <table>
+        <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>对象</th><th>原因/备注</th></tr></thead>
+        <tbody id="audit-body"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const KEY_STORE = 'qtvq_admin_key';
+const $ = (id) => document.getElementById(id);
+let adminKey = '';
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmt(t){ if(!t) return '—'; const d=new Date(t); if(Number.isNaN(d.getTime())) return '—';
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+
+function msg(text, kind){ const el=$('msg'); el.className='msg show'+(kind?' '+kind:''); el.textContent=text; clearTimeout(msg._t); msg._t=setTimeout(()=>el.classList.remove('show'), 5000); }
+
+async function api(path, opts={}){
+  // 口令只走请求头：放进 URL 会进 Nginx access log
+  const res = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: { 'X-Admin-Key': adminKey, ...(opts.body?{'Content-Type':'application/json'}:{}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let json=null; try{ json=await res.json(); }catch{}
+  if(!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+  return json?.data ?? json;
+}
+
+function setStatus(text, color){ const el=$('status'); el.textContent=text; el.style.color=color||''; }
+
+// ---------------- 概览
+async function loadOverview(){
+  try{
+    const d = await api('/v1/admin/overview');
+    $('overview-cards').innerHTML = [
+      ['用户总数', d.users.total], ['已建向量', d.users.profilesReady],
+      ['封禁', d.users.banned], ['隐藏', d.users.invisible],
+      ['报告总数', d.reports.total], ['今日报告', d.reports.today],
+      ['待处理举报', d.moderation.pending], ['钱包账户', d.wallet.accounts],
+      ['余额合计', '¥'+d.wallet.totalBalance.toFixed(2)],
+      ['累计收入', '¥'+d.wallet.revenueAll.toFixed(2)],
+      ['今日收入', '¥'+d.wallet.revenueToday.toFixed(2)],
+    ].map(([k,v])=>`<div class="card"><div class="k">${esc(k)}</div><div class="v num">${esc(v)}</div></div>`).join('');
+    const s = d.safety;
+    $('safety-info').innerHTML = `本地词表 ${s.localWords} 条 / 正则 ${s.localPatterns} 条 · 微信安全接口 ${s.wechatConfigured?'已启用':'未配置'} · 阿里云内容安全 <span class="tag">未实现</span>`;
+    setStatus('已连接 · '+new Date().toLocaleTimeString(), 'var(--ok)');
+    return true;
+  }catch(err){ setStatus('连接失败', 'var(--err)'); msg('加载概览失败：'+err.message,'err'); return false; }
+}
+
+// ---------------- 举报
+async function loadModeration(){
+  try{
+    const status = $('mod-status').value;
+    const d = await api('/v1/admin/moderation?status='+encodeURIComponent(status)+'&limit=100');
+    $('mod-stats').textContent = `待处理 ${d.stats.pending} · 已认定 ${d.stats.approved} · 已驳回 ${d.stats.rejected} · 今日新增 ${d.stats.todayNew}（自动隐藏阈值 ${d.stats.autoHideThreshold} 人）`;
+    if(!d.items.length){ $('mod-body').innerHTML='<tr><td colspan="7" class="empty">没有记录</td></tr>'; return; }
+    $('mod-body').innerHTML = d.items.map(x=>`
+      <tr>
+        <td class="mono">${fmt(x.createdAt)}</td>
+        <td class="mono">${esc(x.targetType)}<br>${esc(x.targetId)}</td>
+        <td>${esc(x.reason)}</td>
+        <td class="mono">${esc(x.reporterUid)}</td>
+        <td>${esc(x.detail||'—')}${x.autoHidden?'<br><span class="tag">已自动隐藏</span>':''}</td>
+        <td><span class="tag ${esc(x.status)}">${esc(x.status)}</span></td>
+        <td>${x.status==='pending' ? `
+          <div class="row">
+            <button class="danger" data-act="approve" data-id="${esc(x.id)}">认定并处置</button>
+            <button data-act="reject" data-id="${esc(x.id)}">驳回</button>
+          </div>` : esc(x.handleNote||'—')}
+        </td>
+      </tr>`).join('');
+  }catch(err){ $('mod-body').innerHTML=`<tr><td colspan="7" class="empty">加载失败：${esc(err.message)}</td></tr>`; }
+}
+
+async function handleModeration(id, action){
+  const note = action==='approve' ? (prompt('处置备注（会写进审计日志）') || '') : (prompt('驳回理由（可留空）') || '');
+  try{
+    const r = await api('/v1/admin/moderation/'+encodeURIComponent(id)+'/handle', { method:'POST', body:{ action, note } });
+    msg(`已${action==='approve'?'认定':'驳回'}${r.effect?` · 效果：${r.effect}`:''}`, 'ok');
+    loadModeration();
+  }catch(err){ msg('处置失败：'+err.message,'err'); }
+}
+
+// ---------------- 用户
+async function searchUsers(){
+  try{
+    const q = $('user-q').value.trim();
+    const st = $('user-status').value;
+    const d = await api('/v1/admin/users?q='+encodeURIComponent(q)+'&status='+encodeURIComponent(st)+'&limit=50');
+    if(!d.items.length){ $('user-body').innerHTML='<tr><td colspan="7" class="empty">没有匹配用户</td></tr>'; return; }
+    $('user-body').innerHTML = d.items.map(u=>`
+      <tr>
+        <td class="mono">${esc(u.uid)}</td>
+        <td>${esc(u.nickname||'—')}</td>
+        <td class="muted">${esc([u.gender,u.age?u.age+'岁':null,u.city].filter(Boolean).join(' · ')||'—')}<br>${esc((u.tags||[]).join('、'))}</td>
+        <td>${u.hasVector?'<span class="tag active">有</span>':'<span class="tag">无</span>'}</td>
+        <td class="num">¥${Number(u.balance).toFixed(2)}</td>
+        <td><span class="tag ${esc(u.status)}">${esc(u.status)}</span></td>
+        <td>
+          <div class="row">
+            <button data-udetail="${esc(u.uid)}">详情</button>
+            <button data-ucredit="${esc(u.uid)}">充值</button>
+            <button data-ustatus="${esc(u.uid)}" data-cur="${esc(u.status)}">改状态</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }catch(err){ $('user-body').innerHTML=`<tr><td colspan="7" class="empty">搜索失败：${esc(err.message)}</td></tr>`; }
+}
+
+async function userDetail(uid){
+  try{
+    const d = await api('/v1/admin/users/'+encodeURIComponent(uid));
+    $('user-detail-panel').hidden = false;
+    $('ud-uid').textContent = uid;
+    const u = d.user;
+    $('user-detail').innerHTML = `
+      <div class="cards">
+        <div class="card"><div class="k">余额</div><div class="v num">¥${Number(d.wallet.balance).toFixed(2)}</div></div>
+        <div class="card"><div class="k">累计入账</div><div class="v num">¥${Number(d.wallet.totalIn).toFixed(2)}</div></div>
+        <div class="card"><div class="k">累计消费</div><div class="v num">¥${Number(d.wallet.totalOut).toFixed(2)}</div></div>
+        <div class="card"><div class="k">被举报</div><div class="v num">${d.moderation.length}</div></div>
+      </div>
+      <p class="muted">昵称 ${esc(u.nickname||'—')} · ${esc([u.gender,u.age,u.city].filter(Boolean).join(' / ')||'资料不全')}</p>
+      <p class="muted" style="margin:8px 0">简介：${esc(u.intro||'—')}</p>
+      <h2 style="font-size:14px;margin:14px 0 8px">最近流水</h2>
+      <table><thead><tr><th>时间</th><th>方向</th><th>金额</th><th>原因</th><th>余额</th></tr></thead><tbody>
+      ${d.ledger.map(x=>`<tr><td class="mono">${fmt(x.createdAt)}</td><td>${esc(x.direction)}</td><td class="num">${x.direction==='out'?'-':'+'}¥${Number(x.amount).toFixed(2)}</td><td>${esc(x.reason)}</td><td class="num">¥${Number(x.balanceAfter??0).toFixed(2)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">无流水</td></tr>'}
+      </tbody></table>`;
+  }catch(err){ msg('读取详情失败：'+err.message,'err'); }
+}
+
+async function creditUser(uid){
+  const amount = prompt(`给 ${uid} 充值多少元？（对公/收款码核实无误后再充）`);
+  if(amount===null) return;
+  const ref = prompt('汇款单号 / 银行流水后四位（作为幂等键，重复提交只入账一次；可留空）') || null;
+  try{
+    const r = await api('/v1/admin/users/'+encodeURIComponent(uid)+'/credit', { method:'POST', body:{ amount:Number(amount), ref, reason:'人工核实充值' } });
+    msg(r.replayed ? `该单号已入账过，余额仍为 ¥${Number(r.balance).toFixed(2)}` : `已充值 ¥${r.credited.toFixed(2)}，当前余额 ¥${Number(r.balance).toFixed(2)}`, 'ok');
+    searchUsers();
+  }catch(err){ msg('充值失败：'+err.message,'err'); }
+}
+
+async function changeStatus(uid, cur){
+  const next = prompt(`当前状态：${cur}\n输入新状态：active / invisible / banned`, cur);
+  if(!next) return;
+  const reason = next==='banned' ? (prompt('封禁原因（会写进审计日志）')||'') : '';
+  try{
+    await api('/v1/admin/users/'+encodeURIComponent(uid)+'/status', { method:'POST', body:{ status: next.trim(), reason } });
+    msg('状态已更新','ok'); searchUsers();
+  }catch(err){ msg('更新失败：'+err.message,'err'); }
+}
+
+// ---------------- 流水 / 审计
+async function loadLedger(){
+  try{
+    const d = await api('/v1/admin/ledger?limit=100');
+    if(!d.items.length){ $('ledger-body').innerHTML='<tr><td colspan="8" class="empty">暂无流水</td></tr>'; return; }
+    $('ledger-body').innerHTML = d.items.map(x=>`
+      <tr>
+        <td class="mono">${fmt(x.createdAt)}</td>
+        <td class="mono">${esc(x.uid)}</td>
+        <td>${x.direction==='out'?'支出':x.direction==='in'?'入账':'免费'}</td>
+        <td class="num">${x.direction==='out'?'-':'+'}¥${Number(x.amount).toFixed(2)}</td>
+        <td>${esc(x.reason)}${x.operator?' <span class="tag">'+esc(x.operator)+'</span>':''}</td>
+        <td class="mono">${esc(x.ref||'—')}</td>
+        <td><span class="tag ${x.status==='done'?'approved':x.status==='failed'?'banned':'pending'}">${esc(x.status)}</span></td>
+        <td class="num">${x.balanceAfter==null?'—':'¥'+Number(x.balanceAfter).toFixed(2)}</td>
+      </tr>`).join('');
+  }catch(err){ $('ledger-body').innerHTML=`<tr><td colspan="8" class="empty">加载失败：${esc(err.message)}</td></tr>`; }
+}
+
+async function loadAudit(){
+  try{
+    const d = await api('/v1/admin/audit?limit=100');
+    if(!d.items.length){ $('audit-body').innerHTML='<tr><td colspan="5" class="empty">暂无记录</td></tr>'; return; }
+    $('audit-body').innerHTML = d.items.map(x=>`
+      <tr>
+        <td class="mono">${fmt(x.createdAt)}</td>
+        <td>${esc(x.admin)}</td>
+        <td>${esc(x.action)}</td>
+        <td class="mono">${esc(x.targetType||'—')} ${esc(x.targetId||'')}</td>
+        <td>${esc(x.reason||'—')}${x.meta?`<br><span class="muted">${esc(JSON.stringify(x.meta))}</span>`:''}</td>
+      </tr>`).join('');
+  }catch(err){ $('audit-body').innerHTML=`<tr><td colspan="5" class="empty">加载失败：${esc(err.message)}</td></tr>`; }
+}
+
+// ---------------- 事件
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+    const tab=b.dataset.tab;
+    ['overview','moderation','users','ledger','audit'].forEach(t=>{ $('tab-'+t).hidden = t!==tab; });
+    if(tab==='overview') loadOverview();
+    if(tab==='moderation') loadModeration();
+    if(tab==='ledger') loadLedger();
+    if(tab==='audit') loadAudit();
+  });
+});
+
+$('connect').addEventListener('click', async ()=>{
+  const k=$('key').value.trim();
+  if(!k){ msg('请输入运营口令','err'); return; }
+  adminKey=k;
+  const ok = await loadOverview();
+  if(ok){ localStorage.setItem(KEY_STORE,k); msg('连接成功','ok'); loadModeration(); }
+  else localStorage.removeItem(KEY_STORE);
+});
+$('forget').addEventListener('click', ()=>{ localStorage.removeItem(KEY_STORE); $('key').value=''; adminKey=''; setStatus('未连接'); msg('已清除本机保存的口令','ok'); });
+
+$('key').addEventListener('keydown', e=>{ if(e.key==='Enter') $('connect').click(); });
+
+$('mod-status').addEventListener('change', loadModeration);
+$('mod-refresh').addEventListener('click', loadModeration);
+$('mod-body').addEventListener('click', e=>{
+  const b=e.target.closest('button[data-act]'); if(!b) return;
+  handleModeration(b.dataset.id, b.dataset.act);
+});
+$('user-search').addEventListener('click', searchUsers);
+$('user-q').addEventListener('keydown', e=>{ if(e.key==='Enter') searchUsers(); });
+$('user-body').addEventListener('click', e=>{
+  const d=e.target.closest('button[data-udetail]'); if(d) return userDetail(d.dataset.udetail);
+  const c=e.target.closest('button[data-ucredit]'); if(c) return creditUser(c.dataset.ucredit);
+  const s=e.target.closest('button[data-ustatus]'); if(s) return changeStatus(s.dataset.ustatus, s.dataset.cur);
+});
+$('ledger-refresh').addEventListener('click', loadLedger);
+$('audit-refresh').addEventListener('click', loadAudit);
+
+// 打开即尝试用本机保存的口令连接
+const saved = localStorage.getItem(KEY_STORE);
+if(saved){ $('key').value=saved; adminKey=saved; loadOverview().then(ok=>{ if(ok){ setStatus('已连接（本机口令）','var(--ok)'); loadModeration(); } }); }
+else { setStatus('未连接'); }
+</script>
+</body>
+</html>

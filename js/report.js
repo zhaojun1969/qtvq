@@ -19,9 +19,56 @@ const state = {
   inviteToken: null,
   backendReady: false,
   loggedIn: false,
+  wallet: null,
+  membership: null,
+  quotes: null,
+  // 幂等键：网络重试要复用它，拿到服务端明确结论后要换新的（见 withIdempotency）
+  pendingKey: null,
 };
 
 let gender = null;
+
+/**
+ * 幂等键的生命周期。
+ *
+ * 这一点很容易做错：如果每次点击都换新键，双击就会扣两次钱；如果一直复用同一个键，
+ * 用户充值后再点「生成」会永远拿到上一次的失败结论（402）而无法重试。
+ *
+ * 规则：**只有「根本没拿到服务端响应」（status === 0，超时/断网）才保留键**，
+ * 服务端已经给出结论（4xx/5xx）就换新键 —— 覆盖「重试安全」与「可重试」两个需求。
+ */
+async function withIdempotency(fn) {
+  if (!state.pendingKey) state.pendingKey = api.newIdempotencyKey();
+  try {
+    const result = await fn(state.pendingKey);
+    state.pendingKey = null;
+    return result;
+  } catch (err) {
+    if (err instanceof api.ReportApiError && err.status > 0) state.pendingKey = null;
+    throw err;
+  }
+}
+
+/** 统一处理生成类错误：余额不足 / 内容被拦 / 需要登录 / 需要资料 */
+function handleGenerateError(err) {
+  if (err?.needLogin) {
+    renderNeedLogin('生成配对报告');
+    return;
+  }
+  if (err?.needFunds) {
+    notice(`<strong>${escapeHtml(err.message)}</strong><br>可以在 <a href="account.html">我的账户</a> 通过扫码或对公汇款充值，
+      充值核实到账后回来重新生成即可（已生成的报告不会重复扣费）。`, 'warn');
+    showToast('余额不足');
+    return;
+  }
+  if (err?.blocked) {
+    const cats = err.safety?.categories?.join('、') || '违规内容';
+    notice(`提问被内容安全策略拦下（${escapeHtml(cats)}）。请换一种说法，或直接描述你的困扰本身。`, 'warn');
+    showToast('提问未通过内容检查');
+    return;
+  }
+  showToast(err?.message || '生成失败');
+}
 
 // ---------------------------------------------------------------- 工具
 
@@ -224,7 +271,11 @@ async function saveProfile(e) {
     renderCompleteness(state.profile);
     showToast(data?.vectorUpdated ? '已保存，资料向量已更新' : '已保存');
   } catch (err) {
-    showToast(err.message);
+    if (err?.blocked) {
+      const cats = err.safety?.categories?.join('、') || '违规内容';
+      notice(`资料未通过内容检查（${escapeHtml(cats)}）。请去掉相关表述后重试；昵称与简介里也不允许填写手机号、微信号等联系方式。`, 'warn');
+    }
+    showToast(err?.message || '保存失败');
   } finally {
     btn.disabled = false;
     btn.textContent = original;
@@ -235,15 +286,26 @@ async function saveProfile(e) {
 
 function renderTierGrid() {
   const grid = $('tier-grid');
-  grid.innerHTML = api.TIERS.map(
-    (t) => `
+  grid.innerHTML = api.TIERS.map((t) => {
+    // 有报价就显示「对我会收多少」：免费档 / 会员每日免费 / 实价
+    const q = state.quotes?.[t.key];
+    let badge;
+    if (q) {
+      badge =
+        q.amount === 0
+          ? `<span class="tier-free">${escapeHtml(q.label || '本次免费')}</span>`
+          : `<span class="tier-free">将扣 ¥${q.amount}</span>`;
+    } else {
+      badge = `<span class="tier-free">¥${t.price}</span>`;
+    }
+    return `
     <button type="button" class="tier-card${t.key === state.tier ? ' active' : ''}" data-tier="${t.key}">
       <div class="tier-name">${escapeHtml(t.zh)}</div>
       <div class="tier-price">¥${t.price}</div>
       <div class="tier-desc">${escapeHtml(t.desc)}</div>
-      <span class="tier-free">当前阶段不扣费</span>
-    </button>`,
-  ).join('');
+      ${badge}
+    </button>`;
+  }).join('');
 
   grid.querySelectorAll('.tier-card').forEach((card) => {
     card.addEventListener('click', () => {
@@ -251,6 +313,42 @@ function renderTierGrid() {
       grid.querySelectorAll('.tier-card').forEach((c) => c.classList.toggle('active', c === card));
     });
   });
+}
+
+/** 余额条 + 计费说明 */
+function renderWallet() {
+  const bar = $('wallet-bar');
+  if (!state.wallet) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  $('wallet-balance').textContent = `¥${Number(state.wallet.balance).toFixed(2)}`;
+  const m = state.membership?.active;
+  $('wallet-membership').textContent = m
+    ? `会员有效期至 ${fmtDate(state.membership.activeUntil)}`
+    : '未开通会员（会员每日可免费生成 1 次）';
+
+  const free = api.TIERS.filter((t) => state.quotes?.[t.key]?.amount === 0).map((t) => t.zh);
+  $('billing-hint').innerHTML = state.billingEnabled === false
+    ? '<strong>计费当前未开启</strong>（服务端 <code>ENFORCE_BILLING=0</code>）：会照常记录流水，但不扣余额。'
+    : `生成前会先校验余额，<strong>余额不足不会扣款</strong>；同一请求重复提交只扣一次${free.length ? `；${escapeHtml(free.join('、'))} 本次免费` : ''}。`;
+}
+
+async function loadWallet() {
+  if (!state.loggedIn) return;
+  try {
+    const data = await api.fetchWallet();
+    state.wallet = data?.wallet || null;
+    state.membership = data?.membership || null;
+    state.quotes = data?.quotes || null;
+    state.billingEnabled = data?.billing?.enforce !== false;
+    renderWallet();
+    renderTierGrid();
+  } catch (err) {
+    // 钱包读取失败不影响浏览报告，但要让人知道价格可能不准
+    if (!err?.needLogin) console.warn('[report] 读取钱包失败', err);
+  }
 }
 
 // ---------------------------------------------------------------- 报告渲染
@@ -316,6 +414,27 @@ function renderReport(report, { isOwner = true } = {}) {
       </button>
       <button type="button" class="btn btn-secondary" id="btn-share-image">下载分享长图</button>
       <button type="button" class="btn btn-secondary" id="btn-back-list">返回报告列表</button>
+      <button type="button" class="btn btn-secondary" id="btn-open-complaint">举报</button>
+    </div>
+
+    <div class="report-form hidden" id="complaint-form">
+      <div class="row">
+        <select id="cf-target">
+          <option value="report">举报这份报告的内容</option>
+          <option value="user">举报 TA 的资料（${escapeHtml((target.nickname || '对方').slice(0, 8))}）</option>
+        </select>
+        <select id="cf-reason">
+          ${api.REPORT_REASONS.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
+        </select>
+      </div>
+      <textarea id="cf-detail" maxlength="500" placeholder="补充说明（选填，最多 500 字）。请勿在举报说明里填写手机号等个人信息。"></textarea>
+      <div class="row" style="margin:10px 0 0">
+        <button type="button" class="btn btn-primary" id="cf-submit">提交举报</button>
+        <button type="button" class="btn btn-secondary" id="cf-cancel">取消</button>
+      </div>
+      <p class="panel-hint" style="margin:10px 0 0">
+        举报会提交给运营人工核实；同一对象当天只能举报一次。恶意举报会被记录。
+      </p>
     </div>
     <p class="panel-hint" style="margin:16px 0 0">
       ${isOwner ? '这份报告归你所有，' : '这份报告由他人分享，'}
@@ -331,7 +450,39 @@ function renderReport(report, { isOwner = true } = {}) {
     $('panel-report').classList.add('hidden');
     $('panel-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  $('btn-open-complaint').addEventListener('click', () => {
+    if (!requireLogin()) return;
+    $('complaint-form').classList.toggle('hidden');
+  });
+  $('cf-cancel').addEventListener('click', () => $('complaint-form').classList.add('hidden'));
+  $('cf-submit').addEventListener('click', onSubmitComplaint);
   $('panel-report').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** 提交举报：对象可以是报告内容或对方资料 */
+async function onSubmitComplaint() {
+  const btn = $('cf-submit');
+  const kind = $('cf-target').value;
+  const reason = $('cf-reason').value;
+  const detail = $('cf-detail').value.trim();
+  const targetId = kind === 'report' ? state.report?.reportId : state.report?.target?.uid;
+  if (!targetId) {
+    showToast('找不到举报对象');
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>提交中…';
+  try {
+    const r = await api.submitReport({ targetType: kind, targetId, reason, detail });
+    $('complaint-form').classList.add('hidden');
+    $('cf-detail').value = '';
+    showToast(r?.duplicate ? '今天已经举报过这个对象了，运营正在处理' : '举报已提交，运营会尽快核实');
+  } catch (err) {
+    showToast(err?.message || '举报提交失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '提交举报';
+  }
 }
 
 async function onShareReport() {
@@ -433,7 +584,10 @@ async function onCreateInvite() {
     const copied = await copyText(url);
     showToast(copied ? '邀请链接已复制，发给 TA 即可' : '邀请链接已生成');
   } catch (err) {
-    showToast(err.message);
+    if (err?.needProfile) {
+      notice('请先完善资料，对方才能得到有意义的报告。', 'warn');
+    }
+    showToast(err?.message || '生成邀请链接失败');
   } finally {
     btn.disabled = false;
     btn.textContent = '生成邀请链接';
@@ -485,14 +639,16 @@ async function onAcceptInvite() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>正在生成报告…';
   try {
+    // 幂等键由服务端按邀请 token 生成（invite:<token>），重复接受不会重复扣款
     const report = await api.acceptInvite(state.inviteToken, { tier: state.tier });
     state.shareToken = report.shareToken || null;
     $('invite-landing').classList.add('hidden');
     renderReport(report, { isOwner: false });
-    showToast('报告已生成');
+    showToast(billingToast(report));
+    await loadWallet();
     loadReportList();
   } catch (err) {
-    showToast(err.message);
+    handleGenerateError(err);
     btn.disabled = false;
     btn.textContent = '接受并生成配对报告';
   }
@@ -515,17 +671,27 @@ async function onGenerateByUid() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>生成中…';
   try {
-    const report = await api.generateReport({ targetUid, tier: state.tier });
+    const report = await withIdempotency((key) => api.generateReport({ targetUid, tier: state.tier, idempotencyKey: key }));
     state.shareToken = null;
     renderReport(report, { isOwner: true });
-    showToast('报告已生成');
+    showToast(billingToast(report));
+    await loadWallet();
     loadReportList();
   } catch (err) {
-    showToast(err.message);
+    handleGenerateError(err);
   } finally {
     btn.disabled = false;
     btn.textContent = '生成配对报告';
   }
+}
+
+/** 生成成功后的计费提示：扣了多少 / 为什么免费 / 是否重放 */
+function billingToast(report) {
+  const b = report?.billing;
+  if (!b) return '报告已生成';
+  if (b.replayed) return '这份报告已经生成过，直接为你打开（未重复扣费）';
+  if (b.amount === 0 || b.charged === 0) return `报告已生成 · ${b.label || '本次免费'}`;
+  return `报告已生成 · 已扣 ¥${b.charged}${typeof b.balance === 'number' ? ` · 余额 ¥${b.balance.toFixed(2)}` : ''}`;
 }
 
 // ---------------------------------------------------------------- 初始化
@@ -567,9 +733,10 @@ async function init() {
   // 4) 邀请落地
   if (inviteToken) await loadInviteLanding(inviteToken);
 
-  // 5) 登录后加载资料与列表
+  // 5) 登录后加载资料、钱包与列表
   if (state.loggedIn && state.backendReady) {
     await loadProfile();
+    await loadWallet();
     await loadReportList();
   } else if (state.loggedIn && !state.backendReady) {
     $('report-list-body').innerHTML = '<div class="empty-state">报告服务不可用。</div>';

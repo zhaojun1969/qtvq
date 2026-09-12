@@ -11,6 +11,7 @@ import { USER_STATUS } from '../constants.js';
 import { badRequest, notFound, ok, wrap } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
 import { embedOne, profileText } from '../services/embed.js';
+import { assertSafe } from '../services/content-safety.js';
 
 const router = Router();
 
@@ -155,6 +156,12 @@ router.patch(
     const db = getDB();
     const patch = validateProfileInput(req.body, { partial: true });
     if (!Object.keys(patch).length) throw badRequest('没有需要更新的字段', 'E_EMPTY_PATCH');
+
+    // 词表级内容安全（涉黄/涉赌/涉毒/诈骗/引流/辱骂）。
+    // 上面 validateProfileInput 里的 CONTACT_RE 是同步快速拦截、错误码更精确；
+    // 这里再用词表过一遍，两层互补而不是互相替代。
+    const safetyText = [patch.nickname, patch.intro, ...(patch.tags || [])].filter(Boolean).join(' ');
+    if (safetyText) await assertSafe(safetyText, { field: 'profile', label: '资料' });
 
     const existing = (await db.collection('users').findOne({ _id: req.uid })) || { _id: req.uid, createdAt: new Date() };
     const merged = { ...existing, ...patch };

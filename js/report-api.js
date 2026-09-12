@@ -42,11 +42,12 @@ export const REPORT_API_BASE = (() => {
 })();
 
 export class ReportApiError extends Error {
-  constructor(message, status = 0, code = null) {
+  constructor(message, status = 0, code = null, extra = {}) {
     super(message);
     this.name = 'ReportApiError';
     this.status = status;
     this.code = code;
+    this.safety = extra.safety || null;
   }
   /** 需要用户先登录 */
   get needLogin() {
@@ -56,14 +57,23 @@ export class ReportApiError extends Error {
   get needProfile() {
     return this.code === 'E_NEED_PROFILE';
   }
+  /** 余额不足 */
+  get needFunds() {
+    return this.code === 'E_INSUFFICIENT_BALANCE';
+  }
+  /** 内容被安全策略拦下 */
+  get blocked() {
+    return this.code === 'E_CONTENT_BLOCKED';
+  }
 }
 
 /** 生成报告要走一次大模型，30 秒以上是常态，别用默认的短超时 */
 const DEFAULT_TIMEOUT_MS = 90000;
 
-async function request(method, path, { body, token, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+async function request(method, path, { body, token, timeoutMs = DEFAULT_TIMEOUT_MS, idempotencyKey } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (idempotencyKey) headers['X-Idempotency-Key'] = idempotencyKey;
   const t = token === undefined ? readStore(TOKEN_KEY) : token;
   if (t) headers.Authorization = `Bearer ${t}`;
 
@@ -83,7 +93,9 @@ async function request(method, path, { body, token, timeoutMs = DEFAULT_TIMEOUT_
       /* 网关返回的非 JSON（例如 Nginx 502 页面） */
     }
     if (!res.ok) {
-      throw new ReportApiError(json?.error || `请求失败（HTTP ${res.status}）`, res.status, json?.errorCode || null);
+      throw new ReportApiError(json?.error || `请求失败（HTTP ${res.status}）`, res.status, json?.errorCode || null, {
+        safety: json?.safety || null,
+      });
     }
     return json && Object.prototype.hasOwnProperty.call(json, 'data') ? json.data : json;
   } catch (err) {
@@ -121,10 +133,27 @@ export function fetchProfile(uid) {
 
 /**
  * 生成配对报告
- * @param {{targetUid:string, tier:'basic'|'advanced'|'deep'|'soul', question?:string}} params
+ *
+ * 带 `idempotencyKey`：双击、网络重试、用户反复点「生成」都只会扣一次钱。
+ * 服务端用唯一索引保证，不依赖前端「按钮禁用」这种不可靠的防重。
+ * @param {{targetUid:string, tier:'basic'|'advanced'|'deep'|'soul', question?:string, idempotencyKey?:string}} params
  */
-export function generateReport({ targetUid, tier = 'deep', question = '' }) {
-  return request('POST', '/v1/report/generate', { body: { targetUid, tier, question } });
+export function generateReport({ targetUid, tier = 'deep', question = '', idempotencyKey }) {
+  const key = idempotencyKey || newIdempotencyKey();
+  return request('POST', '/v1/report/generate', {
+    body: { targetUid, tier, question },
+    idempotencyKey: key,
+  });
+}
+
+/** 生成一个幂等键（优先用 crypto.randomUUID） */
+export function newIdempotencyKey() {
+  try {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  } catch {
+    /* 回退 */
+  }
+  return `k_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** 读取报告：本人可读；否则需带 shareToken */
@@ -166,6 +195,34 @@ export function absoluteUrl(path) {
   const loc = globalThis.location;
   const origin = loc && loc.origin ? loc.origin : 'https://qtvq.cn';
   return `${origin}${p}`;
+}
+
+/** 钱包：余额、会员状态、各档位「对我会收多少」 */
+export function fetchWallet() {
+  return request('GET', '/v1/wallet', { timeoutMs: 12000 });
+}
+
+/** 我的流水 */
+export function fetchLedger(limit = 20) {
+  return request('GET', `/v1/wallet/ledger?limit=${encodeURIComponent(limit)}`);
+}
+
+/** 内容安全预检：提交前就能提示，不用等被服务端拒 */
+export function checkText(text, field = 'profile') {
+  return request('POST', '/v1/safety/check', { body: { text, field }, timeoutMs: 12000 });
+}
+
+/** 举报原因（与服务端 services/moderation.js 的 REPORT_REASONS 保持一致） */
+export const REPORT_REASONS = ['涉黄', '广告', '诈骗', '辱骂', '头像违规', '虚假资料', '其他'];
+
+/** 提交举报 */
+export function submitReport({ targetType, targetId, reason, detail = '' }) {
+  return request('POST', '/v1/moderation/report', { body: { targetType, targetId, reason, detail } });
+}
+
+/** 我的举报记录 */
+export function listMyComplaints(limit = 20) {
+  return request('GET', `/v1/moderation/mine?limit=${encodeURIComponent(limit)}`);
 }
 
 /** 档位展示用（与服务端 src/constants.js 保持一致） */

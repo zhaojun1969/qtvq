@@ -8,6 +8,8 @@ RUN npm install --omit=dev
 
 COPY src ./src
 COPY scripts ./scripts
+COPY data ./data
+COPY public ./public
 
 ENV NODE_ENV=production
 EXPOSE 3000

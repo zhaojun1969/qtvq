@@ -103,6 +103,10 @@ async function main() {
   process.env.PORT = String(E2E_PORT);
   process.env.ALLOW_DEV_LOGIN = '1';
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'e2e-test-secret';
+  // 本套件要跑多份 deep 报告（¥20/份），把赠送余额调高，否则会撞 402。
+  // 计费本身的边界（余额不足、幂等、退款）由 e2e-billing-safety.mjs 专门覆盖。
+  process.env.ENFORCE_BILLING = '1';
+  process.env.WELCOME_BALANCE = '200';
 
   console.log(`== 端到端自检 ==`);
   console.log(`  Mongo: ${mongo.uri.replace(/\/\/[^@]*@/, '//***@')} (${mongo.external ? '外部库' : '内存库'})`);
@@ -246,7 +250,11 @@ async function main() {
   const g = gen.json?.data;
   check('生成成功', gen.status === 200 && !!g?.reportId, `status=${gen.status}`);
   check('档位与价格正确（deep=深度配对 ¥20）', g?.tier === 'deep' && g?.tierZh === '深度配对' && g?.price === 20);
-  check('计费状态显式标注 deferred', g?.billing === 'deferred');
+  check(
+    '计费信息明确（未开启时会标注 billing_disabled，不会静默免费）',
+    g?.billing && typeof g.billing === 'object' && g.billing.enforce === true && g.billing.charged === 20,
+    JSON.stringify(g?.billing),
+  );
   check('三个维度都有分数', ['interest', 'personality', 'lifestyle'].every((k) => typeof g?.scores?.[k] === 'number'), JSON.stringify(g?.scores));
   check('综合分在 [0,1]', g?.overall >= 0 && g?.overall <= 1, `overall=${g?.overall}`);
   check('正文非空（兜底分支也必须有内容）', typeof g?.content === 'string' && g.content.length > 50, `len=${g?.content?.length}`);

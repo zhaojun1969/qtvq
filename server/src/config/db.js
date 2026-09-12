@@ -64,4 +64,21 @@ async function ensureIndexes(database) {
   ]);
 
   await database.collection('qa_pairs').createIndexes([{ key: { uid: 1, createdAt: -1 } }]);
+
+  // 钱包账本：uid + 流水时间；幂等键唯一（重复请求靠它拦截，而不是靠应用层判断）
+  await database.collection('wallet_ledger').createIndexes([
+    { key: { uid: 1, createdAt: -1 } },
+    { key: { idempotencyKey: 1 }, unique: true, sparse: true },
+    { key: { uid: 1, reason: 1, createdAt: -1 } },
+  ]);
+
+  await database.collection('moderation').createIndexes([
+    { key: { status: 1, createdAt: -1 } },
+    { key: { reporterUid: 1, createdAt: -1 } },
+    { key: { targetType: 1, targetId: 1, status: 1 } },
+    // 同一举报人对同一目标 24h 内只能报一次：靠唯一键而不是查询判断（并发下也成立）
+    { key: { dedupeKey: 1 }, unique: true, sparse: true },
+  ]);
+
+  await database.collection('audit_logs').createIndexes([{ key: { createdAt: -1 } }]);
 }

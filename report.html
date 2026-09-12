@@ -43,6 +43,14 @@
     <!-- 后端未部署 / 未登录 / 资料未完善 等提示位 -->
     <div id="notice-slot"></div>
 
+    <!-- 余额与会员状态 -->
+    <div class="wallet-bar" id="wallet-bar" hidden>
+      <span>余额 <span class="wb-balance" id="wallet-balance">—</span></span>
+      <span class="muted" id="wallet-membership"></span>
+      <span class="grow"></span>
+      <a href="account.html">充值 / 办理会员 →</a>
+    </div>
+
     <!-- 邀请落地：URL 带 ?invite=xxx 时显示 -->
     <section id="invite-landing" class="panel hidden">
       <h2>有人请你做一次配对</h2>
@@ -131,9 +139,8 @@
 
       <h3 style="font-size:15px;margin:22px 0 12px">报告精度</h3>
       <div class="tier-grid" id="tier-grid"></div>
-      <p class="panel-hint" style="margin-bottom:0">
-        <strong>当前阶段不扣费</strong>：接口返回 <code>billing: "deferred"</code>，档位与价格已在服务端统一定义，
-        接入钱包后即按此表计费。
+      <p class="panel-hint" id="billing-hint" style="margin-bottom:0">
+        加载计费信息中…
       </p>
 
       <div class="form-actions">

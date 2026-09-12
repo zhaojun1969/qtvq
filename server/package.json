@@ -11,7 +11,9 @@
     "check:imports": "node scripts/check-imports.mjs",
     "probe:models": "node scripts/probe-models.mjs",
     "test:e2e": "node scripts/e2e-test.mjs",
-    "test:frontend": "node scripts/e2e-frontend.mjs"
+    "test:frontend": "node scripts/e2e-frontend.mjs",
+    "test:billing": "node scripts/e2e-billing-safety.mjs",
+    "test:all": "npm run check:imports && npm run test:e2e && npm run test:billing && npm run test:frontend"
   },
   "dependencies": {
     "cors": "^2.8.5",

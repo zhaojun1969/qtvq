@@ -72,6 +72,28 @@ export const env = {
     'http://localhost:8080',
     'http://localhost:8788',
   ]),
+
+  // ===== 计费 =====
+  // 0 = 只计算不扣款（响应里仍会明确标注），用于灰度；1 = 真扣
+  enforceBilling: process.env.ENFORCE_BILLING !== '0',
+  /** 新钱包初始赠送余额（元）；0 = 关闭 */
+  welcomeBalance: num(process.env.WELCOME_BALANCE, 10),
+  /** 免费档位（逗号分隔）。默认 basic 免费，作为体验档 */
+  freeTiers: list(process.env.FREE_TIERS, ['basic']),
+  /** 会员每日可免费生成的次数（任意档位） */
+  memberDailyFree: num(process.env.MEMBER_DAILY_FREE, 1),
+  /** 不同举报人数达到该阈值时，目标用户自动转 invisible（等待人工确认） */
+  moderationAutoHide: num(process.env.MODERATION_AUTO_HIDE, 5),
+
+  // ===== 运营台 =====
+  /** 运营台口令；未配置时 /v1/admin/* 全部 404（不是 401，避免暴露存在性） */
+  adminKey: process.env.ADMIN_KEY || '',
+
+  // ===== 内容安全 =====
+  /** local | local+wechat —— 本地词表始终生效，wechat 需配置密钥 */
+  safetyProvider: process.env.SAFETY_PROVIDER || 'local',
+  wechatMiniAppId: process.env.WECHAT_MINI_APPID || '',
+  wechatMiniSecret: process.env.WECHAT_MINI_SECRET || '',
 };
 
 function describe(kind, provider) {

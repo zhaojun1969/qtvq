@@ -120,6 +120,9 @@ async function main() {
   process.env.PORT = String(E2E_PORT);
   process.env.ALLOW_DEV_LOGIN = '1';
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'e2e-fe-secret';
+  // 本套件会生成多份报告，赠送余额调高以免撞 402；计费边界另有专门套件覆盖
+  process.env.ENFORCE_BILLING = '1';
+  process.env.WELCOME_BALANCE = '200';
 
   const { connectDB, closeDB, getDB } = await import('../src/config/db.js');
   const { PITFALLS } = await import('../../js/data.js');
@@ -280,7 +283,23 @@ async function main() {
   check('超长正文 + 多条案例仍能出图', longOk !== null, `${longOk?.width}x${longOk?.height}`);
 
   // ---- 清理 ----
-  console.log('\n[6] 清理');
+  console.log('\n[6] 钱包 / 内容安全 / 举报（客户端函数）');
+  asA();
+  const wallet = await api.fetchWallet();
+  check('fetchWallet 返回余额与各档位报价', typeof wallet?.wallet?.balance === 'number' && !!wallet?.quotes?.deep, `balance=${wallet?.wallet?.balance}`);
+  check('报价含「本次免费」原因，便于前端提示', typeof wallet?.quotes?.basic?.reason === 'string', `reason=${wallet?.quotes?.basic?.reason}`);
+
+  const st = await api.checkText('加微信详聊', 'profile');
+  check('checkText 能拦下引流（提交前即可提示）', st?.clean === false && st?.action === 'block', JSON.stringify(st?.categories));
+
+  const rep = await api.submitReport({ targetType: 'user', targetId: 'u_fe_b', reason: '虚假资料', detail: '端到端测试' });
+  check('submitReport 提交成功', rep?.status === 'pending' || rep?.duplicate === true, JSON.stringify(rep));
+
+  const mineComplaints = await api.listMyComplaints();
+  check('listMyComplaints 可读', Array.isArray(mineComplaints?.items), `items=${mineComplaints?.items?.length}`);
+
+  // ---- 清理 ----
+  console.log('\n[7] 清理');
   const db = getDB();
   const u = await db.collection('users').deleteMany({ _id: { $in: ['u_fe_a', 'u_fe_b'] } });
   const r = await db.collection('reports').deleteMany({ uid: { $in: ['u_fe_a', 'u_fe_b'] } });

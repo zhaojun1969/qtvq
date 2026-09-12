@@ -15,6 +15,10 @@ import { signLocalToken } from './middleware/auth.js';
 import healthRoutes from './routes/health.js';
 import profileRoutes from './routes/profile.js';
 import reportRoutes from './routes/report.js';
+import walletRoutes from './routes/wallet.js';
+import moderationRoutes from './routes/moderation.js';
+import safetyRoutes from './routes/safety.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -48,6 +52,11 @@ app.use((req, res, next) => {
 app.use('/v1/health', healthRoutes);
 app.use('/v1/profile', profileRoutes);
 app.use('/v1/report', reportRoutes);
+app.use('/v1/wallet', walletRoutes);
+app.use('/v1/moderation', moderationRoutes);
+app.use('/v1/safety', safetyRoutes);
+// 未配置 ADMIN_KEY 时整组按 404 处理（见 middleware/admin.js）
+app.use('/v1/admin', adminRoutes);
 
 // 开发/内测用：直接签发本地 token（生产 ALLOW_DEV_LOGIN 必须为 0）
 app.post(

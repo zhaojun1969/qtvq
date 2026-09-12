@@ -54,7 +54,19 @@ async function verifyWithLegacy(token) {
     const body = await res.json();
     const uid = body?.user?.id;
     if (!uid) return null;
-    return { uid, source: 'legacy', legacy: true, legacyUser: body.user };
+
+    // 顺带把现网的会员状态带回来：报告计费要用它判断「会员每日免费次数」。
+    // 拿不到时按“非会员”处理（宁可少给免费次数，也不能白送）。
+    const sub = body?.quota?.subscription;
+    const activeUntil = sub?.activeUntil || null;
+    const membership = {
+      active: !!(activeUntil && Number(activeUntil) > Date.now()),
+      activeUntil,
+      plan: sub?.plan || null,
+      unlimited: !!body?.quota?.unlimited,
+    };
+
+    return { uid, source: 'legacy', legacy: true, legacyUser: body.user, membership };
   } catch {
     return null;
   } finally {
@@ -67,7 +79,7 @@ export async function resolveIdentity(req) {
   const token = bearerToken(req);
   if (!token) return null;
   const local = verifyLocal(token);
-  if (local) return local;
+  if (local) return { ...local, membership: { active: false } };
   return verifyWithLegacy(token);
 }
 
@@ -78,6 +90,7 @@ export async function requireAuth(req, res, next) {
     if (!identity) throw unauthorized();
     req.identity = identity;
     req.uid = identity.uid;
+    req.membership = identity.membership || { active: false };
     next();
   } catch (err) {
     next(err);

@@ -23,7 +23,6 @@ export function notFound(message = '资源不存在') {
 export function ok(res, data) {
   return res.json({ code: 0, data });
 }
-
 /** 统一错误出口：永远不要把内部堆栈返回给客户端 */
 export function errorHandler(err, req, res, _next) {
   const status = err instanceof ApiError ? err.status : 500;
@@ -32,6 +31,8 @@ export function errorHandler(err, req, res, _next) {
     code: status,
     error: status >= 500 ? '服务器错误' : err.message,
     ...(err instanceof ApiError && err.code ? { errorCode: err.code } : {}),
+    // 内容安全命中类别等结构化补充信息，便于前端给出具体提示
+    ...(err && err.safety ? { safety: err.safety } : {}),
   });
 }
 
