@@ -151,17 +151,34 @@ if [ "$DO_INSTALL" -eq 1 ]; then
     esac
     echo ">> 安装 MongoDB ${MONGO_VER}（检测到代号 ${CODENAME}）"
 
-    # 国内 ECS 访问 repo.mongodb.org 经常不通，所以先探测可达性再决定源。
-    # 需要走镜像时：MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb
-    MONGO_REPO_BASE="${MONGO_APT_MIRROR:-https://repo.mongodb.org}"
+    # 按序探测可用 apt 源，第一个通的就用它。
+    # 注意探测路径必须是 `dists/<代号>/mongodb-org/<版本>/Release`：
+    # 这个仓库**没有** `dists/<代号>/InRelease`，用后者探测会永远 404，
+    # 从而把安装流程误判成「源不可达」。
     MONGO_KEY_URL="${MONGO_KEY_URL:-https://pgp.mongodb.com/server-${MONGO_VER}.asc}"
+    MONGO_REPO_BASE=""
+    CANDIDATES=(
+      "${MONGO_APT_MIRROR:-}"
+      "https://repo.mongodb.org"
+      "https://mirrors.aliyun.com/mongodb"
+      "https://mirrors.tuna.tsinghua.edu.cn/mongodb"
+    )
+    for base in "${CANDIDATES[@]}"; do
+      [ -z "$base" ] && continue
+      probe="${base}/apt/ubuntu/dists/${CODENAME}/mongodb-org/${MONGO_VER}/Release"
+      if curl -fsSI --max-time 12 "$probe" >/dev/null 2>&1; then
+        MONGO_REPO_BASE="$base"
+        break
+      fi
+      c_warn "源不可达，尝试下一个：${base}"
+    done
 
-    if ! curl -fsSI --max-time 12 "${MONGO_REPO_BASE}/apt/ubuntu/dists/${CODENAME}/InRelease" >/dev/null 2>&1; then
-      c_bad "apt 源不可达：${MONGO_REPO_BASE}/apt/ubuntu/dists/${CODENAME}/InRelease"
-      echo "     这是国内服务器的常见情况，两条退路（任选一条）："
+    if [ -z "$MONGO_REPO_BASE" ]; then
+      c_bad "所有 MongoDB apt 源都不可达（${CODENAME}/mongodb-org/${MONGO_VER}）"
+      echo "     两条退路（任选一条）："
       echo
-      echo "     a) 走清华镜像重跑："
-      echo "        sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb \\"
+      echo "     a) 手动指定镜像重跑："
+      echo "        sudo MONGO_APT_MIRROR=https://mirrors.aliyun.com/mongodb \\"
       echo "          bash $0 --install --systemd"
       echo
       echo "     b) 用容器（若已装 docker）："
@@ -170,6 +187,7 @@ if [ "$DO_INSTALL" -eq 1 ]; then
       echo "        然后确认 .env 里 MONGO_URI=mongodb://127.0.0.1:27017/qtvq"
       exit 1
     fi
+    c_ok "使用 MongoDB 源：${MONGO_REPO_BASE}"
 
     curl -fsSL "${MONGO_KEY_URL}" \
       | gpg --dearmor -o "/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg" \
@@ -182,10 +200,10 @@ if [ "$DO_INSTALL" -eq 1 ]; then
       > "/etc/apt/sources.list.d/mongodb-org-${MONGO_VER}.list"
     apt-get update -qq
     if ! apt-get install -y -qq mongodb-org; then
-      c_bad "MongoDB ${MONGO_VER} 安装失败"
-      echo "     常见原因：该发行版没有对应包（7.0 没有 noble 24.04），或 apt 源同步不全。"
+      c_bad "MongoDB ${MONGO_VER} 安装失败（源：${MONGO_REPO_BASE}）"
+      echo "     常见原因：该发行版没有对应包（7.0 没有 noble 24.04）、或源同步不全。"
       echo "     两条退路："
-      echo "       a) 换镜像重跑：sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb bash $0 --install --systemd"
+      echo "       a) 换源重跑：sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb bash $0 --install --systemd"
       echo "       b) 用容器：docker run -d --name qtvq-mongo --restart unless-stopped -p 127.0.0.1:27017:27017 mongo:7"
       exit 1
     fi
