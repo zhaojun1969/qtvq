@@ -14,9 +14,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import hmac
 import os
 import sys
 import tarfile
+import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +32,41 @@ BUNDLE_NAME = "qtvq-server.tgz"
 DEFAULT_PREFIX = "qtvq/srv/"
 EXCLUDE_PARTS = {"node_modules", ".git", "__pycache__", "dist", "coverage"}
 EXCLUDE_FILES = {".env", "boot-out.txt", "boot-err.txt"}
+
+
+def presign_oss_v1(ak: str, sk: str, bucket: str, key: str, endpoint: str, expires: int = 86400) -> str:
+    """自己算阿里云 OSS 的 V1 签名。
+
+    为什么不用 SDK 的 `createSignedUrl`：这个环境的 SDK 是华为云 OBS 的
+    `esdk-obs-python`（只是把 endpoint 指向了阿里云 OSS），它生成的查询参数是
+    `AccessKeyId`，而**阿里云要求 `OSSAccessKeyId`** —— 参数名不对，OSS 视为缺少鉴权信息，
+    直接 403。实测：`AccessKeyId` → 403，`OSSAccessKeyId` → 200。
+
+    上传（putFile）用 SDK 没问题，只有签名 URL 需要自己算。
+    """
+    expires_at = int(time.time()) + int(expires)
+    # V1 StringToSign: VERB\nContent-MD5\nContent-Type\nExpires\nCanonicalizedOSSHeaders\nCanonicalizedResource
+    # GET 无 body、无自定义头，中间三段为空
+    string_to_sign = f"GET\n\n\n{expires_at}\n/{bucket}/{key}"
+    signature = base64.b64encode(
+        hmac.new(sk.encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha1).digest()
+    ).decode("utf-8")
+    return (
+        f"https://{bucket}.{endpoint}/{key}"
+        f"?Expires={expires_at}"
+        f"&OSSAccessKeyId={urllib.parse.quote(ak, safe='')}"
+        f"&Signature={urllib.parse.quote(signature, safe='')}"
+    )
+
+
+def verify_url(url: str) -> tuple[bool, str]:
+    """发出链接前先自己下载一次：不要把没验证过的 URL 交给别人。"""
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return True, f"HTTP {resp.status}，{resp.headers.get('Content-Length')} 字节"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{getattr(exc, 'code', '?')} {exc}"
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -101,14 +142,17 @@ def main() -> int:
             print(f"上传失败 status={status} {resp}", file=sys.stderr)
             return 1
         print(f">> 已上传 oss://{bucket}/{key}")
-
-        signed = client.createSignedUrl("GET", bucket, key, expires=args.expires)
-        url = getattr(signed, "signedUrl", None)
-        if not url:
-            print(f"签名失败：{signed}", file=sys.stderr)
-            return 1
     finally:
         client.close()
+
+    # 自己签名（SDK 生成的是华为 OBS 的 AccessKeyId，阿里云不认）并当场验证
+    url = presign_oss_v1(ak, sk, bucket, key, endpoint, expires=args.expires)
+    ok, detail = verify_url(url)
+    if not ok:
+        print(f"!! 生成的签名 URL 自检失败：{detail}", file=sys.stderr)
+        print("   已中止，未把不可用链接交出去。请检查 AK/SK 是否有该桶的读权限。", file=sys.stderr)
+        return 1
+    print(f">> 签名 URL 自检通过：{detail}")
 
     hours = args.expires / 3600
     print()
