@@ -140,16 +140,31 @@ if [ "$DO_INSTALL" -eq 1 ]; then
   fi
 
   if [[ " ${MISSING[*]:-} " == *" mongo "* ]]; then
-    echo ">> 安装 MongoDB 7（官方 apt 源）"
+    # MongoDB 官方 apt 源按 Ubuntu 代号发布，且 7.0 **没有** noble(24.04) 的包。
+    # 写死版本号会在 24.04 上直接安装失败，所以这里按代号选版本。
     CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
-    curl -fsSL https://pgp.mongodb.com/server-7.0.asc \
-      | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${CODENAME}/mongodb-org/7.0 multiverse" \
-      > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    case "$CODENAME" in
+      focal|jammy)        MONGO_VER="7.0" ;;
+      noble|oracular)     MONGO_VER="8.0" ;;
+      bookworm|bullseye)  MONGO_VER="7.0" ;;
+      *)                  MONGO_VER="8.0" ;;
+    esac
+    echo ">> 安装 MongoDB ${MONGO_VER}（检测到代号 ${CODENAME}）"
+    curl -fsSL "https://pgp.mongodb.com/server-${MONGO_VER}.asc" \
+      | gpg --dearmor -o "/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg" \
+      || { c_bad "下载 MongoDB GPG key 失败（网络不通？）"; exit 1; }
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg ] https://repo.mongodb.org/apt/ubuntu ${CODENAME}/mongodb-org/${MONGO_VER} multiverse" \
+      > "/etc/apt/sources.list.d/mongodb-org-${MONGO_VER}.list"
     apt-get update -qq
-    apt-get install -y -qq mongodb-org || { c_bad "MongoDB 安装失败，请检查网络/源"; exit 1; }
+    if ! apt-get install -y -qq mongodb-org; then
+      c_bad "MongoDB ${MONGO_VER} 安装失败"
+      echo "     若该发行版没有对应包，两条退路："
+      echo "       a) 手动指定版本：MONGODB_VERSION=8.0 重跑，或改 apt 源代号"
+      echo "       b) 用容器：docker run -d --name qtvq-mongo -p 127.0.0.1:27017:27017 mongo:7"
+      exit 1
+    fi
     systemctl enable --now mongod || { c_bad "mongod 启动失败"; exit 1; }
-    c_ok "mongod 已启动：$(systemctl is-active mongod)"
+    c_ok "mongod 已启动：$(systemctl is-active mongod)（版本 ${MONGO_VER}）"
     echo "  （MongoDB 默认只监听 127.0.0.1:27017，无需额外加固；如需远程访问请自行配置鉴权与防火墙）"
   else
     c_ok "MongoDB 已就绪或以 docker 方式提供，跳过"
