@@ -150,21 +150,47 @@ if [ "$DO_INSTALL" -eq 1 ]; then
       *)                  MONGO_VER="8.0" ;;
     esac
     echo ">> 安装 MongoDB ${MONGO_VER}（检测到代号 ${CODENAME}）"
-    curl -fsSL "https://pgp.mongodb.com/server-${MONGO_VER}.asc" \
+
+    # 国内 ECS 访问 repo.mongodb.org 经常不通，所以先探测可达性再决定源。
+    # 需要走镜像时：MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb
+    MONGO_REPO_BASE="${MONGO_APT_MIRROR:-https://repo.mongodb.org}"
+    MONGO_KEY_URL="${MONGO_KEY_URL:-https://pgp.mongodb.com/server-${MONGO_VER}.asc}"
+
+    if ! curl -fsSI --max-time 12 "${MONGO_REPO_BASE}/apt/ubuntu/dists/${CODENAME}/InRelease" >/dev/null 2>&1; then
+      c_bad "apt 源不可达：${MONGO_REPO_BASE}/apt/ubuntu/dists/${CODENAME}/InRelease"
+      echo "     这是国内服务器的常见情况，两条退路（任选一条）："
+      echo
+      echo "     a) 走清华镜像重跑："
+      echo "        sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb \\"
+      echo "          bash $0 --install --systemd"
+      echo
+      echo "     b) 用容器（若已装 docker）："
+      echo "        docker run -d --name qtvq-mongo --restart unless-stopped \\"
+      echo "          -p 127.0.0.1:27017:27017 mongo:7"
+      echo "        然后确认 .env 里 MONGO_URI=mongodb://127.0.0.1:27017/qtvq"
+      exit 1
+    fi
+
+    curl -fsSL "${MONGO_KEY_URL}" \
       | gpg --dearmor -o "/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg" \
-      || { c_bad "下载 MongoDB GPG key 失败（网络不通？）"; exit 1; }
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg ] https://repo.mongodb.org/apt/ubuntu ${CODENAME}/mongodb-org/${MONGO_VER} multiverse" \
+      || {
+        c_bad "下载 MongoDB GPG key 失败：${MONGO_KEY_URL}"
+        echo "     可用 MONGO_KEY_URL=... 覆盖该地址，或改用上面的容器方案。"
+        exit 1
+      }
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg ] ${MONGO_REPO_BASE}/apt/ubuntu ${CODENAME}/mongodb-org/${MONGO_VER} multiverse" \
       > "/etc/apt/sources.list.d/mongodb-org-${MONGO_VER}.list"
     apt-get update -qq
     if ! apt-get install -y -qq mongodb-org; then
       c_bad "MongoDB ${MONGO_VER} 安装失败"
-      echo "     若该发行版没有对应包，两条退路："
-      echo "       a) 手动指定版本：MONGODB_VERSION=8.0 重跑，或改 apt 源代号"
-      echo "       b) 用容器：docker run -d --name qtvq-mongo -p 127.0.0.1:27017:27017 mongo:7"
+      echo "     常见原因：该发行版没有对应包（7.0 没有 noble 24.04），或 apt 源同步不全。"
+      echo "     两条退路："
+      echo "       a) 换镜像重跑：sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb bash $0 --install --systemd"
+      echo "       b) 用容器：docker run -d --name qtvq-mongo --restart unless-stopped -p 127.0.0.1:27017:27017 mongo:7"
       exit 1
     fi
     systemctl enable --now mongod || { c_bad "mongod 启动失败"; exit 1; }
-    c_ok "mongod 已启动：$(systemctl is-active mongod)（版本 ${MONGO_VER}）"
+    c_ok "mongod 已启动：$(systemctl is-active mongod)（版本 ${MONGO_VER}，源 ${MONGO_REPO_BASE}）"
     echo "  （MongoDB 默认只监听 127.0.0.1:27017，无需额外加固；如需远程访问请自行配置鉴权与防火墙）"
   else
     c_ok "MongoDB 已就绪或以 docker 方式提供，跳过"
