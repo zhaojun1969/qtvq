@@ -157,7 +157,9 @@ router.get(
     if (!report) throw notFound('报告不存在');
 
     const identity = await resolveIdentity(req);
-    const isOwner = identity && identity.uid === report.uid;
+    // 必须是严格布尔：持分享链接匿名访问时 resolveIdentity 返回 null，
+    // 直接返回 null 会让前端 `isOwner === false` 之类的判断失效
+    const isOwner = Boolean(identity && identity.uid === report.uid);
     const token = typeof req.query.share === 'string' ? req.query.share : null;
     const tokenOk = token && report.shareToken && token === report.shareToken;
     if (!isOwner && !tokenOk) throw unauthorized('无权查看该报告');

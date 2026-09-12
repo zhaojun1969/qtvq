@@ -40,6 +40,28 @@ npm run import:pitfalls       # 导入 50+ 条避坑案例 + 1024 维向量
 npm run dev                   # http://127.0.0.1:3000/v1/health
 ```
 
+**不想先装 MongoDB？** 用内存库跑一次完整自检（39 项断言，含真实 HTTP 请求）：
+
+```bash
+npm install --no-save mongodb-memory-server
+npm run test:e2e
+```
+
+## 自检
+
+| 命令 | 作用 | 依赖 |
+|---|---|---|
+| `npm run check:imports` | 本地模块图一致性（`node --check` 查不出的具名导入错误）+ 档位枚举完整性 | 无 |
+| `npm run test:e2e` | 端到端：真实 MongoDB + 真实 HTTP，覆盖资料校验、未成年拦截、报告生成、权限隔离、分享链接、边界错误 | 内存版 MongoDB 或现成数据库 |
+
+在服务器上用现成数据库跑自检（会写入测试数据，必须显式确认）：
+
+```bash
+E2E_ACK=1 MONGO_URI='mongodb://127.0.0.1:27017/qtvq' npm run test:e2e
+```
+
+安全约定：用外部库时只删除自己创建的 `u_e2e_*` 文档，**绝不 drop 数据库**；`pitfalls` 集合已有数据时跳过写入，**不会覆盖你正式导入的向量**。
+
 内测登录（仅当 `.env` 里 `ALLOW_DEV_LOGIN=1`）：
 
 ```bash

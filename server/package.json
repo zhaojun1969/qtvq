@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "node --watch src/app.js",
     "start": "node src/app.js",
-    "import:pitfalls": "node scripts/import-pitfalls.mjs"
+    "import:pitfalls": "node scripts/import-pitfalls.mjs",
+    "check:imports": "node scripts/check-imports.mjs",
+    "test:e2e": "node scripts/e2e-test.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
