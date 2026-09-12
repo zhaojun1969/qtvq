@@ -52,6 +52,7 @@ npm run test:e2e
 | 命令 | 作用 | 依赖 |
 |---|---|---|
 | `npm run check:imports` | 本地模块图一致性（`node --check` 查不出的具名导入错误）+ 档位枚举完整性 | 无 |
+| `npm run probe:models` | 逐个试当前密钥下每个模型，报出可用/不可用**与真实原因** | 密钥 |
 | `npm run test:e2e` | 端到端：真实 MongoDB + 真实 HTTP，覆盖资料校验、未成年拦截、报告生成、权限隔离、分享链接、边界错误 | 内存版 MongoDB 或现成数据库 |
 
 在服务器上用现成数据库跑自检（会写入测试数据，必须显式确认）：
@@ -61,6 +62,49 @@ E2E_ACK=1 MONGO_URI='mongodb://127.0.0.1:27017/qtvq' npm run test:e2e
 ```
 
 安全约定：用外部库时只删除自己创建的 `u_e2e_*` 文档，**绝不 drop 数据库**；`pitfalls` 集合已有数据时跳过写入，**不会覆盖你正式导入的向量**。
+
+## 模型配置：两个实测踩到的坑
+
+### 坑 1：百炼「仅使用免费额度」模式会让对话模型全部 403
+
+`text-embedding-v3` 正常（1024 维，约 280ms），但 `qwen-plus` / `qwen-turbo` / `qwen-flash` 全部返回：
+
+```
+403 AllocationQuota.FreeTierOnly
+Free quota exhausted. ... please add funds or disable the "use free tier only" mode
+```
+
+这是**账号设置**，不是代码问题。两种处理：
+
+```bash
+npm run probe:models     # 先确认到底哪些可用
+```
+
+- **a)** 阿里云百炼控制台 → 关闭「仅使用免费额度」模式（转为按量付费）或充值；
+- **b)** 先用已有的 Cloudflare Workers AI 顶上（已实测可用）：
+
+```env
+LLM_PROVIDER=workers-ai      # .env 里改这一行即可，CF_ACCOUNT_ID / CF_API_TOKEN 已配好
+```
+
+> 注意 (b) 会把用户资料送到 Cloudflare（境外）。内测可以，正式上线若在意个人信息出境，请走 (a)。
+
+### 坑 2：推理模型会把 token 预算吃光，`content` 返回 null
+
+`@cf/zai-org/glm-4.7-flash`、`@cf/qwen/qwen3-30b-a3b-fp8` 是**推理模型**：它们先在 `message.reasoning` 里输出一大段思考，**这段同样计入 `max_tokens`**。预算给小了就会得到：
+
+```json
+{"message":{"content":null,"reasoning":"1. **分析用户请求**……"},"finish_reason":"length"}
+```
+
+看起来像「模型返回为空」，实际是被思考过程占满了。`src/services/llm.js` 的 `budgetFor()` 对推理模型自动放大预算（`maxTokens*2+512`，上限 4096），并把降级链末尾放一个**非推理模型**（`@cf/meta/llama-3.1-8b-instruct`）兜底。修复前后对比：
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| `max_tokens` | 32（按字面配置） | 2048 |
+| `content` | `null` | 「连通」 |
+
+> 顺带说明：现网 `functions/api/chat.js` 用同样的推理模型 + `max_tokens: 512`，但**生产实测正常**（真实 AI 回答 + RAG 引用，无 fallback）——因为问答回复短，512 够用。本服务的报告需要 1000+ 字正文，所以必须放大预算。
 
 内测登录（仅当 `.env` 里 `ALLOW_DEV_LOGIN=1`）：
 

@@ -18,9 +18,12 @@ foreach ($r in $remotes) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "FAILED: $r" -ForegroundColor Red
         if ($r -eq "gitee") {
-            Write-Host "  1. Create PRIVATE repo at https://gitee.com/projects/new (name: qtvq)" -ForegroundColor Yellow
-            Write-Host "  2. git remote set-url gitee https://gitee.com/YOUR_USER/qtvq.git" -ForegroundColor Yellow
-            Write-Host "  3. Re-run: npm run git:push-all" -ForegroundColor Yellow
+            Write-Host "  1. 确认私有仓存在：https://gitee.com/zhaobing2020_admin/qtvq" -ForegroundColor Yellow
+            Write-Host "  2. 改回 SSH（不要用账号密码，Gitee 已限制密码认证）：" -ForegroundColor Yellow
+            Write-Host "     git remote set-url gitee git@gitee.com:zhaobing2020_admin/qtvq.git" -ForegroundColor Yellow
+            Write-Host "  3. 验证公钥已登记：ssh -T git@gitee.com" -ForegroundColor Yellow
+            Write-Host "  4. 重跑：npm run git:push-all" -ForegroundColor Yellow
+            Write-Host "  详见 docs/GITEE-SETUP.md" -ForegroundColor Yellow
         }
         exit 1
     }

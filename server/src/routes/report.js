@@ -91,6 +91,7 @@ router.post(
       fallback: generated.fallback,
       model: generated.model,
       provider: generated.provider,
+      llmError: generated.llmError || null,
       meSnapshot: publicProfile(me),
       targetSnapshot: publicProfile(ta),
       question: question ? String(question).slice(0, 500) : '',
@@ -114,6 +115,10 @@ router.post(
       pitfalls: doc.pitfalls,
       retrieval: doc.retrieval,
       fallback: doc.fallback,
+      model: doc.model,
+      provider: doc.provider,
+      // 走兜底时把上游真实错误一并返回，便于定位（模型未开通/免费额度用尽/超时）
+      llmError: doc.fallback ? doc.llmError || null : null,
       me: doc.meSnapshot,
       target: doc.targetSnapshot,
       createdAt: doc.createdAt,

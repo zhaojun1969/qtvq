@@ -62,46 +62,96 @@ async function chatWorkers({ model, messages, temperature, maxTokens }) {
   return postJson(url, { Authorization: `Bearer ${env.cf.token}` }, { messages, temperature, max_tokens: maxTokens });
 }
 
+function modelsFor(provider) {
+  if (provider === 'dashscope') {
+    const chain = Array.isArray(env.dashscope.chatModels) ? env.dashscope.chatModels : [];
+    return chain.length ? chain : [env.dashscope.chatModel];
+  }
+  if (provider === 'workers-ai') {
+    const chain = Array.isArray(env.cf.chatModels) ? env.cf.chatModels : [];
+    return chain.length ? chain : [env.cf.chatModel];
+  }
+  return [env.openai.chatModel];
+}
+
 /**
- * @returns {Promise<{text: string|null, model: string, provider: string, error?: string}>}
+ * 推理模型的 token 预算要单独放大。
+ *
+ * 实测踩到的坑：Workers AI 的 `@cf/zai-org/glm-4.7-flash` 与
+ * `@cf/qwen/qwen3-30b-a3b-fp8` 会在 `message.reasoning` 里先输出一大段思考，
+ * 这段**同样计入 max_tokens**。预算给小了就会出现
+ * `content: null` + `finish_reason: "length"` —— 看起来像「返回内容为空」，
+ * 实际是被思考过程吃光了额度。
+ */
+function isReasoningLike(model) {
+  return /glm-4\.[0-9]|qwen3|qwq|deepseek|gpt-oss|thinking|reasoning/i.test(String(model));
+}
+
+function budgetFor(model, maxTokens) {
+  if (!isReasoningLike(model)) return maxTokens;
+  return Math.min(4096, Math.max(2048, Math.round(maxTokens * 2 + 512)));
+}
+
+/**
+ * 依次尝试模型降级链，返回第一个成功的结果。
+ *
+ * 为什么要链：实测百炼在「仅使用免费额度」模式下会返回
+ * `403 AllocationQuota.FreeTierOnly`，此时若只有一个模型，整份报告就会
+ * 退化成兜底文案。多一个候选模型就能继续出真实内容。
+ *
+ * @returns {Promise<{text: string|null, model: string, provider: string, attempts?: number, error?: string}>}
  */
 export async function chat({ messages, temperature = 0.8, maxTokens = 1200 }) {
   const provider = env.llmProvider;
-  const model =
-    provider === 'dashscope' ? env.dashscope.chatModel : provider === 'workers-ai' ? env.cf.chatModel : env.openai.chatModel;
+  const models = modelsFor(provider);
+  const errors = [];
 
-  try {
-    let payload;
-    if (provider === 'dashscope') {
-      if (!env.dashscope.key) throw new ApiError(503, 'DASHSCOPE_API_KEY 未配置', 'E_NO_LLM_KEY');
-      payload = await chatCompletions({
-        base: env.dashscope.base,
-        key: env.dashscope.key,
-        model,
-        messages,
-        temperature,
-        maxTokens,
-      });
-    } else if (provider === 'workers-ai') {
-      if (!env.cf.accountId || !env.cf.token) throw new ApiError(503, 'CF_ACCOUNT_ID / CF_API_TOKEN 未配置', 'E_NO_LLM_KEY');
-      payload = await chatWorkers({ model, messages, temperature, maxTokens });
-    } else {
-      if (!env.openai.key) throw new ApiError(503, 'OPENAI_KEY 未配置', 'E_NO_LLM_KEY');
-      payload = await chatCompletions({
-        base: env.openai.base,
-        key: env.openai.key,
-        model,
-        messages,
-        temperature,
-        maxTokens,
-      });
+  for (const model of models) {
+    try {
+      // 推理模型要把思考过程的 token 也算进去
+      const budget = budgetFor(model, maxTokens);
+      let payload;
+      if (provider === 'dashscope') {
+        if (!env.dashscope.key) throw new ApiError(503, 'DASHSCOPE_API_KEY 未配置', 'E_NO_LLM_KEY');
+        payload = await chatCompletions({
+          base: env.dashscope.base,
+          key: env.dashscope.key,
+          model,
+          messages,
+          temperature,
+          maxTokens: budget,
+        });
+      } else if (provider === 'workers-ai') {
+        if (!env.cf.accountId || !env.cf.token) throw new ApiError(503, 'CF_ACCOUNT_ID / CF_API_TOKEN 未配置', 'E_NO_LLM_KEY');
+        payload = await chatWorkers({ model, messages, temperature, maxTokens: budget });
+      } else {
+        if (!env.openai.key) throw new ApiError(503, 'OPENAI_KEY 未配置', 'E_NO_LLM_KEY');
+        payload = await chatCompletions({
+          base: env.openai.base,
+          key: env.openai.key,
+          model,
+          messages,
+          temperature,
+          maxTokens: budget,
+        });
+      }
+
+      const text = extractText(payload);
+      if (!text) {
+        const finish =
+          payload?.result?.choices?.[0]?.finish_reason || payload?.choices?.[0]?.finish_reason || null;
+        const reasoningLen = (payload?.result?.choices?.[0]?.message?.reasoning || '').length;
+        errors.push(
+          `${model}: 返回内容为空${finish === 'length' ? `（finish_reason=length，疑似思考过程占满 ${budget} tokens${reasoningLen ? `，reasoning 已 ${reasoningLen} 字` : ''}）` : ''}`,
+        );
+        continue;
+      }
+      return { text: String(text).trim(), model, provider, attempts: errors.length + 1 };
+    } catch (err) {
+      console.error(`[llm] ${model} 失败: ${err.message}`);
+      errors.push(`${model}: ${err.message}`);
     }
-
-    const text = extractText(payload);
-    if (!text) return { text: null, model, provider, error: 'EMPTY_RESPONSE' };
-    return { text: String(text).trim(), model, provider };
-  } catch (err) {
-    console.error('[llm] failed:', err.message);
-    return { text: null, model, provider, error: err.message };
   }
+
+  return { text: null, model: models[0], provider, error: errors.join(' | ') };
 }

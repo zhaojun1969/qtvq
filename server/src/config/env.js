@@ -36,14 +36,27 @@ export const env = {
     key: process.env.DASHSCOPE_API_KEY || '',
     base: (process.env.DASHSCOPE_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, ''),
     embedModel: process.env.EMBED_MODEL || 'text-embedding-v3',
-    chatModel: process.env.CHAT_MODEL || 'qwen-plus',
+    chatModel: (process.env.CHAT_MODEL || 'qwen-plus,qwen-turbo').split(',')[0].trim(),
+    // 模型降级链：单个模型配额耗尽/不可用时自动换下一个。
+    // 实测会遇到 403 AllocationQuota.FreeTierOnly（百炼免费额度用尽），
+    // 没有降级链就会整条报告退化成兜底文案。
+    chatModels: list(process.env.CHAT_MODEL || 'qwen-plus,qwen-turbo', ['qwen-plus', 'qwen-turbo']),
   },
 
   cf: {
     accountId: process.env.CF_ACCOUNT_ID || '',
     token: process.env.CF_API_TOKEN || '',
     embedModel: process.env.CF_EMBED_MODEL || '@cf/qwen/qwen3-embedding-0.6b',
-    chatModel: process.env.CF_CHAT_MODEL || '@cf/zai-org/glm-4.7-flash',
+    chatModel: (process.env.CF_CHAT_MODEL || '').split(',')[0].trim() || '@cf/meta/llama-3.1-8b-instruct',
+    // 降级链。实测：glm-4.7-flash / qwen3-30b 是**推理模型**，
+    // reasoning 也会消耗 token，max_tokens 给小了会出现 content=null、
+    // finish_reason=length（见 llm.js 的 budgetFor）。因此链尾一定要放一个
+    // 非推理模型兜底，否则整份报告会退化成兜底文案。
+    chatModels: list(process.env.CF_CHAT_MODEL, [
+      '@cf/zai-org/glm-4.7-flash',
+      '@cf/qwen/qwen3-30b-a3b-fp8',
+      '@cf/meta/llama-3.1-8b-instruct',
+    ]),
   },
 
   openai: {

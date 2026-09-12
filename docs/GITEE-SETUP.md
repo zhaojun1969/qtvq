@@ -1,49 +1,66 @@
 # Gitee 私有仓库 · 首次配置
 
-GitHub 已推送时，Gitee 需 **先建私有空仓库** 再 push（远程 `gitee` 已指向 `zhaojun1969/qtvq`，请按你的用户名修改）。
+**当前状态：已配置完成，且走 SSH（无需账号密码）。**
+
+| 项 | 值 |
+|---|---|
+| Gitee 账号 | `zhaobing2020_admin` |
+| 仓库 | https://gitee.com/zhaobing2020_admin/qtvq （私有） |
+| remote | `git@gitee.com:zhaobing2020_admin/qtvq.git` |
+| 认证方式 | **SSH 公钥**（`~/.ssh/id_ed25519`，已在本机验证可用） |
+| 默认分支 | 仓库当前默认是 `master`，代码推在 `main`；建议在 Gitee 仓库设置里把默认分支改成 `main` |
+
+> 不要用账号密码推 Gitee。实测：HTTPS 带密码会返回 `403 Access denied`（Gitee 已限制密码认证 Git 操作），而 SSH 直接可用。用密码还会把明文口令落到磁盘上。
 
 ---
 
-## 步骤 1：创建私有仓库
+## 日常推送
 
-1. 登录 https://gitee.com  
-2. 右上角 **+** → **新建仓库**  
-3. 填写：
-   - 仓库名称：`qtvq`
-   - 路径：`qtvq`
-   - **私有**（必选）
-   - **不要**勾选「使用 Readme 文件初始化仓库」
-4. 点击 **创建**
-
----
-
-## 步骤 2：配置远程（用户名若不是 zhaojun1969）
-
-```powershell
+```bash
 cd d:\qtvq
-git remote set-url gitee https://gitee.com/你的Gitee用户名/qtvq.git
-git remote -v
+npm run git:push-all          # 同时推 GitHub(SSH:443) 与 Gitee(SSH)
+```
+
+或单独推：
+
+```bash
+git push origin main          # GitHub
+git push gitee main           # Gitee
 ```
 
 ---
 
-## 步骤 3：推送
+## 换机器时的完整配置
+
+### 步骤 1：确认仓库存在
+
+在 https://gitee.com 登录 `zhaobing2020_admin`，确认私有仓 `qtvq` 已创建（**私有**、不要用 Readme 初始化）。
+
+### 步骤 2：配置 remote 与 SSH
+
+```powershell
+cd d:\qtvq
+git remote set-url gitee git@gitee.com:zhaobing2020_admin/qtvq.git
+git remote -v
+
+# 验证 SSH 公钥已在 Gitee 登记
+ssh -T git@gitee.com
+# 期望输出：Hi zhaobing(@zhaobing2020_admin)! You've successfully authenticated...
+```
+
+若 `ssh -T` 失败，把公钥内容复制到 Gitee → 设置 → SSH 公钥：
+
+```powershell
+type $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+### 步骤 3：推送
 
 ```powershell
 git push -u gitee main
 ```
 
-用户名填 Gitee 账号，密码填 **私人令牌**（设置 → 安全设置 → 私人令牌，勾选 `projects`）。
-
-或一键双推（GitHub + Gitee）：
-
-```powershell
-npm run git:push-all
-```
-
----
-
-## 步骤 4：确认私有
+### 步骤 4：确认私有
 
 仓库页 → **管理** → **基本信息** → 仓库类型应为 **私有**。
 
@@ -53,9 +70,24 @@ npm run git:push-all
 
 | 问题 | 处理 |
 |------|------|
-| `404` / repository not found | 尚未在 Gitee 创建 `qtvq` 私有仓 |
-| 认证失败 | 使用私人令牌，不要用登录密码 |
-| 推送卡住 | 在本机终端手动 `git push gitee main` 完成登录 |
+| `404 not found` | 仓库路径不对（用户名拼错）。用 `git remote -v` 核对，或在仓库页面直接复制地址栏 URL |
+| `403 Access denied` | 在用账号密码走 HTTPS。改 SSH：`git remote set-url gitee git@gitee.com:zhaobing2020_admin/qtvq.git` |
+| `Incorrect username or password` | 同上，Gitee 已不支持密码认证 Git；改用 SSH 或私人令牌 |
+| `ssh -T git@gitee.com` 报 Permission denied | 公钥未登记，见步骤 2 |
+| 推送卡住 | 见下方「代理」 |
+
+---
+
+## 代理
+
+本机 git 全局配了 `http.proxy=127.0.0.1:31180` / `https.proxy=127.0.0.1:31181`（给 VPN 用）。**代理没开时 HTTPS 操作会直接失败。**
+
+两条现用 remote 都走 SSH，**不经过这个代理**，所以代理开不开都能推：
+
+| remote | 地址 | 是否受代理影响 |
+|---|---|---|
+| `origin`（GitHub） | `ssh://git@ssh.github.com:443/...` | 否 |
+| `gitee` | `git@gitee.com:zhaobing2020_admin/qtvq.git` | 否 |
 
 ---
 
@@ -68,3 +100,4 @@ npm run git:push-all
 ```
 
 GitHub 改私有：仓库 Settings → Danger Zone → Make private（见 [GIT-PRIVATE.md](GIT-PRIVATE.md)）。
+
