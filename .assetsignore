@@ -1,0 +1,38 @@
+# Cloudflare Pages 发布白名单外排除（Output dir = 仓库根目录，见 wrangler.toml）
+#
+# 背景：pages_build_output_dir = "."，即把整个仓库目录当 Pages 站点发布。
+# 曾经导致 cf.env（含 Cloudflare API Token）被公开在
+#   https://qtvq-api.pages.dev/cf.env
+# 一旦泄露过就必须轮换密钥 —— 删文件只能止损，不能消除已泄露的事实。
+#
+# 语法同 .gitignore。**注意不要排除 functions/ 与 tools/**：
+#   functions/ 是 API 本体；tools/verify-payment.html 是工作人员核实页，都在使用中。
+
+# ---- 密钥类：一律不发布 ----
+cf.env
+obs.env
+.env
+.env.*
+*.env
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+
+# ---- 后端服务与源码：不需要公开 ----
+server/
+packages/
+apps/
+dist/
+context/
+backup/
+obsidian/
+verify/
+docs/
+.github/
+.git/
+
+# ---- 依赖与临时文件 ----
+node_modules/
+.wrangler/
+tmp-*

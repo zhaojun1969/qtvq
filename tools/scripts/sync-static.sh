@@ -35,15 +35,45 @@ sudo rsync -av --delete \
   --exclude='backup' \
   --exclude='logo' \
   --exclude='packages' \
+  --exclude='docs' \
+  --exclude='obsidian' \
+  --exclude='verify' \
+  --exclude='.github' \
+  --exclude='*.pem' \
+  --exclude='*.key' \
+  `# 后端服务与所有 .env 绝不能进公网目录` \
+  --exclude='server' \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='*.env' \
   "$ROOT/" "$DEST/"
 
-# 若历史同步误拷了密钥文件，从公网目录删除
-for leak in cf.env obs.env .dev.vars .dev.vsrs; do
-  if [ -f "$DEST/$leak" ]; then
+# 兜底清理：历史同步可能已经把密钥拷进公网目录了（曾真实发生过：
+# cf.env 与 server/.env 被公开在 https://qtvq.cn/ 下，必须轮换密钥）
+LEAKED=0
+for leak in cf.env obs.env .dev.vars .dev.vsrs .env; do
+  if [ -e "$DEST/$leak" ]; then
     echo ">> 警告：删除公网目录中的敏感文件 $leak"
-    sudo rm -f "$DEST/$leak"
+    sudo rm -rf "$DEST/$leak"
+    LEAKED=1
   fi
 done
+# server/ 整个目录都不该出现在网站根目录（里面有 .env、源码、数据库脚本）
+if [ -d "$DEST/server" ]; then
+  echo ">> 警告：删除公网目录中的后端目录 server/（含 .env，绝不能公开）"
+  sudo rm -rf "$DEST/server"
+  LEAKED=1
+fi
+
+# 同步后强制自检：公网目录里不允许存在任何密钥类文件
+FOUND="$(sudo find "$DEST" -maxdepth 4 \( -name '.env' -o -name '.env.*' -o -name '*.env' -o -name '*.pem' -o -name '*.key' \) -print 2>/dev/null)"
+if [ -n "$FOUND" ]; then
+  echo "!! 公网目录中仍存在疑似密钥文件，已删除并中止："
+  echo "$FOUND"
+  echo "$FOUND" | while read -r f; do [ -n "$f" ] && sudo rm -f "$f"; done
+  exit 1
+fi
+[ "$LEAKED" -eq 1 ] && echo ">> 已清理历史泄露文件；请顺手确认这些密钥是否已在控制台轮换"
 
 echo ">> 域名校验文件 -> 网站根目录"
 bash "$ROOT/tools/scripts/copy-verify-root.sh" "$DEST"
