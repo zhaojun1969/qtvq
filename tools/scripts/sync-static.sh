@@ -46,24 +46,55 @@ sudo rsync -av --delete \
   --exclude='.env' \
   --exclude='.env.*' \
   --exclude='*.env' \
+  `# 仓库根目录里这些属于内部资料，网站不需要` \
+  --exclude='README.md' \
+  --exclude='DEPLOY.md' \
+  --exclude='GITHUB.md' \
+  --exclude='package.json' \
+  --exclude='package-lock.json' \
+  --exclude='cf.env.example' \
+  --exclude='obs.env.example' \
+  --exclude='.assetsignore' \
+  --exclude='.gitattributes' \
+  --exclude='.gitignore' \
+  --exclude='*.docx' \
+  --exclude='EgTqXy3q41.txt' \
+  --exclude='pO8yu0YU22.txt' \
   "$ROOT/" "$DEST/"
 
-# 兜底清理：历史同步可能已经把密钥拷进公网目录了（曾真实发生过：
-# cf.env 与 server/.env 被公开在 https://qtvq.cn/ 下，必须轮换密钥）
+# ---- 兜底清理 ----
+# 注意：rsync 的 `--exclude` 只阻止「拷贝」，**不会删除目标里已存在的同名路径**。
+# 历史那次有缺陷的同步已经把 server/ docs/ apps/ cf.env 等拷进了公网目录，
+# 光靠 exclude 是清不掉的 —— 必须显式删。曾真实造成
+# https://qtvq.cn/server/.env 与 https://qtvq.cn/cf.env 可公开读取。
 LEAKED=0
+
+# 1) 密钥类文件
 for leak in cf.env obs.env .dev.vars .dev.vsrs .env; do
   if [ -e "$DEST/$leak" ]; then
-    echo ">> 警告：删除公网目录中的敏感文件 $leak"
+    echo ">> 清理公网目录中的敏感文件：$leak"
     sudo rm -rf "$DEST/$leak"
     LEAKED=1
   fi
 done
-# server/ 整个目录都不该出现在网站根目录（里面有 .env、源码、数据库脚本）
-if [ -d "$DEST/server" ]; then
-  echo ">> 警告：删除公网目录中的后端目录 server/（含 .env，绝不能公开）"
-  sudo rm -rf "$DEST/server"
-  LEAKED=1
-fi
+
+# 2) 不该出现在网站根目录的目录（含历史残留）
+for stale in server docs apps backup obsidian verify context packages logo tools dist node_modules .git .wrangler functions; do
+  if [ -e "$DEST/$stale" ]; then
+    echo ">> 清理公网目录中的历史残留目录：$stale/"
+    sudo rm -rf "$DEST/$stale"
+    LEAKED=1
+  fi
+done
+
+# 3) 不该公开的根目录文件
+for f in README.md DEPLOY.md GITHUB.md package.json package-lock.json cf.env.example obs.env.example .assetsignore .gitattributes .gitignore; do
+  if [ -e "$DEST/$f" ]; then
+    echo ">> 清理公网目录中的内部文件：$f"
+    sudo rm -f "$DEST/$f"
+    LEAKED=1
+  fi
+done
 
 # 同步后强制自检：公网目录里不允许存在任何密钥类文件
 FOUND="$(sudo find "$DEST" -maxdepth 4 \( -name '.env' -o -name '.env.*' -o -name '*.env' -o -name '*.pem' -o -name '*.key' \) -print 2>/dev/null)"
