@@ -74,13 +74,22 @@ fi
 
 command -v npm >/dev/null 2>&1 && c_ok "npm $(npm -v)" || { c_bad "npm 未安装"; MISSING+=("npm"); }
 
+# MongoDB 三种情形要分开，不能用「有没有 docker」当成「MongoDB 就绪」。
+# 曾经写成 `MISSING+=("mongo-via-docker")`，而安装分支用 `*" mongo "*` 匹配 ——
+# 子串对不上，结果整个安装被静默跳过，服务一直连不上库。
+MONGO_MODE="none"
 if command -v mongod >/dev/null 2>&1; then
+  MONGO_MODE="native"
   c_ok "mongod $(mongod --version | head -1 | awk '{print $3}')"
+elif systemctl is-active --quiet mongod 2>/dev/null; then
+  MONGO_MODE="native"
+  c_ok "mongod 服务运行中"
 elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  c_ok "docker $(docker --version | awk '{print $3}' | tr -d ,)（可用容器跑 mongo）"
-  MISSING+=("mongo-via-docker")
+  MONGO_MODE="docker"
+  c_warn "mongod 未安装，但 docker 可用（$(docker --version | awk '{print $3}' | tr -d ,)）—— --install 会先试 apt，失败才用容器"
 else
-  c_bad "mongod 与 docker 都不可用"; MISSING+=("mongo")
+  MONGO_MODE="none"
+  c_bad "mongod 与 docker 都不可用"
 fi
 
 command -v nginx >/dev/null 2>&1 && c_ok "nginx $(nginx -v 2>&1 | awk -F/ '{print $2}')" || c_warn "nginx 未安装（反代时才需要）"
@@ -119,6 +128,88 @@ else
 fi
 
 # ---------- 安装 ----------
+
+# 用容器跑 MongoDB。Docker Hub 在国内可能拉不动镜像，所以失败信息里给出镜像加速提示。
+start_mongo_docker() {
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx qtvq-mongo; then
+    docker start qtvq-mongo >/dev/null 2>&1 || { c_bad "启动已有容器 qtvq-mongo 失败"; return 1; }
+    c_ok "已启动已有容器 qtvq-mongo"
+  else
+    if ! docker run -d --name qtvq-mongo --restart unless-stopped \
+        -p 127.0.0.1:27017:27017 mongo:7 >/dev/null 2>&1; then
+      c_bad "创建 MongoDB 容器失败（多半是拉不动 mongo:7 镜像）"
+      echo "     配置镜像加速后重试，或改用 apt 方式（MONGO_APT_MIRROR=... 换源）"
+      return 1
+    fi
+    c_ok "已创建并启动容器 qtvq-mongo（mongo:7）"
+  fi
+  echo ">> 等待 MongoDB 就绪…"
+  for _ in $(seq 1 20); do
+    if docker exec qtvq-mongo mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then
+      c_ok "MongoDB 容器已就绪（127.0.0.1:27017）"
+      echo "  （只绑 127.0.0.1，不对外暴露；查看日志：docker logs qtvq-mongo）"
+      return 0
+    fi
+    sleep 2
+  done
+  c_warn "容器已启动但 40s 内未就绪，请查 docker logs qtvq-mongo"
+  return 1
+}
+
+# apt 安装。成功返回 0，失败返回 1（由调用方决定是否退回容器方案）。
+install_mongo_apt() {
+  # MongoDB 官方 apt 源按 Ubuntu 代号发布，且 7.0 **没有** noble(24.04) 的包。
+  # 写死版本号会在 24.04 上直接安装失败，所以这里按代号选版本。
+  CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+  case "$CODENAME" in
+    focal|jammy)        MONGO_VER="7.0" ;;
+    noble|oracular)     MONGO_VER="8.0" ;;
+    bookworm|bullseye)  MONGO_VER="7.0" ;;
+    *)                  MONGO_VER="8.0" ;;
+  esac
+  echo ">> 安装 MongoDB ${MONGO_VER}（检测到代号 ${CODENAME}）"
+
+  # 按序探测可用 apt 源，第一个通的就用它。
+  # 注意探测路径必须是 `dists/<代号>/mongodb-org/<版本>/Release`：
+  # 这个仓库**没有** `dists/<代号>/InRelease`，用后者探测会永远 404，
+  # 从而把安装流程误判成「源不可达」。
+  MONGO_KEY_URL="${MONGO_KEY_URL:-https://pgp.mongodb.com/server-${MONGO_VER}.asc}"
+  MONGO_REPO_BASE=""
+  for base in "${MONGO_APT_MIRROR:-}" \
+              "https://repo.mongodb.org" \
+              "https://mirrors.aliyun.com/mongodb" \
+              "https://mirrors.tuna.tsinghua.edu.cn/mongodb"; do
+    [ -z "$base" ] && continue
+    if curl -fsSI --max-time 12 "${base}/apt/ubuntu/dists/${CODENAME}/mongodb-org/${MONGO_VER}/Release" >/dev/null 2>&1; then
+      MONGO_REPO_BASE="$base"
+      break
+    fi
+    c_warn "源不可达，尝试下一个：${base}"
+  done
+  if [ -z "$MONGO_REPO_BASE" ]; then
+    c_bad "所有 MongoDB apt 源都不可达（${CODENAME}/mongodb-org/${MONGO_VER}）"
+    return 1
+  fi
+  c_ok "使用 MongoDB 源：${MONGO_REPO_BASE}"
+
+  if ! curl -fsSL "${MONGO_KEY_URL}" \
+      | gpg --dearmor -o "/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg"; then
+    c_bad "下载 MongoDB GPG key 失败：${MONGO_KEY_URL}"
+    return 1
+  fi
+  echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg ] ${MONGO_REPO_BASE}/apt/ubuntu ${CODENAME}/mongodb-org/${MONGO_VER} multiverse" \
+    > "/etc/apt/sources.list.d/mongodb-org-${MONGO_VER}.list"
+  apt-get update -qq
+  if ! apt-get install -y -qq mongodb-org; then
+    c_bad "MongoDB ${MONGO_VER} 安装失败（源：${MONGO_REPO_BASE}）"
+    return 1
+  fi
+  systemctl enable --now mongod || { c_bad "mongod 启动失败"; return 1; }
+  c_ok "mongod 已启动：$(systemctl is-active mongod)（版本 ${MONGO_VER}，源 ${MONGO_REPO_BASE}）"
+  echo "  （MongoDB 默认只监听 127.0.0.1:27017，无需额外加固；如需远程访问请自行配置鉴权与防火墙）"
+  return 0
+}
+
 if [ "$DO_INSTALL" -eq 1 ]; then
   need_root
   head1 "安装（--install）"
@@ -139,80 +230,24 @@ if [ "$DO_INSTALL" -eq 1 ]; then
     c_ok "node 已就绪，跳过"
   fi
 
-  if [[ " ${MISSING[*]:-} " == *" mongo "* ]]; then
-    # MongoDB 官方 apt 源按 Ubuntu 代号发布，且 7.0 **没有** noble(24.04) 的包。
-    # 写死版本号会在 24.04 上直接安装失败，所以这里按代号选版本。
-    CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
-    case "$CODENAME" in
-      focal|jammy)        MONGO_VER="7.0" ;;
-      noble|oracular)     MONGO_VER="8.0" ;;
-      bookworm|bullseye)  MONGO_VER="7.0" ;;
-      *)                  MONGO_VER="8.0" ;;
-    esac
-    echo ">> 安装 MongoDB ${MONGO_VER}（检测到代号 ${CODENAME}）"
-
-    # 按序探测可用 apt 源，第一个通的就用它。
-    # 注意探测路径必须是 `dists/<代号>/mongodb-org/<版本>/Release`：
-    # 这个仓库**没有** `dists/<代号>/InRelease`，用后者探测会永远 404，
-    # 从而把安装流程误判成「源不可达」。
-    MONGO_KEY_URL="${MONGO_KEY_URL:-https://pgp.mongodb.com/server-${MONGO_VER}.asc}"
-    MONGO_REPO_BASE=""
-    CANDIDATES=(
-      "${MONGO_APT_MIRROR:-}"
-      "https://repo.mongodb.org"
-      "https://mirrors.aliyun.com/mongodb"
-      "https://mirrors.tuna.tsinghua.edu.cn/mongodb"
-    )
-    for base in "${CANDIDATES[@]}"; do
-      [ -z "$base" ] && continue
-      probe="${base}/apt/ubuntu/dists/${CODENAME}/mongodb-org/${MONGO_VER}/Release"
-      if curl -fsSI --max-time 12 "$probe" >/dev/null 2>&1; then
-        MONGO_REPO_BASE="$base"
-        break
+  # native 直接跳过；其余都先走 apt（systemd 管理更规范、仓库源会自动挑快的），
+  # 失败再退回容器。docker 可用只是把它当作**后备**，不代表 MongoDB 就绪。
+  case "$MONGO_MODE" in
+    native)
+      c_ok "MongoDB 已就绪（native），跳过"
+      ;;
+    *)
+      if ! install_mongo_apt; then
+        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+          c_warn "apt 方式未成功，改用 docker 容器方案"
+          start_mongo_docker || exit 1
+        else
+          c_bad "MongoDB 安装失败，且没有可用的 docker 退回方案"
+          exit 1
+        fi
       fi
-      c_warn "源不可达，尝试下一个：${base}"
-    done
-
-    if [ -z "$MONGO_REPO_BASE" ]; then
-      c_bad "所有 MongoDB apt 源都不可达（${CODENAME}/mongodb-org/${MONGO_VER}）"
-      echo "     两条退路（任选一条）："
-      echo
-      echo "     a) 手动指定镜像重跑："
-      echo "        sudo MONGO_APT_MIRROR=https://mirrors.aliyun.com/mongodb \\"
-      echo "          bash $0 --install --systemd"
-      echo
-      echo "     b) 用容器（若已装 docker）："
-      echo "        docker run -d --name qtvq-mongo --restart unless-stopped \\"
-      echo "          -p 127.0.0.1:27017:27017 mongo:7"
-      echo "        然后确认 .env 里 MONGO_URI=mongodb://127.0.0.1:27017/qtvq"
-      exit 1
-    fi
-    c_ok "使用 MongoDB 源：${MONGO_REPO_BASE}"
-
-    curl -fsSL "${MONGO_KEY_URL}" \
-      | gpg --dearmor -o "/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg" \
-      || {
-        c_bad "下载 MongoDB GPG key 失败：${MONGO_KEY_URL}"
-        echo "     可用 MONGO_KEY_URL=... 覆盖该地址，或改用上面的容器方案。"
-        exit 1
-      }
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VER}.gpg ] ${MONGO_REPO_BASE}/apt/ubuntu ${CODENAME}/mongodb-org/${MONGO_VER} multiverse" \
-      > "/etc/apt/sources.list.d/mongodb-org-${MONGO_VER}.list"
-    apt-get update -qq
-    if ! apt-get install -y -qq mongodb-org; then
-      c_bad "MongoDB ${MONGO_VER} 安装失败（源：${MONGO_REPO_BASE}）"
-      echo "     常见原因：该发行版没有对应包（7.0 没有 noble 24.04）、或源同步不全。"
-      echo "     两条退路："
-      echo "       a) 换源重跑：sudo MONGO_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/mongodb bash $0 --install --systemd"
-      echo "       b) 用容器：docker run -d --name qtvq-mongo --restart unless-stopped -p 127.0.0.1:27017:27017 mongo:7"
-      exit 1
-    fi
-    systemctl enable --now mongod || { c_bad "mongod 启动失败"; exit 1; }
-    c_ok "mongod 已启动：$(systemctl is-active mongod)（版本 ${MONGO_VER}，源 ${MONGO_REPO_BASE}）"
-    echo "  （MongoDB 默认只监听 127.0.0.1:27017，无需额外加固；如需远程访问请自行配置鉴权与防火墙）"
-  else
-    c_ok "MongoDB 已就绪或以 docker 方式提供，跳过"
-  fi
+      ;;
+  esac
 fi
 
 # ---------- .env ----------
