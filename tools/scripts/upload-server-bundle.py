@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Package `server/` and publish it to OSS, then print a time-limited signed URL.
+"""Package `server/` + deploy helpers and publish them to OSS, then print a
+time-limited signed URL.
 
 Why this exists: the production ECS can reach OSS but has no usable SSH key from
 this Windows profile, and GitHub/Gitee are not dependable from here. The static
@@ -17,6 +18,7 @@ import argparse
 import base64
 import hashlib
 import hmac
+import io
 import os
 import sys
 import tarfile
@@ -38,14 +40,44 @@ EXCLUDE_FILES = {".env", "boot-out.txt", "boot-err.txt"}
 # 只给 server/ 的话服务器上拿到的仍是那份有泄露缺陷的旧脚本。
 EXTRA_PATHS = ["tools", ".assetsignore"]
 
+# 文本类文件打进 Linux 包时必须转成 LF。
+# 本仓库 core.autocrlf=true，工作区的 .sh 可能是 CRLF —— 原样打包的话，
+# 服务器上会报 `line 4: $'\r': command not found`，而且只有部分脚本中招，极难排查。
+TEXT_EXTS = {
+    ".sh", ".mjs", ".js", ".json", ".md", ".html", ".css", ".txt",
+    ".yml", ".yaml", ".toml", ".example", ".gitignore", ".gitattributes",
+    ".ps1", ".py",
+}
+TEXT_NAMES = {
+    "Dockerfile", "Makefile", ".env.example",
+    ".gitignore", ".assetsignore", ".gitattributes",
+}
+
+
+def is_text_like(path: Path) -> bool:
+    return path.name in TEXT_NAMES or path.suffix.lower() in TEXT_EXTS or path.name.startswith(".")
+
+
+def load_env(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if not path.exists():
+        return env
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip()
+    return env
+
 
 def presign_oss_v1(ak: str, sk: str, bucket: str, key: str, endpoint: str, expires: int = 86400) -> str:
     """自己算阿里云 OSS 的 V1 签名。
 
     为什么不用 SDK 的 `createSignedUrl`：这个环境的 SDK 是华为云 OBS 的
     `esdk-obs-python`（只是把 endpoint 指向了阿里云 OSS），它生成的查询参数是
-    `AccessKeyId`，而**阿里云要求 `OSSAccessKeyId`** —— 参数名不对，OSS 视为缺少鉴权信息，
-    直接 403。实测：`AccessKeyId` → 403，`OSSAccessKeyId` → 200。
+    `AccessKeyId`，而**阿里云要求 `OSSAccessKeyId`** —— 参数名不对，OSS 视为缺少
+    鉴权信息，直接 403。实测：`AccessKeyId` → 403，`OSSAccessKeyId` → 200。
 
     上传（putFile）用 SDK 没问题，只有签名 URL 需要自己算。
     """
@@ -74,49 +106,80 @@ def verify_url(url: str) -> tuple[bool, str]:
         return False, f"{getattr(exc, 'code', '?')} {exc}"
 
 
-def load_env(path: Path) -> dict[str, str]:
-    env: dict[str, str] = {}
-    if not path.exists():
-        return env
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+def add_tree(tar: tarfile.TarFile, base: Path, arc_prefix: str) -> None:
+    """把 base 递归加入 tar，文本文件统一转 LF。
+
+    不用 `tar.add(..., filter=)` 是因为 filter 只能改 TarInfo、改不了内容，
+    而 CRLF 必须改内容 —— 见 is_text_like 的注释。
+    """
+    base = base.resolve()
+    for path in sorted(base.rglob("*")):
+        rel = path.relative_to(base)
+        if any(part in EXCLUDE_PARTS for part in rel.parts):
             continue
-        key, value = line.split("=", 1)
-        env[key.strip()] = value.strip()
-    return env
-
-
-def tar_filter(info: tarfile.TarInfo):
-    parts = Path(info.name).parts
-    if any(p in EXCLUDE_PARTS for p in parts):
-        return None
-    if Path(info.name).name in EXCLUDE_FILES:
-        return None
-    # 归一化权限：源码不该带可执行位差异
-    if info.isfile():
-        info.mode = 0o644
-    return info
+        if path.name in EXCLUDE_FILES:
+            continue
+        arcname = f"{arc_prefix}/{rel.as_posix()}"
+        info = tar.gettarinfo(str(path), arcname=arcname)
+        if info.isdir():
+            tar.addfile(info)
+            continue
+        if info.isreg() and is_text_like(path):
+            data = path.read_bytes().replace(b"\r\n", b"\n")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+            continue
+        if info.isreg():
+            with open(path, "rb") as fh:
+                tar.addfile(info, fh)
+        else:
+            tar.addfile(info)
 
 
 def build_bundle() -> Path:
     DIST.mkdir(exist_ok=True)
     out = DIST / BUNDLE_NAME
-    print(f">> 打包 {SERVER_DIR} -> {out}")
+    print(f">> 打包 {SERVER_DIR} + {' '.join(EXTRA_PATHS)} -> {out}")
+
     with tarfile.open(out, "w:gz") as tar:
-        tar.add(SERVER_DIR, arcname="server", filter=tar_filter)
+        add_tree(tar, SERVER_DIR, "server")
         for rel in EXTRA_PATHS:
             p = ROOT / rel
-            if p.exists():
-                tar.add(p, arcname=rel, filter=tar_filter)
+            if p.is_dir():
+                add_tree(tar, p, rel)
+            elif p.is_file():
+                info = tar.gettarinfo(str(p), arcname=rel)
+                raw = p.read_bytes()
+                data = raw.replace(b"\r\n", b"\n") if is_text_like(p) else raw
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+            else:
+                print(f"   跳过（不存在）：{rel}")
+
     size_kb = out.stat().st_size / 1024
     with tarfile.open(out, "r:gz") as tar:
-        names = tar.getnames()
+        members = tar.getmembers()
+        names = [m.name for m in members]
+        # 打包后自证：shell 脚本里不许残留 CR
+        shell_bad = []
+        for m in members:
+            if m.name.endswith(".sh"):
+                fh = tar.extractfile(m)
+                if fh and b"\r\n" in fh.read():
+                    shell_bad.append(m.name)
     print(f"   文件数 {len(names)}，大小 {size_kb:.1f} KB")
+
     required = ["server/src/app.js", "tools/scripts/sync-static.sh"]
     missing = [r for r in required if not any(n.endswith(r) for n in names)]
     if missing:
         print(f"!! 打包内容异常：缺少 {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+    if shell_bad:
+        print(
+            f"!! 以下 shell 脚本仍含 CRLF，到 Linux 会报 "
+            f"$'\\r': command not found：{shell_bad}",
+            file=sys.stderr,
+        )
         sys.exit(1)
     return out
 
