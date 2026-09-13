@@ -13,7 +13,7 @@
     "sync:static": "powershell -ExecutionPolicy Bypass -File tools/scripts/sync-static-from-windows.ps1",
     "deploy:api:linux": "bash tools/scripts/deploy-api.sh",
     "deploy:api-only:linux": "bash tools/scripts/deploy-api.sh",
-    "deploy:site": "npx wrangler pages deploy . --project-name=qtvq-site",
+    "deploy:site": "powershell -ExecutionPolicy Bypass -File tools/scripts/build-pages-public.ps1 && npx wrangler pages deploy dist/pages-public --project-name=qtvq-site --commit-dirty=true",
     "setup:kv": "powershell -ExecutionPolicy Bypass -File tools/scripts/setup-kv.ps1",
     "deploy:full": "powershell -ExecutionPolicy Bypass -File tools/scripts/deploy.ps1",
     "post-deploy": "powershell -ExecutionPolicy Bypass -File tools/scripts/post-deploy.ps1",

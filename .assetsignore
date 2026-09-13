@@ -1,9 +1,21 @@
-# Cloudflare Pages 发布白名单外排除（Output dir = 仓库根目录，见 wrangler.toml）
+# Cloudflare Pages 发布排除名单（Output dir = 仓库根目录，见 wrangler.toml）
+#
+# ⚠️ 重要更正（2026-09-13 实测）：本文件在 wrangler 4.98 的 Pages 部署路径上**不生效**。
+#    证据：580a458c 这次部署里连 .assetsignore 自己都被发布出去（HTTP 200），
+#    cf.env / obs.env / .dev.vars / server/.env / context/ / tmp-chat.json 也全部可读，
+#    而 wrangler 内置的默认排除项（/.assetsignore、/_headers、/_redirects）同样没起作用。
+#    因此：**不要把安全性寄托在本文件上**。真正生效的机制是显式白名单构建器：
+#      tools/scripts/build-pages-public.ps1   →  dist/pages-public/
+#    由 tools/scripts/deploy.ps1 与 package.json 的 deploy:site 调用后再发布。
+#    本文件保留下来只作两用：① 记录"哪些东西不该公开"；② 若将来 wrangler 修好该机制，
+#    它能作为第二道防线。
 #
 # 背景：pages_build_output_dir = "."，即把整个仓库目录当 Pages 站点发布。
 # 曾经导致 cf.env（含 Cloudflare API Token）被公开在
 #   https://qtvq-api.pages.dev/cf.env
 # 一旦泄露过就必须轮换密钥 —— 删文件只能止损，不能消除已泄露的事实。
+# 另注：Pages 对非 HTML 资源默认 `cache-control: public, s-maxage=604800`，
+# 即使新部署已移除该文件，边缘缓存仍可能继续供应最长 7 天。
 #
 # 语法同 .gitignore。**注意不要排除 functions/ 与 tools/**：
 #   functions/ 是 API 本体；tools/verify-payment.html 是工作人员核实页，都在使用中。
