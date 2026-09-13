@@ -105,4 +105,26 @@ export async function markOrderPaid(env, orderId, { platformTradeNo, paidAt = Da
   return { order, alreadyPaid: false };
 }
 
+/** 工作人员：最近在线支付订单（需 KV） */
+export async function listRecentOrders(env, { limit = 50 } = {}) {
+  const kv = getKv(env);
+  if (!kv) {
+    const items = [...memoryOrders.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { items: items.slice(0, limit), storage: 'memory' };
+  }
+  const list = await kv.list({ prefix: ORDER_PREFIX });
+  const items = [];
+  for (const { name } of list.keys) {
+    const raw = await kv.get(name);
+    if (!raw) continue;
+    try {
+      items.push(JSON.parse(raw));
+    } catch {
+      /* skip */
+    }
+  }
+  items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  return { items: items.slice(0, limit), storage: 'kv' };
+}
+
 export { PLANS };
