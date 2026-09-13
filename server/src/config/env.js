@@ -85,6 +85,18 @@ export const env = {
   /** 不同举报人数达到该阈值时，目标用户自动转 invisible（等待人工确认） */
   moderationAutoHide: num(process.env.MODERATION_AUTO_HIDE, 5),
 
+  // ===== 转盘 =====
+  /** 转一次的价格（元）；0 = 免费 */
+  wheelPrice: num(process.env.WHEEL_PRICE, 1),
+  /** 会员每日免费转动次数 */
+  memberDailySpins: num(process.env.MEMBER_DAILY_SPINS, 3),
+  /** 单次最多取多少候选进内存打分（O(N)，见 services/wheel.js 的规模说明） */
+  wheelPoolLimit: num(process.env.WHEEL_POOL_LIMIT, 200),
+  /** 转盘扇区数（每扇区一个头像） */
+  wheelSectors: num(process.env.WHEEL_SECTORS, 12),
+  /** 排除最近 N 次已转到的对象，避免转来转去都是同一个人 */
+  wheelRecentExclude: num(process.env.WHEEL_RECENT_EXCLUDE, 20),
+
   // ===== 运营台 =====
   /** 运营台口令；未配置时 /v1/admin/* 全部 404（不是 401，避免暴露存在性） */
   adminKey: process.env.ADMIN_KEY || '',

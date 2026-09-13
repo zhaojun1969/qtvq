@@ -298,8 +298,35 @@ async function main() {
   const mineComplaints = await api.listMyComplaints();
   check('listMyComplaints 可读', Array.isArray(mineComplaints?.items), `items=${mineComplaints?.items?.length}`);
 
+  // ---- 转盘客户端 ----
+  console.log('\n[7] 转盘（客户端函数）');
+  asA();
+  const wheelQuote = await api.fetchWheelQuote();
+  check(
+    'fetchWheelQuote 返回价格与原因',
+    typeof wheelQuote?.price === 'number' && typeof wheelQuote?.reason === 'string',
+    JSON.stringify({ p: wheelQuote?.price, r: wheelQuote?.reason }),
+  );
+
+  // A 已把资料填成 male，B 是 female，因此 A 的转盘应能看到 B
+  const wheelCands = await api.fetchWheelCandidates();
+  check('fetchWheelCandidates 返回扇区列表', Array.isArray(wheelCands?.items) && wheelCands.items.length >= 1, `items=${wheelCands?.items?.length}`);
+  check('候选不含向量字段', (wheelCands?.items || []).every((x) => !('profileVector' in x)));
+
+  const spinRes = await api.spinWheel({});
+  check(
+    'spinWheel 返回 sectors 与 targetIndex',
+    Array.isArray(spinRes?.sectors) && Number.isInteger(spinRes?.targetIndex),
+    `sectors=${spinRes?.sectors?.length} idx=${spinRes?.targetIndex}`,
+  );
+  check('target 与 targetIndex 一致（前端只需按 index 停位）', spinRes?.sectors?.[spinRes?.targetIndex]?.uid === spinRes?.target?.uid);
+  check('转盘计费信息在 billing 里', typeof spinRes?.billing?.charged === 'number', JSON.stringify(spinRes?.billing));
+
+  const hist = await api.fetchSpinHistory();
+  check('fetchSpinHistory 可读', Array.isArray(hist?.items) && hist.items.length >= 1, `items=${hist?.items?.length}`);
+
   // ---- 清理 ----
-  console.log('\n[7] 清理');
+  console.log('\n[8] 清理');
   const db = getDB();
   const u = await db.collection('users').deleteMany({ _id: { $in: ['u_fe_a', 'u_fe_b'] } });
   const r = await db.collection('reports').deleteMany({ uid: { $in: ['u_fe_a', 'u_fe_b'] } });

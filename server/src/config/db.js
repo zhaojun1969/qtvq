@@ -81,4 +81,10 @@ async function ensureIndexes(database) {
   ]);
 
   await database.collection('audit_logs').createIndexes([{ key: { createdAt: -1 } }]);
+
+  // 转盘记录：按用户倒序查「最近转到过谁」（去重），以及审计
+  await database.collection('spin_logs').createIndexes([
+    { key: { uid: 1, createdAt: -1 } },
+    { key: { targetUid: 1, createdAt: -1 } },
+  ]);
 }

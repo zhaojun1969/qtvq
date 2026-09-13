@@ -13,7 +13,7 @@ function clamp01(x) {
 }
 
 /** Jaccard 相似度；任一为空返回中性值 0.5，避免「没填资料=0 分」的挫败感 */
-function jaccard(a = [], b = []) {
+export function jaccard(a = [], b = []) {
   const sa = new Set((a || []).map((x) => String(x).trim()).filter(Boolean));
   const sb = new Set((b || []).map((x) => String(x).trim()).filter(Boolean));
   if (!sa.size || !sb.size) return 0.5;
@@ -23,7 +23,7 @@ function jaccard(a = [], b = []) {
   return union ? inter / union : 0.5;
 }
 
-function cityScore(a, b) {
+export function cityScore(a, b) {
   if (!a || !b) return 0.5;
   if (a === b) return 1;
   const sameProvince = { 北京: '华北', 天津: '华北', 上海: '华东', 杭州: '华东', 南京: '华东', 广州: '华南', 深圳: '华南', 成都: '西南', 重庆: '西南' };
@@ -31,7 +31,7 @@ function cityScore(a, b) {
   return 0.55;
 }
 
-function ageScore(a, b) {
+export function ageScore(a, b) {
   if (!a || !b) return 0.5;
   const gap = Math.abs(Number(a) - Number(b));
   if (!Number.isFinite(gap)) return 0.5;

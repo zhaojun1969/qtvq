@@ -16,6 +16,7 @@ import healthRoutes from './routes/health.js';
 import profileRoutes from './routes/profile.js';
 import reportRoutes from './routes/report.js';
 import walletRoutes from './routes/wallet.js';
+import wheelRoutes from './routes/wheel.js';
 import moderationRoutes from './routes/moderation.js';
 import safetyRoutes from './routes/safety.js';
 import adminRoutes from './routes/admin.js';
@@ -55,6 +56,7 @@ app.use('/v1/report', reportRoutes);
 app.use('/v1/wallet', walletRoutes);
 app.use('/v1/moderation', moderationRoutes);
 app.use('/v1/safety', safetyRoutes);
+app.use('/v1/wheel', wheelRoutes);
 // 未配置 ADMIN_KEY 时整组按 404 处理（见 middleware/admin.js）
 app.use('/v1/admin', adminRoutes);
 

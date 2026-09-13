@@ -225,6 +225,37 @@ export function listMyComplaints(limit = 20) {
   return request('GET', `/v1/moderation/mine?limit=${encodeURIComponent(limit)}`);
 }
 
+// ---------------------------------------------------------------- 转盘
+
+/** 转盘候选（用于扇区预览与空态判断）；服务端只返回展示字段，不含向量 */
+export function fetchWheelCandidates() {
+  return request('GET', '/v1/wheel/candidates');
+}
+
+/** 转一次要花多少（按钮上显示价格用） */
+export function fetchWheelQuote() {
+  return request('GET', '/v1/wheel/quote');
+}
+
+/**
+ * 转一次。
+ *
+ * **抽签结果由服务端决定**：返回 `{sectors, targetIndex, target, billing}`，
+ * 前端只负责把动画停到 `targetIndex` 对应的扇区。
+ * `idempotencyKey` 的作用是「双击/网络重试只扣一次钱」，**不能**用来指定对象。
+ */
+export function spinWheel({ idempotencyKey } = {}) {
+  return request('POST', '/v1/wheel/spin', {
+    body: {},
+    idempotencyKey: idempotencyKey || newIdempotencyKey(),
+  });
+}
+
+/** 我的转动记录 */
+export function fetchSpinHistory(limit = 20) {
+  return request('GET', `/v1/wheel/history?limit=${encodeURIComponent(limit)}`);
+}
+
 /** 档位展示用（与服务端 src/constants.js 保持一致） */
 export const TIERS = [
   { key: 'basic', zh: '缘分一转', price: 1, desc: '总体判断 + 1 条最该做的事' },

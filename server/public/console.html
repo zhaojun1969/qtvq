@@ -190,6 +190,8 @@ async function loadOverview(){
       ['用户总数', d.users.total], ['已建向量', d.users.profilesReady],
       ['封禁', d.users.banned], ['隐藏', d.users.invisible],
       ['报告总数', d.reports.total], ['今日报告', d.reports.today],
+      ['转盘总次数', d.wheel ? d.wheel.total : '—'], ['今日转动', d.wheel ? d.wheel.today : '—'],
+      ['转盘收入', d.wheel ? '¥'+Number(d.wheel.revenue).toFixed(2) : '—'],
       ['待处理举报', d.moderation.pending], ['钱包账户', d.wallet.accounts],
       ['余额合计', '¥'+d.wallet.totalBalance.toFixed(2)],
       ['累计收入', '¥'+d.wallet.revenueAll.toFixed(2)],

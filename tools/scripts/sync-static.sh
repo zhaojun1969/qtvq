@@ -135,6 +135,9 @@ test -f "$DEST/js/report.js"
 test -f "$DEST/js/report-api.js"
 test -f "$DEST/js/report-share.js"
 test -f "$DEST/css/report.css"
+test -f "$DEST/wheel.html"
+test -f "$DEST/js/wheel.js"
+test -f "$DEST/css/wheel.css"
 test -f "$DEST/pO8yu0YU22.txt"
 grep -q 'bbbb6c592fbd78c00beaa494f3943ba2' "$DEST/pO8yu0YU22.txt"
 grep -q 'feature-card-link' "$DEST/index.html"
@@ -146,6 +149,13 @@ grep -q 'prompt:' "$DEST/js/data.js"
 grep -q 'BUILD_SHA' "$DEST/js/version.js"
 grep -q 'js/report.js' "$DEST/report.html"
 grep -q 'report.html' "$DEST/index.html"
+grep -q 'wheel.html' "$DEST/index.html"
+grep -q 'wheel-canvas' "$DEST/wheel.html"
+# 转盘的落点必须来自服务端：这里反向确保前端没有引入「随机决定落点」的写法
+if grep -qE 'Math\.random\(\)[[:space:]]*\*[[:space:]]*n' "$DEST/js/wheel.js"; then
+  echo "!! js/wheel.js 出现前端随机决定落点的写法——抽签必须由服务端决定"
+  exit 1
+fi
 
 echo ">> OK $(date)"
 echo "   首页: https://qtvq.cn/"

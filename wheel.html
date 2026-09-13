@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Q问转盘配对：转一圈，遇见一个真实的人，再看你们的契合度报告。">
+  <title>转盘配对 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/wheel.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text">
+          我心永恒
+          <span>Q问 · qtvq.cn</span>
+        </div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="wheel.html" class="active">转盘配对</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="report.html">配对报告</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wheel-page">
+    <section class="wheel-hero">
+      <h1>转一圈，遇见TA</h1>
+      <p>指针只会停在<strong>真实活跃用户</strong>上 —— 没有假人池，转到的每个人都可以去看你们的契合度报告</p>
+    </section>
+
+    <div id="notice-slot"></div>
+
+    <div class="wheel-wallet hidden" id="wheel-wallet">
+      <span>余额 <span class="bal" id="wallet-balance">—</span></span>
+      <span class="muted" id="wallet-note"></span>
+      <span class="grow"></span>
+      <a href="account.html">充值 / 办理会员 →</a>
+    </div>
+
+    <div class="wheel-stage" id="wheel-stage">
+      <div class="wheel-pointer"></div>
+      <canvas id="wheel-canvas"></canvas>
+      <div class="wheel-center"><span class="q">Q</span><span class="dot"></span></div>
+    </div>
+
+    <div class="wheel-actions">
+      <button type="button" class="btn-spin" id="btn-spin">转一圈</button>
+      <p class="wheel-hint" id="spin-hint"></p>
+    </div>
+
+    <section class="result-card hidden" id="result-card"></section>
+
+    <section class="wheel-history" id="history-wrap">
+      <h2>我的转动记录</h2>
+      <div class="history-list" id="history-list">
+        <div class="wheel-hint">加载中…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>域名 qtvq.cn · Q Thought, Voice, Question · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>qtvq@qtvq.cn</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+    <p class="footer-support">
+      <a href="help.html">使用帮助</a>
+      · <a href="privacy.html">隐私说明</a>
+      · <a href="report.html">配对报告</a>
+      · <a href="pitfalls.html">避坑大全</a>
+      · <a href="account.html">我的账户</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/wheel.js"></script>
+</body>
+</html>

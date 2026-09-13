@@ -16,6 +16,7 @@ import { badRequest, notFound, ok, wrap } from '../lib/http.js';
 import { requireAdmin } from '../middleware/admin.js';
 import { credit, getWallet, listLedger, startOfDayCN } from '../services/wallet.js';
 import { handleReport, listPending, moderationStats, publicModeration } from '../services/moderation.js';
+import { spinStats } from '../services/wheel.js';
 import { listAudit, logAudit } from '../services/audit.js';
 import { safetyStatus } from '../services/content-safety.js';
 
@@ -77,6 +78,7 @@ router.get(
     return ok(res, {
       users: { total: users, profilesReady, banned, invisible },
       reports: { total: totalReports, today: reportsToday },
+      wheel: await spinStats(),
       moderation: mod,
       wallet: {
         accounts: bal[0]?.n || 0,

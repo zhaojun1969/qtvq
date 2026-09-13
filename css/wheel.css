@@ -1,0 +1,343 @@
+/**
+ * 转盘专用样式
+ *
+ * 复用主样式表的设计令牌（--pink/--purple/--bg/--bg-card/--bg-elevated/--radius/--shadow/--font），
+ * 只新增本页需要的东西。
+ */
+
+.hidden {
+  display: none !important;
+}
+
+.wheel-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 20px 64px;
+}
+
+.wheel-hero {
+  text-align: center;
+  padding: 12px 0 20px;
+}
+
+.wheel-hero h1 {
+  font-size: 28px;
+  font-weight: 800;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.wheel-hero p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* ---------- 余额条 ---------- */
+.wheel-wallet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.wheel-wallet .bal {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--pink);
+}
+
+.wheel-wallet .grow {
+  flex: 1;
+}
+
+/* ---------- 转盘 ---------- */
+.wheel-stage {
+  position: relative;
+  margin: 8px auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#wheel-canvas {
+  display: block;
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px var(--bg-elevated), var(--shadow);
+  touch-action: manipulation;
+}
+
+/* 固定指针：放在顶部。计划书原本让「中心圆点」当指针并绕圈转，
+   但指针与转盘同时旋转会让"指向哪里"变得有歧义，这里改为
+   转盘转、指针固定（老虎机形态），落点唯一且可核对。 */
+.wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-top: 22px solid var(--pink);
+  filter: drop-shadow(0 2px 6px rgba(255, 107, 129, 0.5));
+  z-index: 2;
+}
+
+.wheel-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--pink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wheel-center .q {
+  font-size: 34px;
+  font-weight: 900;
+  color: var(--pink);
+  line-height: 1;
+}
+
+.wheel-center .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pink);
+  margin-top: 3px;
+}
+
+/* ---------- 操作区 ---------- */
+.wheel-actions {
+  text-align: center;
+}
+
+.btn-spin {
+  padding: 14px 46px;
+  border-radius: 30px;
+  border: none;
+  background: var(--gradient);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s, opacity 0.2s;
+}
+
+.btn-spin:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+
+.btn-spin:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-spin:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wheel-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+/* ---------- 结果卡片 ---------- */
+.result-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-top: 24px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  animation: cardIn 0.32s ease;
+}
+
+@keyframes cardIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.result-card .avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--gradient);
+  border: 3px solid var(--pink);
+  overflow: hidden;
+}
+
+.result-card .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-card h3 {
+  font-size: 20px;
+}
+
+.result-card .meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.result-card .score {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.result-card .score b {
+  font-size: 30px;
+  color: var(--pink);
+  vertical-align: -3px;
+}
+
+.result-card .tags {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.result-card .tags span {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.result-card .intro {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 12px 0 4px;
+}
+
+.result-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.result-actions .btn {
+  width: 100%;
+}
+
+.tier-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tier-pick button {
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tier-pick button.active {
+  border-color: var(--pink);
+  background: linear-gradient(135deg, rgba(255, 107, 129, 0.2), rgba(108, 92, 231, 0.2));
+}
+
+.tier-pick button small {
+  display: block;
+  color: var(--pink);
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+/* ---------- 历史 ---------- */
+.wheel-history {
+  margin-top: 28px;
+}
+
+.wheel-history h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.history-item .hi-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-item .hi-amount {
+  color: var(--pink);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .wheel-page {
+    padding: 14px 14px 48px;
+  }
+  .wheel-hero h1 {
+    font-size: 23px;
+  }
+  .btn-spin {
+    padding: 13px 34px;
+    font-size: 16px;
+  }
+}
