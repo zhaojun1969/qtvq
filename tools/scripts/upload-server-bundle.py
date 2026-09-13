@@ -33,6 +33,11 @@ DEFAULT_PREFIX = "qtvq/srv/"
 EXCLUDE_PARTS = {"node_modules", ".git", "__pycache__", "dist", "coverage"}
 EXCLUDE_FILES = {".env", "boot-out.txt", "boot-err.txt"}
 
+# 除了 server/，还要带上静态同步依赖的文件：
+# sync-static.sh 会调用同目录的 write-version.sh 与 copy-verify-root.sh，
+# 只给 server/ 的话服务器上拿到的仍是那份有泄露缺陷的旧脚本。
+EXTRA_PATHS = ["tools", ".assetsignore"]
+
 
 def presign_oss_v1(ak: str, sk: str, bucket: str, key: str, endpoint: str, expires: int = 86400) -> str:
     """自己算阿里云 OSS 的 V1 签名。
@@ -100,12 +105,18 @@ def build_bundle() -> Path:
     print(f">> 打包 {SERVER_DIR} -> {out}")
     with tarfile.open(out, "w:gz") as tar:
         tar.add(SERVER_DIR, arcname="server", filter=tar_filter)
+        for rel in EXTRA_PATHS:
+            p = ROOT / rel
+            if p.exists():
+                tar.add(p, arcname=rel, filter=tar_filter)
     size_kb = out.stat().st_size / 1024
     with tarfile.open(out, "r:gz") as tar:
         names = tar.getnames()
     print(f"   文件数 {len(names)}，大小 {size_kb:.1f} KB")
-    if not any(n.endswith("server/src/app.js") for n in names):
-        print("!! 打包内容异常：缺少 server/src/app.js", file=sys.stderr)
+    required = ["server/src/app.js", "tools/scripts/sync-static.sh"]
+    missing = [r for r in required if not any(n.endswith(r) for n in names)]
+    if missing:
+        print(f"!! 打包内容异常：缺少 {', '.join(missing)}", file=sys.stderr)
         sys.exit(1)
     return out
 
