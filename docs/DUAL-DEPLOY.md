@@ -19,9 +19,13 @@
 ## 一、Cloudflare（API）
 
 ```bash
-npm run deploy          # wrangler pages deploy . --project-name=qtvq-api
-npm run post-deploy     # PAYMENT_ADMIN_KEY + 冒烟测试
+npm run deploy          # 先构建白名单目录 dist/pages-public，再发布（绝不整仓发布）
+npm run post-deploy     # 从 .dev.vars 推密钥 + 重新部署 + 冒烟测试
 ```
+
+⚠️ **不要直接 `wrangler pages deploy .`**：`wrangler.toml` 里 `pages_build_output_dir = "."`，
+发布 `.` 等于把整个仓库公开（cf.env / obs.env / .dev.vars / server/.env / context/ 等，
+2026-09-13 发生过，见 §§9.7）。白名单清单在 `tools/scripts/build-pages-public.mjs`（唯一实现）。
 
 Dashboard → **qtvq-api** → 确认：
 

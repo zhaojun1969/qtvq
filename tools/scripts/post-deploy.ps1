@@ -29,42 +29,33 @@ if (Test-Path ".dev.vars") {
         Write-Host ">> Upload PAYMENT_ADMIN_KEY to Pages ($Project) ..."
         $val | & npx wrangler pages secret put PAYMENT_ADMIN_KEY --project-name=$Project
     }
-    $mailKeys = @('MAIL_PROVIDER','SMTP_HOST','SMTP_PORT','SMTP_SECURE','SMTP_USER','SMTP_PASS','SMTP_FROM','SMTP_TO','RESEND_API_KEY','MAIL_FROM','MAIL_TO')
-    foreach ($key in $mailKeys) {
-        $mline = $lines | Where-Object { $_ -match "^${key}=" } | Select-Object -First 1
-        if ($mline -match "^${key}=(.+)$") {
-            $mval = $Matches[1].Trim()
-            if ($mval -and $mval -notmatch '请填写|请替换|xxxxxxxx') {
-                Write-Host ">> Upload $key ..."
-                $mval | & npx wrangler pages secret put $key --project-name=$Project
-            }
-        }
-    }
-    $nlsLine = $lines | Where-Object { $_ -match '^NLS_APP_KEY=' } | Select-Object -First 1
-    if ($nlsLine -match '^NLS_APP_KEY=(.+)$') {
-        $nlsVal = $Matches[1].Trim()
-        if ($nlsVal -and $nlsVal.Length -ge 8 -and $nlsVal -notmatch 'placeholder|example|xxxxxxxx') {
-            Write-Host ">> Upload NLS_APP_KEY ..."
-            $nlsVal | & npx wrangler pages secret put NLS_APP_KEY --project-name=$Project
-        }
-    }
-    $wechatKeys = @('WECHAT_MCH_ID','WECHAT_APP_ID','WECHAT_API_V3_KEY','WECHAT_MCH_SERIAL','WECHAT_MCH_PRIVATE_KEY','WECHAT_PAY_NOTIFY_URL','WECHAT_PLATFORM_PUBLIC_KEY')
-    foreach ($key in $wechatKeys) {
-        $wline = $lines | Where-Object { $_ -match "^${key}=" } | Select-Object -First 1
-        if ($wline -match "^${key}=(.+)$") {
-            $wval = $Matches[1].Trim()
-            if ($wval -and $wval -notmatch '^#|请填写|请替换|xxxxxxxx') {
-                Write-Host ">> Upload $key ..."
-                $wval | & npx wrangler pages secret put $key --project-name=$Project
-            }
+    # ⚠️ 不要在这里自己解析 .dev.vars 推密钥。
+    # 这里原来用 `$_ -match "^KEY=" | Select-Object -First 1` 取值，而
+    # WECHAT_MCH_PRIVATE_KEY 是**多行 PEM**（BEGIN + 26 行 base64 + END），
+    # 于是只把 27 字符的 "-----BEGIN PRIVATE KEY-----" 推了上去 ——
+    # 2026-09-15 实际发生过：线上微信支付立刻变成 502 "Invalid merchant private key"。
+    # 改为调用三个专用脚本，它们对该多行值有正确的收集逻辑与 normalize 校验。
+    Write-Host ">> Upload secrets via dedicated scripts ..."
+    foreach ($sub in @("upload-mail-secrets.ps1", "upload-speech-secrets.ps1", "upload-wechat-secrets.ps1")) {
+        $subPath = Join-Path $PSScriptRoot $sub
+        if (-not (Test-Path $subPath)) { continue }
+        Write-Host "   >> $sub"
+        & powershell -ExecutionPolicy Bypass -File $subPath
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ("      ($sub 退出码 $LASTEXITCODE，已跳过；不中断整体部署)") -ForegroundColor Yellow
         }
     }
 } else {
     Write-Host "Skip secrets: no .dev.vars (copy from .dev.vars.example)" -ForegroundColor Yellow
 }
 
-Write-Host ">> Redeploy $Project ..."
-& npx wrangler pages deploy . --project-name=$Project
+# 与 deploy.ps1 保持一致：绝不发布仓库根目录。
+# 这里原本是 `wrangler pages deploy .`，而 wrangler.toml 里 pages_build_output_dir = "."，
+# 等于把 cf.env / obs.env / .dev.vars / server/.env 全部公开（2026-09-13 事件）—— 别改回去。
+Write-Host ">> Build public allow-list + redeploy $Project ..."
+& node (Join-Path $Root "tools\scripts\build-pages-public.mjs") --out (Join-Path $Root "dist\pages-public")
+if ($LASTEXITCODE -ne 0) { throw "build-pages-public failed (exit $LASTEXITCODE) - 疑似命中敏感规则，已中止部署" }
+& npx wrangler pages deploy (Join-Path $Root "dist\pages-public") --project-name=$Project --commit-dirty=true
 if ($LASTEXITCODE -ne 0) { throw "Deploy failed" }
 
 Write-Host ">> Smoke test ..."

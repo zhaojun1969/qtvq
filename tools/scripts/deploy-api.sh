@@ -22,8 +22,13 @@ export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-bb7eb342a5cfde7c0a84cd9bd
 
 bash tools/scripts/write-version.sh
 
+# 绝不发布仓库根目录：wrangler.toml 里 pages_build_output_dir = "."，直接发 "." 等于把
+# cf.env / obs.env / .dev.vars / server/ 全部公开（2026-09-13 事件）。必须先构建白名单目录。
+echo "=== Build public allow-list ==="
+node tools/scripts/build-pages-public.mjs --out dist/pages-public
+
 echo "=== Deploy API (qtvq-api) ==="
-npx wrangler pages deploy . --project-name=qtvq-api
+npx wrangler pages deploy dist/pages-public --project-name=qtvq-api --commit-dirty=true
 
 echo ""
 echo "=== API smoke test ==="

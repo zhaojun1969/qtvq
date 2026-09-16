@@ -57,11 +57,19 @@ wrangler pages project create qtvq
 
 ## 三、部署静态站点 + Functions
 
-项目根目录即为构建输出（`wrangler.toml` 中 `pages_build_output_dir = "."`）。
+⚠️ **不要用 `wrangler pages deploy .`。** `wrangler.toml` 里 `pages_build_output_dir = "."`，
+所以直接发布 `.` 等于**把整个仓库公开** —— 2026-09-13 就是这样把 `cf.env`（Cloudflare API Token）、
+`obs.env`（OSS AK/SK）、`.dev.vars`、`server/.env` 等推上公网的（详见
+`docs/计划书对齐与整改实施方案.md` §9.7）。`.assetsignore` 在当前 wrangler 版本下**不生效**，别指望它。
+
+正确做法是先构建白名单目录，再发布它：
 
 ```bash
-wrangler pages deploy . --project-name=qtvq-api
+node tools/scripts/build-pages-public.mjs           # 白名单构建到 dist/pages-public（带敏感闸门）
+npx wrangler pages deploy dist/pages-public --project-name=qtvq-api --commit-dirty=true
 ```
+
+Windows 上等价于 `npm run deploy`（`tools/scripts/deploy.ps1` 已封装这两步，并附带部署后泄露自检）。
 
 部署成功后终端会输出访问地址。
 
@@ -183,10 +191,14 @@ npm run serve
 ```powershell
 # .dev.vars 中一行: PAYMENT_ADMIN_KEY=你的强密钥
 Get-Content .dev.vars | Where-Object { $_ -match '^PAYMENT_ADMIN_KEY=' } | ForEach-Object { ($_ -split '=',2)[1] } | npx wrangler pages secret put PAYMENT_ADMIN_KEY --project-name=qtvq-api
-npx wrangler pages deploy . --project-name=qtvq-api
+node tools/scripts/build-pages-public.mjs
+npx wrangler pages deploy dist/pages-public --project-name=qtvq-api --commit-dirty=true
 ```
 
-或执行：`npm run post-deploy`（从 `.dev.vars` 上传密钥并 redeploy + 冒烟测试）。
+⚠️ Pages 的环境变量/密钥**要到下一次部署才生效**，所以推完密钥必须重新部署（上面第二条命令的作用）。
+注意别把第二条写成 `wrangler pages deploy .`（那会整仓公开，见本节开头的警告）。
+
+或执行：`npm run post-deploy`（从 `.dev.vars` 上传密钥并 redeploy + 冒烟测试；该脚本已改为走白名单目录）。
 
 ### 用户提交汇款
 
