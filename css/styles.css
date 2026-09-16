@@ -197,6 +197,35 @@ a:hover {
   background: rgba(108, 92, 231, 0.28);
 }
 
+/* 账户页顶部的登录状态条：明确写出「登没登、会员开没开」。
+   起因（2026-09-16 业务方反馈）：登录状态靠面板显隐暗示，用户看不出自己到底登没登上、
+   刚扫码有没有成功，也说不出"退出登录在哪"。 */
+.account-status {
+  max-width: 720px;
+  margin: 0 auto 1.25rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(108, 92, 231, 0.35);
+  background: rgba(108, 92, 231, 0.12);
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.account-status.is-guest {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+.account-status.is-member {
+  border-color: rgba(7, 193, 96, 0.5);
+  background: rgba(7, 193, 96, 0.14);
+}
+.account-status.is-warn {
+  border-color: rgba(255, 176, 32, 0.55);
+  background: rgba(255, 176, 32, 0.14);
+}
+
 .user-stats {
   display: flex;
   gap: 1rem;

@@ -49,6 +49,9 @@
     <h1 class="hero-tagline" style="text-align:center;margin-bottom:1rem">我的账户</h1>
     <p class="modal-hint" style="text-align:center;margin-bottom:1.5rem">注册登录后，可在任意设备查看<strong>打款核实</strong>与<strong>会员开通</strong>状态（月卡 ¥29 · 季卡 ¥79 · 年卡 ¥299）。</p>
 
+    <!-- 登录状态条：无论登录与否都显示，避免"看不出自己登没登、会员开没开" -->
+    <p id="acc-status" class="account-status" role="status" aria-live="polite">正在加载账户信息…</p>
+
     <section id="guest-panel" data-auth-guest>
       <div class="account-tabs">
         <button type="button" id="tab-login" class="btn btn-secondary active">登录</button>

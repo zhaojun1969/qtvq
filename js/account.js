@@ -94,6 +94,19 @@ function renderPayHistory(quota) {
   });
 }
 
+/**
+ * 顶部登录状态条。它回答三个以前只能靠"猜"的问题：
+ * 现在登没登？用什么方式登的？会员开了没有？
+ * 起因（2026-09-16 业务方反馈）：状态只靠面板显隐暗示，用户扫码后看不出成没成，
+ * 也找不到"退出登录"在哪（退出按钮在已登录面板里）。
+ */
+function setAccountStatus(kind, text) {
+  const el = document.getElementById('acc-status');
+  if (!el) return;
+  el.className = 'account-status' + (kind ? ' is-' + kind : '');
+  el.textContent = text;
+}
+
 function renderDashboard(data) {
   const user = data?.user || getAuthUser();
   const quota = data?.quota;
@@ -108,6 +121,14 @@ function renderDashboard(data) {
     ? formatQuotaStatusText({ subscription: quota.subscription, paymentPending: quota.paymentPending, questionTimestamps: [] })
     : formatQuotaStatusText(getUser());
 
+  const who = user.phone ? `手机号 ${user.phone}` : user.wechatBound ? '微信账号' : '账号';
+  const member = quota?.unlimited
+    ? `会员已开通${quota.subscription?.label ? `（${quota.subscription.label}）` : ''}`
+    : quota?.paymentPending
+      ? '会员未开通（有付款待核实，客服核对后开通）'
+      : '会员未开通（可点下方「办理 / 续费会员」）';
+  setAccountStatus(quota?.unlimited ? 'member' : '', `已登录：${who} · ${member} · 退出登录见下方按钮`);
+
   renderPayStatus(quota);
   renderPayHistory(quota);
   refreshAuthNav();
@@ -116,18 +137,24 @@ function renderDashboard(data) {
 
 async function loadDashboard() {
   if (!isLoggedIn()) {
+    setAccountStatus('guest', '当前未登录 · 请用下方任一方式登录或注册（未注册可直接点「微信扫码登录」，自动创建账号）');
     if (guestPanel) guestPanel.hidden = false;
     if (userPanel) userPanel.hidden = true;
     refreshAuthNav();
     return;
   }
+  setAccountStatus('', '正在加载账户信息…');
   try {
     const data = await fetchAccountMe();
     renderDashboard(data);
   } catch (e) {
+    // 登录态失效要**明确说出来**：以前只弹一个短暂 toast，页面随后显示访客面板，
+    // 用户会以为自己已经登录却"看不到任何信息"（2026-09-16 业务方反馈）。
     showToast(e.message || '加载失败');
+    setAccountStatus('warn', `登录状态已失效（${e.message || '获取账户失败'}）· 请重新登录`);
     if (guestPanel) guestPanel.hidden = false;
     if (userPanel) userPanel.hidden = true;
+    refreshAuthNav();
   }
 }
 
