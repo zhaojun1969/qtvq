@@ -144,6 +144,26 @@
         <ul id="pay-history" class="pay-history"></ul>
         <p id="pay-history-empty" class="modal-hint">暂无记录</p>
       </div>
+
+      <!-- 注销账号：破坏性操作，单独放在最后一栏并醒目标注后果 -->
+      <div class="account-panel danger-zone">
+        <h3>注销账号</h3>
+        <p class="modal-hint">
+          注销后<strong>个人资料、登录凭证、提问记录、微信绑定</strong>将<strong>立即删除且不可恢复</strong>；
+          <strong>订单流水会脱敏保留</strong>（金额 / 时间 / 套餐 / 状态，用于财务与审计）。
+          会员未到期的账号暂不支持自助注销，请先联系客服协商（微信客服或
+          <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>）。
+        </p>
+        <label id="delete-pwd-label">登录密码
+          <input type="password" id="delete-password" autocomplete="current-password" placeholder="输入登录密码以确认">
+        </label>
+        <label id="delete-text-label" hidden>确认短语
+          <input type="text" id="delete-confirm-text" placeholder="请输入：注销账号" autocomplete="off">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="btn-delete-account" class="btn btn-secondary btn-danger">确认注销我的账号</button>
+        </div>
+      </div>
     </section>
   </main>
 

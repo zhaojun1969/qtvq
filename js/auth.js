@@ -166,6 +166,26 @@ export async function handleWechatOpenCallback() {
   return loginWechatOpen(code, state);
 }
 
+/**
+ * 注销账号（不可恢复）。
+ * 有密码的账号传 password 做二次确认；纯微信账号（无密码）传 confirmText='注销账号'。
+ * 服务端策略：订单脱敏保留；未到期会员或待核实付款会被拒绝（引导联系客服协商）。
+ */
+export async function deleteAccount({ password, confirmText } = {}) {
+  const res = await apiFetch('/api/auth/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(password ? { password } : { confirmText }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || '注销失败');
+    err.code = data.code || null;
+    throw err;
+  }
+  return data;
+}
+
 export async function logoutAccount() {
   const token = getAuthToken();
   if (token) {

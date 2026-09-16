@@ -226,6 +226,24 @@ a:hover {
   background: rgba(255, 176, 32, 0.14);
 }
 
+/* 注销账号：破坏性操作区，与普通账户卡片在视觉上拉开距离 */
+.account-panel.danger-zone {
+  border-color: rgba(255, 92, 92, 0.45);
+  background: rgba(255, 92, 92, 0.06);
+}
+.account-panel.danger-zone h3 {
+  color: #ff7b7b;
+}
+.btn.btn-danger {
+  border-color: rgba(255, 92, 92, 0.7) !important;
+  color: #ff8080 !important;
+}
+.btn.btn-danger:hover,
+.btn.btn-danger:focus-visible {
+  background: rgba(255, 92, 92, 0.18) !important;
+  color: #fff !important;
+}
+
 .user-stats {
   display: flex;
   gap: 1rem;

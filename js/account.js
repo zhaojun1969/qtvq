@@ -9,6 +9,8 @@ import {
   isLoggedIn,
   refreshAuthNav,
   changePassword,
+  deleteAccount,
+  clearAuthSession,
   startWechatOpenLogin,
   handleWechatOpenCallback,
 } from './auth.js';
@@ -131,8 +133,22 @@ function renderDashboard(data) {
 
   renderPayStatus(quota);
   renderPayHistory(quota);
+  renderDeleteZone(user);
   refreshAuthNav();
   refreshStatUI();
+}
+
+/**
+ * 注销区：有密码的账号要输密码，纯微信账号要打出「注销账号」四个字。
+ * 服务端还会再拦一道（未到期会员 / 待核实付款），这里只是把确认方式显示正确。
+ */
+function renderDeleteZone(user) {
+  const pwdLabel = document.getElementById('delete-pwd-label');
+  const textLabel = document.getElementById('delete-text-label');
+  if (!pwdLabel || !textLabel) return;
+  const hasPwd = Boolean(user?.hasPassword);
+  pwdLabel.hidden = !hasPwd;
+  textLabel.hidden = hasPwd;
 }
 
 async function loadDashboard() {
@@ -253,6 +269,49 @@ document.getElementById('btn-logout')?.addEventListener('click', async () => {
 
 document.getElementById('btn-subscribe')?.addEventListener('click', () => {
   location.href = 'index.html?subscribe=1';
+});
+
+// 注销账号：先本地确认，服务端再按策略拦（未到期会员 / 待核实付款）
+document.getElementById('btn-delete-account')?.addEventListener('click', async () => {
+  const me = getAuthUser() || {};
+  const pwdInput = document.getElementById('delete-password');
+  const textInput = document.getElementById('delete-confirm-text');
+  const payload = me.hasPassword
+    ? { password: pwdInput?.value || '' }
+    : { confirmText: (textInput?.value || '').trim() };
+
+  if (me.hasPassword && !payload.password) {
+    showToast('请输入登录密码以确认');
+    pwdInput?.focus();
+    return;
+  }
+  if (!me.hasPassword && payload.confirmText !== '注销账号') {
+    showToast('请输入「注销账号」四个字以确认');
+    textInput?.focus();
+    return;
+  }
+  if (!window.confirm('确认注销？个人资料与登录凭证将立即删除且不可恢复（订单流水脱敏保留）。')) return;
+
+  const btn = document.getElementById('btn-delete-account');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '注销中…';
+  }
+  try {
+    const data = await deleteAccount(payload);
+    clearAuthSession();
+    showToast(data.message || '账号已注销');
+    setTimeout(() => {
+      location.href = 'index.html';
+    }, 1200);
+  } catch (err) {
+    // 会员未到期 / 有待核实付款：服务端会说清原因，原样展示给用户
+    showToast(err.message || '注销失败');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '确认注销我的账号';
+    }
+  }
 });
 
 loadDashboard();

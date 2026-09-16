@@ -357,4 +357,78 @@ export async function getPhoneByClientId(env, clientId) {
   return user ? maskPhone(user.phone) : null;
 }
 
+/** 校验某账号的密码（注销等敏感操作需要二次确认）。纯微信账号无密码，返回 false。 */
+export async function verifyUserPassword(env, userId, password) {
+  const user = await loadUser(env, userId);
+  if (!user?.passwordHash || !user?.passwordSalt) return false;
+  return verifyPassword(String(password || ''), user.passwordHash, user.passwordSalt);
+}
+
+/**
+ * 注销账号：删除用户本体与全部索引，并吊销该账号的所有会话。
+ *
+ * 只负责"人"这一块；订单脱敏保留、配额记录清理、OSS 备份覆盖由调用方
+ * （functions/api/auth/delete.js）处理 —— 那些要用到 quota / order / oss 模块，
+ * 放到这里会形成循环依赖。
+ *
+ * **订单不删**：业务方 2026-09-16 决定「注销后订单脱敏保留」（财务与审计需要）。
+ */
+export async function deleteUserAccount(env, userId) {
+  const user = await loadUser(env, userId);
+  if (!user) return { ok: false, error: '账号不存在' };
+
+  const kv = getKv(env);
+  let removedKeys = 0;
+  if (kv) {
+    const keys = [
+      `${USER_PREFIX}${user.id}`,
+      user.phone ? `${PHONE_PREFIX}${user.phone}` : null,
+      user.clientId ? `${CLIENT_PREFIX}${user.clientId}` : null,
+      user.wechatOpenId ? `${OPENID_PREFIX}${user.wechatOpenId}` : null,
+      user.wechatWebOpenId ? `${OPENID_PREFIX}${user.wechatWebOpenId}` : null,
+      user.wechatMpOpenId ? `${OPENID_PREFIX}${user.wechatMpOpenId}` : null,
+      user.wechatUnionId ? `${UNION_PREFIX}${user.wechatUnionId}` : null,
+    ].filter(Boolean);
+    for (const k of keys) {
+      await kv.delete(k);
+      removedKeys += 1;
+    }
+
+    // 吊销该账号的全部会话：KV 不能按值查询，只能列前缀后逐条比对。
+    // 会话数量很小，最多翻 10 页，避免极端情况下无限循环。
+    let cursor;
+    for (let page = 0; page < 10; page += 1) {
+      const list = await kv.list({ prefix: SESSION_PREFIX, cursor });
+      for (const { name } of list.keys) {
+        const s = await loadSession(env, name.slice(SESSION_PREFIX.length));
+        if (s?.userId === user.id) {
+          await kv.delete(name);
+          removedKeys += 1;
+        }
+      }
+      if (list.list_complete) break;
+      cursor = list.cursor;
+    }
+  }
+
+  // 内存模式（本地开发无 KV）同样要清干净，否则注销后还能"登录"回来
+  memory.users.delete(user.id);
+  if (user.phone) memory.phones.delete(user.phone);
+  if (user.clientId) memory.clients.delete(user.clientId);
+  for (const oid of [user.wechatOpenId, user.wechatWebOpenId, user.wechatMpOpenId]) {
+    if (oid) memory.openids.delete(oid);
+  }
+  if (user.wechatUnionId) memory.unions.delete(user.wechatUnionId);
+  for (const [token, s] of [...memory.sessions]) {
+    if (s?.userId === user.id) memory.sessions.delete(token);
+  }
+
+  return {
+    ok: true,
+    removedKeys,
+    clientId: user.clientId || null,
+    phoneMasked: user.phone ? maskPhone(user.phone) : null,
+  };
+}
+
 export { maskPhone, validPhone };

@@ -82,6 +82,18 @@ function buildQuota(rec, now = Date.now()) {
   };
 }
 
+/**
+ * 注销账号时清除该设备的配额 / 订阅 / 付款历史记录。
+ * 订单本身不删：由 functions/api/auth/delete.js 脱敏保留（业务方 2026-09-16 决定）。
+ */
+export async function clearClientRecord(env, clientId) {
+  if (!validClientId(clientId)) return false;
+  const kv = getKv(env);
+  if (kv) await kv.delete(kvKey(clientId));
+  memory.delete(clientId);
+  return true;
+}
+
 export function validClientId(clientId) {
   return clientId && typeof clientId === 'string' && clientId.length > 0 && clientId.length <= 64;
 }
