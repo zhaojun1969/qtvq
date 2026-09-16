@@ -182,6 +182,21 @@ a:hover {
   background: rgba(108, 92, 231, 0.2);
 }
 
+/* 账户入口（出）与功能导航（进）视觉分离：
+   功能导航回答"去哪"，账户入口回答"我是谁 / 登录登出"。
+   混在一起会让人以为「微信用户」是第六个功能栏目（2026-09-16 业务方反馈）。 */
+.nav-main a.nav-account {
+  margin-left: 0.45rem;
+  border: 1px solid rgba(108, 92, 231, 0.45);
+  color: var(--text);
+  font-weight: 600;
+}
+.nav-main a.nav-account:hover,
+.nav-main a.nav-account.active {
+  border-color: var(--purple);
+  background: rgba(108, 92, 231, 0.28);
+}
+
 .user-stats {
   display: flex;
   gap: 1rem;

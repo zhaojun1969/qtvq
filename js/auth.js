@@ -188,11 +188,11 @@ export function isLoggedIn() {
 
 export function refreshAuthNav() {
   const user = getAuthUser();
+  // 导航里的账户入口只表达"登录状态"，不再显示手机号或「微信用户」：
+  // 那是登录方式，不是栏目名，混进功能导航会让人以为多了一栏
+  // （登录方式与绑定情况在 account.html 里展示）。
   document.querySelectorAll('[data-auth-label]').forEach((el) => {
-    if (!user) el.textContent = '登录 / 注册';
-    else if (user.phone) el.textContent = user.phone;
-    else if (user.wechatBound) el.textContent = '微信用户';
-    else el.textContent = '我的账户';
+    el.textContent = user ? '我的账户' : '登录 / 注册';
   });
   document.querySelectorAll('[data-auth-logged]').forEach((el) => {
     el.hidden = !user;
