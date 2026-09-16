@@ -2,6 +2,7 @@ import { submitPayment, activatePayment, getQuota, listPendingPayments } from '.
 import { listRecentOrders } from '../lib/order-store.js';
 import { resolveSession } from '../lib/auth-store.js';
 import { corsPreflight, jsonResponse } from '../lib/http.js';
+import { sendNoticeMail } from '../lib/mail.js';
 const COMPANY = {
   name: '我心永恒（北京）网络科技有限公司',
   account: '0200251109200028909',
@@ -92,10 +93,40 @@ export async function onRequest(context) {
   if (result?.error) return jsonResponse(request, { error: result.error }, 400);
   if (!result) return jsonResponse(request, { error: '提交失败' }, 400);
 
+  // 手动收款码 / 对公汇款：客户提交核实后**立刻**通知运营。
+  // 静态收款码（含聚合码）没有任何回调，钱进了账户但我们收不到通知 ——
+  // 所以「客户提交核实」是唯一能立即知道有人付款的时点。
+  // 此前只写进待核实列表，要人工去翻，属漏单隐患（2026-09-16 业务方反馈）。
+  // 发送失败一律吞掉：不能因为通知失败就让客户提交失败、或丢掉这条待核实记录。
+  try {
+    const amountCn = Number(amount).toFixed(2);
+    await sendNoticeMail(env, {
+      subject: `[Q问待核实] ${payerName} 提交付款核实 · ¥${amountCn} · ${plan}`,
+      text: [
+        '有客户提交了付款核实，请在核对到账后为其开通会员。',
+        '',
+        `付款人：${payerName}`,
+        `金额：¥${amountCn}`,
+        `套餐：${plan}`,
+        `付款时间（客户填写）：${paidAt}`,
+        `备注/后四位：${remark || '（未填）'}`,
+        `客户标识：${clientId}`,
+        `绑定手机：${phone || '（未绑定/未登录）'}`,
+        '',
+        '核实并开通：https://qtvq-api.pages.dev/tools/verify-payment.html',
+        '',
+        '说明：静态收款码与对公汇款没有支付回调，无法自动到账识别；',
+        '如需自动开通，请让客户走「微信在线支付」（会自动开通并通知）。',
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error('[payment] 待核实通知邮件发送失败：', err);
+  }
+
   return jsonResponse(request, {
     ok: true,
     pending: result,
-    message: '已登记汇款信息，工作人员核对工商银行到账后将为您解禁不限次数提问',
+    message: '已登记付款信息，客服核对到账后立即为你开通会员（也可联系客服加急）',
     company: COMPANY,
   });
 }

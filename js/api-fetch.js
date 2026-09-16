@@ -1,13 +1,19 @@
 /** API 请求：Cloudflare 优先，超时/失败时读阿里云 OSS 备份 */
 
-import { apiUrl, BACKUP_ORIGIN } from './config.js';
+import { apiUrl, BACKUP_ORIGIN, CROSS_ORIGIN } from './config.js';
 import { DAILY_ASK_LIMIT, PLANS } from './quota.js';
 
-const PRIMARY_TIMEOUT_MS = 8000;
+/**
+ * 主接口超时：生产走同源（qtvq.cn → nginx 反代 Pages），典型 1.6s，
+ * 但上游偶发 9–14s，所以给 15s 预算，避免把"慢但能成"的请求误判为失败。
+ */
+const PRIMARY_TIMEOUT_MS = 15000;
+/** 备接口超时：直连 Cloudflare Pages，国内常超时，只给 8s 试一次 */
+const CROSS_ORIGIN_TIMEOUT_MS = 8000;
 /** 语音识别 / 对话等较慢接口 */
 const PATH_TIMEOUT_MS = {
-  '/api/speech': 20000,
-  '/api/chat': 15000,
+  '/api/speech': 25000,
+  '/api/chat': 20000,
 };
 const OFFLINE_QUEUE_KEY = 'qtvq_offline_queue';
 
@@ -147,17 +153,22 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (method === 'GET') {
-    // 主接口是**跨域到 Cloudflare Pages**。国内访问它经常慢到超过 8 秒超时，
-    // 这时会一路掉到「API 不可用且无备份」——用户点订阅立刻看到报错就是这个原因
-    // （2026-09-16 线上实际发生，且 OSS 兜底对象当时是 403，等于两道兜底都失效）。
-    // 先试一次**同源**：qtvq.cn 的 nginx 已把 /api/ 反代到 Pages，走阿里云快得多。
-    // nginx 未配置时这一步会很快 404，不影响后面的 OSS 备份，因此是纯增益、无回归风险。
-    if (typeof location !== 'undefined' && location.origin && !primary.startsWith(location.origin)) {
+    // 主接口与备接口互为 failover：
+    //   主 = 同源（qtvq.cn → nginx 反代 Pages），实测典型 1.6s；
+    //   备 = 直连 Cloudflare Pages，国内偶尔 8–14s 甚至直接失败。
+    // 两条都失败才读阿里云 OSS 备份（最后一道，要求桶里 backup/api 前缀为公共读）。
+    // 2026-09-16 线上正是因为这条链缺了中间一段、且 OSS 兜底是私有的 403，
+    // 才在点「微信在线支付」时直接抛「API 不可用且无备份」。
+    const alt = primary.startsWith(CROSS_ORIGIN)
+      ? (typeof location !== 'undefined' && location.origin ? `${location.origin}${path}` : null)
+      : `${CROSS_ORIGIN}${path}`;
+    if (alt) {
+      const altTimeout = alt.startsWith(CROSS_ORIGIN) ? CROSS_ORIGIN_TIMEOUT_MS : PRIMARY_TIMEOUT_MS;
       try {
-        const res = await fetchWithTimeout(`${location.origin}${path}`, { method: 'GET', headers }, PRIMARY_TIMEOUT_MS);
+        const res = await fetchWithTimeout(alt, { method: 'GET', headers }, altTimeout);
         if (res.ok) return res;
       } catch {
-        /* 同源也失败，继续走 OSS 备份 */
+        /* 备接口也失败，继续走 OSS 备份 */
       }
     }
 
