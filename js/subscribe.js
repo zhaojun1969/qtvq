@@ -1,5 +1,6 @@
 import { PLANS, COMPANY, getClientId } from './quota.js';
 import { submitPaymentRequest, showToast, syncQuotaFromServer, applyServerSubscription } from './app.js';
+import { getAuthUser } from './auth.js';
 import { PAY_CHANNELS, detectPayEnv } from './pay-qr.js';
 import { createWechatPayOrder, pollWechatPayOrder } from './payment-wechat.js';
 import { qrCodeImageUrl } from './qr-render.js';
@@ -9,6 +10,57 @@ let stopOrderPoll = null;
 
 function getSelectedPrice() {
   return PLANS[selectedPlan]?.price ?? 29;
+}
+
+/** datetime-local 需要「本地时间、不带秒/Z」 */
+function localDateTimeNow(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * 预填付款核实表单：金额=所选套餐、时间=现在、付款人=已登录昵称。
+ *
+ * 为什么必须预填：静态收款码（微信/聚合码）没有任何支付回调，服务器收不到「有人付了钱」
+ * 的通知，唯一能知道这笔付款的时点就是**客户提交核实**。以前要手填 4 项，
+ * 客户付完常常直接关页面 —— 2026-09-16 业务方实测就是这个结果：付了钱既没通知也没开通。
+ * 现在预填 3 项，客户只需确认付款人姓名后点一次按钮。
+ */
+function prefillPaymentForm() {
+  const form = document.getElementById('payment-form');
+  if (!form) return;
+  const plan = PLANS[selectedPlan];
+  const amount = form.querySelector('input[name="amount"]');
+  if (amount && plan && !amount.value) amount.value = String(plan.price);
+  const paidAt = form.querySelector('input[name="paidAt"]');
+  if (paidAt && !paidAt.value) paidAt.value = localDateTimeNow();
+  const name = form.querySelector('input[name="payerName"]');
+  if (name && !name.value.trim()) {
+    const u = typeof getAuthUser === 'function' ? getAuthUser() : null;
+    const guess = (u && (u.nickname || u.phone)) || '';
+    if (guess) name.value = guess;
+  }
+}
+
+/**
+ * 查看器里的「我已付款 · 提交核实」：预填后直接触发表单提交，客户只需一次点击。
+ * 付款人姓名决定我们核对到账时能不能对上，所以它空着时不做静默提交，
+ * 而是把客户带回表单并聚焦该输入框。
+ */
+function submitFromViewer() {
+  const form = document.getElementById('payment-form');
+  if (!form) return;
+  prefillPaymentForm();
+  const name = form.querySelector('input[name="payerName"]');
+  const paidAt = form.querySelector('input[name="paidAt"]');
+  if (!name?.value.trim() || !paidAt?.value) {
+    document.getElementById('pay-qr-viewer')?.classList.remove('open');
+    scrollToPaymentForm();
+    name?.focus();
+    return;
+  }
+  if (typeof form.requestSubmit === 'function') form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
 function setViewerMeta({ title, price, clientId, tip, orderText, statusText, statusPaid }) {
@@ -242,7 +294,8 @@ function initPayQrGrid() {
     navigator.clipboard?.writeText(price).then(() => showToast(`已复制金额 ¥${price}`));
   });
 
-  document.getElementById('btn-pay-done')?.addEventListener('click', scrollToPaymentForm);
+  // 「我已付款 · 提交核实」：预填后一键提交（以前只是滚动到表单，客户还要手填 4 项）
+  document.getElementById('btn-pay-done')?.addEventListener('click', () => submitFromViewer());
 }
 
 function renderBankInfo() {
@@ -297,9 +350,8 @@ export function openSubscribeModal() {
   renderPlanCards();
   const idEl = document.getElementById('pay-client-id');
   if (idEl) idEl.textContent = getClientId();
-  const amountInput = document.querySelector('#payment-form input[name="amount"]');
-  const plan = PLANS[selectedPlan];
-  if (amountInput && plan) amountInput.value = String(plan.price);
+  // 金额/时间/付款人一次性预填好；remark 仍留设备编号作为占位提示
+  prefillPaymentForm();
   const remarkInput = document.querySelector('#payment-form input[name="remark"]');
   if (remarkInput && !remarkInput.value) remarkInput.placeholder = getClientId();
   updatePlanUI();

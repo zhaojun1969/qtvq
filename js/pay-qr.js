@@ -11,14 +11,14 @@ export const PAY_CHANNELS = {
     id: 'wechat',
     label: '微信支付',
     image: 'assets/payment/qr-wechat.png',
-    tip: '请打开微信 → 扫一扫 → 扫描上方二维码。在微信内打开本页可长按识别。付款备注请填写设备编号。',
+    tip: '① 打开微信 → 扫一扫 → 付款（备注建议填设备编号） ② 点下方「我已付款 · 提交核实」 ③ 客服核对到账后立即开通会员。',
     openApp: null,
   },
   aggregate: {
     id: 'aggregate',
     label: '聚合码',
     image: 'assets/payment/qr-aggregate.png',
-    tip: '支持微信、支付宝、云闪付等扫码付款。付款后请在同一页面填写金额与设备编号并提交核实，客服核对到账后开通会员。',
+    tip: '① 用微信/支付宝/云闪付扫一扫付款（备注建议填设备编号） ② 点下方「我已付款 · 提交核实」 ③ 客服核对到账后立即开通会员。',
     openApp: null,
   },
 };
