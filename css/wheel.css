@@ -341,3 +341,22 @@
     font-size: 16px;
   }
 }
+
+/* ---------------------------------------------------------------- 模拟人像剪影
+ * 候选人没有上传头像时，用性别区分的剪影插画替代原来的「昵称首字 / ?」。
+ * 刻意不做照片级合成人脸：候选人是真实账号，合成人脸会被误认为本人照片（误导）。
+ */
+.result-card .avatar.sim-male {
+  background: linear-gradient(135deg, #3b7dd8, #173a66);
+}
+.result-card .avatar.sim-female {
+  background: linear-gradient(135deg, #e2708f, #6f3560);
+}
+.result-card .avatar.sim-na {
+  background: linear-gradient(135deg, #8b90a8, #3a3f55);
+}
+.result-card .avatar-sim {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

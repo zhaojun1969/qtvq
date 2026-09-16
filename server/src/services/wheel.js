@@ -54,12 +54,17 @@ function candidateScore(me, ta) {
   return tag * 0.4 + city * 0.3 + age * 0.2 + complete * 0.1;
 }
 
-/** 公开给转盘的字段：昵称/头像/年龄/城市/标签/一句话，不含 uid 之外的任何标识 */
+/**
+ * 公开给转盘的字段。
+ * gender 只用于前端画「模拟人像」剪影的性别区分（扇区里那个头像位置）；
+ * 转盘本身就是异性配对，性别不构成额外信息泄露。除此之外不含任何标识。
+ */
 function publicCandidate(u) {
   return {
     uid: u._id,
     nickname: u.nickname || 'TA',
     avatar: u.avatar || null,
+    gender: u.gender || null,
     age: u.age || null,
     city: u.city || null,
     tags: Array.isArray(u.tags) ? u.tags.slice(0, 6) : [],

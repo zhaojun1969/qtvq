@@ -135,6 +135,55 @@ function draw(rot = rotation, highlight = -1) {
   ctx.stroke();
 }
 
+/** 性别 -> 剪影配色（男/女区分；未填资料用中性色） */
+function genderPalette(gender) {
+  const g = String(gender || '').toLowerCase();
+  if (g === 'male') return { c1: '#3b7dd8', c2: '#173a66' };
+  if (g === 'female') return { c1: '#e2708f', c2: '#6f3560' };
+  return { c1: '#8b90a8', c2: '#3a3f55' };
+}
+
+/**
+ * 画「模拟人像」剪影（**刻意不是真人照片**）。
+ *
+ * 为什么用剪影而不是合成人脸：扇区里的候选人是**真实注册账号**，只是没上传头像。
+ * 拿一张照片级的合成人脸当他的头像，会让人误以为那是本人的照片 —— 那是误导
+ * （见 docs/计划书对齐与整改实施方案.md §3 意见 4：虚拟头像池是欺诈红线）。
+ * 剪影一眼可辨为插画，男女靠配色与长发区分，既解决了「?」难看的问题，也不涉及假冒。
+ */
+function paintSimAvatar(x, y, r, gender) {
+  const { c1, c2 } = genderPalette(gender);
+  const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  grad.addColorStop(0, c1);
+  grad.addColorStop(1, c2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+  const g = String(gender || '').toLowerCase();
+  const headR = r * 0.30;
+  const headY = y - r * 0.16;
+
+  // 肩（上半椭圆）
+  ctx.fillStyle = 'rgba(255,255,255,0.90)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + r * 0.56, r * 0.42, r * 0.34, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+
+  // 女性加两侧长发，便于一眼区分（先画发、再画脸盖上去）
+  if (g === 'female') {
+    ctx.fillStyle = 'rgba(255,255,255,0.48)';
+    ctx.beginPath();
+    ctx.ellipse(x, headY + headR * 0.45, headR * 1.30, headR * 1.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 头
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.beginPath();
+  ctx.arc(x, headY, headR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawAvatar(x, y, r, item, highlight) {
   const uid = item?.uid || '';
   ctx.save();
@@ -147,16 +196,7 @@ function drawAvatar(x, y, r, item, highlight) {
   if (img && img.complete && img.naturalWidth) {
     ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
   } else {
-    const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-    grad.addColorStop(0, '#ff6b7f');
-    grad.addColorStop(1, '#6c5ce7');
-    ctx.fillStyle = grad;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.94)';
-    ctx.font = `bold ${Math.round(r * 0.95)}px "PingFang SC","Microsoft YaHei",sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(item?.nickname || '?').trim().charAt(0) || '?', x, y + 1);
+    paintSimAvatar(x, y, r, item?.gender);
   }
   ctx.restore();
 
@@ -223,13 +263,30 @@ function animateTo(targetIndex) {
 
 // ---------------------------------------------------------------- 结果卡片
 
+// 结果卡片里的头像：有真实头像就显示；没有就显示**性别区分的模拟人像剪影**（不是真人照片）
+function cardAvatarHtml(t) {
+  if (t.avatar) return `<div class="avatar"><img src="${escapeHtml(t.avatar)}" alt=""></div>`;
+  const g = String(t.gender || '').toLowerCase();
+  const cls = g === 'male' ? 'male' : g === 'female' ? 'female' : 'na';
+  const hair = g === 'female'
+    ? '<ellipse cx="32" cy="27" rx="15.5" ry="18" fill="rgba(255,255,255,0.48)"/>'
+    : '';
+  return `<div class="avatar sim-${cls}">
+      <svg class="avatar-sim" viewBox="0 0 64 64" role="img" aria-label="模拟形象（该用户未上传头像）">
+        ${hair}
+        <ellipse cx="32" cy="57" rx="18" ry="15" fill="rgba(255,255,255,0.90)"/>
+        <circle cx="32" cy="24" r="10.5" fill="rgba(255,255,255,0.94)"/>
+      </svg>
+    </div>`;
+}
+
 function renderCard(res) {
   const t = res.target || {};
   const b = res.billing || {};
   const tags = Array.isArray(t.tags) ? t.tags : [];
 
   $('result-card').innerHTML = `
-    <div class="avatar">${t.avatar ? `<img src="${escapeHtml(t.avatar)}" alt="">` : escapeHtml((t.nickname || 'TA').slice(0, 1))}</div>
+    ${cardAvatarHtml(t)}
     <h3>${escapeHtml(t.nickname || 'TA')}</h3>
     <div class="meta">${escapeHtml([t.age ? `${t.age} 岁` : null, t.city].filter(Boolean).join(' · ') || '资料未填全')}</div>
     <div class="score">初步契合度 <b>${pct(res.score)}</b></div>
