@@ -16,8 +16,12 @@ if (Test-Path $tar) { Remove-Item $tar -Force }
 $stage = Join-Path $env:TEMP "qtvq-static-pack-$(Get-Date -Format 'yyyyMMddHHmmss')"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
-$items = @(
-    "index.html", "pitfalls.html", "profile.html", "report.html", "wheel.html", "help.html", "privacy.html", "download.html", "404.html",
+# 根目录的所有页面：用通配符自动纳入，而不是手写清单。
+# 2026-09-16 实际踩过：手写清单漏了 account.html 与 wechat-callback.html，
+# 导致这两个页面**从未被这条部署通道更新过**（account.html 的菜单一直是旧的）。
+$htmlPages = Get-ChildItem -Path $Root -File -Filter "*.html" | ForEach-Object { $_.Name }
+
+$items = @($htmlPages) + @(
     "css", "js", "assets", "logo",
     "robots.txt", "sitemap.xml", "_headers", "_redirects"
 )
@@ -26,6 +30,12 @@ foreach ($item in $items) {
 }
 
 & (Join-Path $PSScriptRoot "copy-verify-root.ps1") -Stage $stage -Root $Root
+
+# 防呆：根目录的每个 .html 都必须进包，漏一个就直接失败（别再让页面静默不更新）
+$missingPages = @($htmlPages | Where-Object { -not (Test-Path (Join-Path $stage $_)) })
+if ($missingPages.Count -gt 0) {
+    throw "以下页面未打进静态包: " + ($missingPages -join ', ')
+}
 
 $required = @(
     "js/layout.js", "js/contact.js", "js/toast.js", "js/home.js", "js/voice-asr.js",
