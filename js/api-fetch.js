@@ -147,6 +147,20 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (method === 'GET') {
+    // 主接口是**跨域到 Cloudflare Pages**。国内访问它经常慢到超过 8 秒超时，
+    // 这时会一路掉到「API 不可用且无备份」——用户点订阅立刻看到报错就是这个原因
+    // （2026-09-16 线上实际发生，且 OSS 兜底对象当时是 403，等于两道兜底都失效）。
+    // 先试一次**同源**：qtvq.cn 的 nginx 已把 /api/ 反代到 Pages，走阿里云快得多。
+    // nginx 未配置时这一步会很快 404，不影响后面的 OSS 备份，因此是纯增益、无回归风险。
+    if (typeof location !== 'undefined' && location.origin && !primary.startsWith(location.origin)) {
+      try {
+        const res = await fetchWithTimeout(`${location.origin}${path}`, { method: 'GET', headers }, PRIMARY_TIMEOUT_MS);
+        if (res.ok) return res;
+      } catch {
+        /* 同源也失败，继续走 OSS 备份 */
+      }
+    }
+
     const backup = backupUrlForPath(path);
     if (backup) {
       try {

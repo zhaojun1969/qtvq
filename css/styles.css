@@ -1383,6 +1383,14 @@ a.feature-card-link:focus-visible {
   object-position: top center;
 }
 
+/* 聚合码的原始比例（531×785 ≈ 0.676）比 3/4 更细长，用 cover 会裁掉底部约 10%。
+   收款码被裁可能直接扫不出来，所以这一类改用 contain 完整显示、白底留边。 */
+.pay-qr-card.fit-contain img {
+  object-fit: contain;
+  object-position: center;
+  background: #fff;
+}
+
 .pay-qr-label {
   display: block;
   text-align: center;

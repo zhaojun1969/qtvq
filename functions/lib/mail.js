@@ -270,3 +270,41 @@ export async function sendContactMail(env, record) {
     return { ok: false, error: err.message || String(err), provider: cfg.provider };
   }
 }
+
+/**
+ * 通用通知邮件：给运营发一条纯文本通知（如「客户付款成功、会员已开通」）。
+ *
+ * 与 sendContactMail 共用配置与发送通道，只是主题/正文由调用方给。
+ * 刻意不抛异常：通知失败绝不能影响主流程 —— 付款回调若因此失败，微信会重试，
+ * 甚至造成订单状态与会员状态不一致（2026-09-16 加入，此前付款完全没有通知，
+ * 客户付了钱只有客户自己知道，运营只能人工翻「在线订单」）。
+ *
+ * @param {Record<string, string>} env
+ * @param {{ subject: string, text: string, replyTo?: string }} msg
+ */
+export async function sendNoticeMail(env, msg) {
+  const cfg = mailConfig(env);
+  if (!cfg) {
+    return { ok: false, skipped: true, reason: 'mail_not_configured' };
+  }
+
+  const payload = {
+    subject: msg.subject,
+    text: msg.text,
+    replyTo: msg.replyTo || undefined,
+  };
+  const timeoutMs = 20000;
+  const sendPromise =
+    cfg.provider === 'resend' ? sendViaResend(cfg, payload) : sendViaSmtp(cfg, payload);
+
+  try {
+    return await Promise.race([
+      sendPromise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('邮件发送超时')), timeoutMs);
+      }),
+    ]);
+  } catch (err) {
+    return { ok: false, error: err.message || String(err), provider: cfg.provider };
+  }
+}
