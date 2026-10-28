@@ -340,6 +340,117 @@ function appendSupportCard(support) {
   container.scrollTop = container.scrollHeight;
 }
 
+/*
+ * 第二档：痛苦表述的**窄提示条**。
+ *
+ * 与上面的卡片是同一件事的两档，呈现必须不同：
+ *   · 卡片 = 明确危机，占位、带三个号码、红色系；
+ *   · 窄条 = 「撑不下去了」这类痛苦表述，一行字 + 一个号码 + 可以展开，灰蓝色系。
+ *
+ * 为什么要分两档而不是把卡片放宽：卡片一旦误触发就很刺眼，用户学会无视之后，
+ * 真需要时也不看了 —— 宽判定的卡片会毁掉卡片本身。窄条不遮挡回答，出现得起，
+ * 所以可以让它的召回放宽到「痛苦程度」这一层。
+ *
+ * 频次：**一次会话只出现一次**，点 ×「不再提示」永久关闭（localStorage）。
+ * 这不是产品小气，是这一档能存在的前提 —— 每问都出现，它就成了壁纸。
+ */
+const GENTLE_SHOWN_KEY = 'qtvq_gentle_tip_shown';
+const GENTLE_OFF_KEY = 'qtvq_gentle_tip_off';
+
+function gentleTipAllowed() {
+  try {
+    if (localStorage.getItem(GENTLE_OFF_KEY) === '1') return false;
+    if (sessionStorage.getItem(GENTLE_SHOWN_KEY) === '1') return false;
+  } catch {
+    // 隐私模式下 storage 可能抛异常：宁可这次不显示，也不要每次刷新都重来一遍
+    return false;
+  }
+  return true;
+}
+
+function markGentleTipShown({ permanent = false } = {}) {
+  try {
+    sessionStorage.setItem(GENTLE_SHOWN_KEY, '1');
+    if (permanent) localStorage.setItem(GENTLE_OFF_KEY, '1');
+  } catch {
+    /* 记不住就算了，最多下次再出现一次 */
+  }
+}
+
+function appendGentleTip(tip) {
+  const container = document.getElementById('chat-messages');
+  if (!container || tip?.level !== 'distress') return;
+  // 没有号码就不显示：一条没有出路的提示等于一句空话，反而更像敷衍
+  if (!tip.primary?.phone) return;
+  if (!gentleTipAllowed()) return;
+
+  const bar = document.createElement('div');
+  bar.className = 'gentle-tip';
+  bar.setAttribute('role', 'note');
+
+  const text = document.createElement('span');
+  text.className = 'gentle-text';
+  text.textContent = tip.text || '听起来有很难熬的时刻。如果愿意，可以找个人说说话。';
+  bar.appendChild(text);
+
+  const phone = document.createElement('a');
+  phone.className = 'gentle-phone';
+  phone.href = `tel:${String(tip.primary.phone).replace(/[^0-9+]/g, '')}`;
+  phone.textContent = tip.primary.phone;
+  phone.title = tip.primary.name || '';
+  bar.appendChild(phone);
+
+  const actions = document.createElement('span');
+  actions.className = 'gentle-actions';
+
+  if (Array.isArray(tip.resources) && tip.resources.length > 1) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'gentle-more';
+    more.textContent = '还有别的可以联系';
+    const list = document.createElement('ul');
+    list.className = 'gentle-list';
+    list.hidden = true;
+    for (const r of tip.resources) {
+      if (!r?.phone) continue;
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = `tel:${String(r.phone).replace(/[^0-9+]/g, '')}`;
+      a.textContent = r.phone;
+      li.appendChild(a);
+      if (r.name) {
+        const name = document.createElement('span');
+        name.textContent = ` ${r.name}`;
+        li.appendChild(name);
+      }
+      list.appendChild(li);
+    }
+    more.addEventListener('click', () => {
+      list.hidden = !list.hidden;
+      more.textContent = list.hidden ? '还有别的可以联系' : '收起';
+    });
+    actions.appendChild(more);
+    bar.appendChild(actions);
+    bar.appendChild(list);
+  }
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'gentle-close';
+  close.setAttribute('aria-label', '不再提示');
+  close.title = '不再提示';
+  close.textContent = '×';
+  close.addEventListener('click', () => {
+    markGentleTipShown({ permanent: true });
+    bar.remove();
+  });
+  bar.appendChild(close);
+
+  markGentleTipShown();
+  container.appendChild(bar);
+  container.scrollTop = container.scrollHeight;
+}
+
 function showTyping() {
   const container = document.getElementById('chat-messages');
   const el = document.createElement('div');
@@ -400,6 +511,12 @@ async function handleAsk(followUp = false) {
     // 位置刻意在 appendMessage 之后 —— 若放在前面，用户会先看到"求助"再看到回答，
     // 像是系统先给结论再补理由。
     appendSupportCard(data.support);
+    /*
+     * 第二档必须在卡片之后、且服务端已经保证两者不会同时下发；
+     * 这里再判一次 `data.support` 是防"以后服务端改了忘同步"——
+     * 两张一起出现时页面会像警报页，代价远大于多一行判断。
+     */
+    if (!data.support) appendGentleTip(data.gentle);
     /*
      * 激活口径（`server/src/services/metrics.js::ACTIVATION_EVENTS`）：
      * 「完成资料」或「首问」。这里只报首问，且**只在真的拿到回答之后**报 ——

@@ -26,7 +26,13 @@ import { Router } from 'express';
 import { chat } from '../services/llm.js';
 import { retrievePitfalls, formatPitfalls, publicHits } from '../services/pitfalls.js';
 import { canAsk, recordAsk, getQuota } from '../services/quota-store.js';
-import { quickCheck, crisisCheck, buildSupportCard as buildSupport } from '../services/content-safety.js';
+import {
+  quickCheck,
+  crisisCheck,
+  buildSupportCard as buildSupport,
+  distressCheck,
+  buildGentleTip,
+} from '../services/content-safety.js';
 
 const router = Router();
 
@@ -134,6 +140,12 @@ router.post('/', async (req, res) => {
      */
     const crisis = crisisCheck(message.trim());
     const supportCard = buildSupport(crisis);
+    /*
+     * 第二档：痛苦表述 → 一条窄提示（不是卡片）。
+     * 明确级已经出卡片时**不再叠**这条：两张东西一起出现会让页面变成警报页，
+     * 而这一档的全部意义就是"轻"。判定逻辑与取舍见 packages/safety/src/distress.js。
+     */
+    const gentleTip = supportCard ? null : buildGentleTip(distressCheck(message.trim()));
 
     const quotaCheck = await canAsk(cid, !!followUp);
     if (!quotaCheck.ok) {
@@ -195,6 +207,7 @@ router.post('/', async (req, res) => {
       },
       ...(fallback ? { fallback: true, fallbackReason, aiError: ai.error || null } : {}),
       ...(supportCard ? { support: supportCard } : {}),
+      ...(gentleTip ? { gentle: gentleTip } : {}),
     });
   } catch (err) {
     console.error('[chat] 生成失败：', err?.message || err);

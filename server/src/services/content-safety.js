@@ -26,11 +26,21 @@ import { recordLedger } from './moderation-ledger.js';
  * `localCheck` 继续从这里再导出：路由与 `tools/scripts/check-content-safety.mjs` 的
  * 既有 import 路径不必改动（也是刻意保持的兼容面）。
  */
-import { localCheck, wordlistMeta, crisisCheck, crisisMeta, buildSupportCard } from '../../../packages/safety/src/index.js';
+import {
+  localCheck,
+  wordlistMeta,
+  crisisCheck,
+  crisisMeta,
+  buildSupportCard,
+  distressCheck,
+  buildGentleTip,
+} from '../../../packages/safety/src/index.js';
 
 /* 危机识别与词表比对是两套语义（拦 vs 帮），但出口统一在这里，
- * 让路由只需要 import 一个模块。语义差异见 packages/safety/src/crisis.js 开头。 */
-export { localCheck, crisisCheck, crisisMeta, buildSupportCard };
+ * 让路由只需要 import 一个模块。语义差异见 packages/safety/src/crisis.js 开头。
+ * `distressCheck` 是第二档（痛苦表述）—— 与 crisis 分开导出，调用方必须显式
+ * 决定把它渲染成"窄条"而不是"卡片"，见 packages/safety/src/distress.js。 */
+export { localCheck, crisisCheck, crisisMeta, buildSupportCard, distressCheck, buildGentleTip };
 
 /*
  * 启动即打印词表装载情况。

@@ -14,7 +14,13 @@ import { runChatChain, isLlmReady } from '../lib/llm-chain.js';
  * 台账由 Node 的 `/v1/chat` 承担。本文件只在流量回退到 Pages 时生效，
  * 那种情况下"少一条台账"远好于"为了台账把对话拖慢几百毫秒"。
  */
-import { localCheck, crisisCheck, buildSupportCard } from '../../packages/safety/src/index.js';
+import {
+  localCheck,
+  crisisCheck,
+  buildSupportCard,
+  distressCheck,
+  buildGentleTip,
+} from '../../packages/safety/src/index.js';
 
 const SYSTEM_PROMPT = `你是「我心永恒-Q问」的情感智慧顾问。你的风格是「避坑+直线解决」：
 - 不说鸡汤，不给模糊安慰
@@ -118,6 +124,8 @@ export async function onRequestPost(context) {
     );
   }
   const support = buildSupportCard(crisisCheck(message.trim()));
+  /* 第二档（痛苦表述）：明确级命中时不再叠一条，理由见 packages/safety/src/distress.js */
+  const gentle = support ? null : buildGentleTip(distressCheck(message.trim()));
 
   const quotaCheck = await canAsk(env, cid, !!followUp);
   if (!quotaCheck.ok) {
@@ -203,6 +211,7 @@ export async function onRequestPost(context) {
       },
       ...(fallback ? { fallback: true, fallbackReason, aiError: attempts[0]?.error || null } : {}),
       ...(support ? { support } : {}),
+      ...(gentle ? { gentle } : {}),
     });
   } catch (err) {
     console.error('AI error:', err);
@@ -215,6 +224,7 @@ export async function onRequestPost(context) {
       aiError: err?.message || String(err),
       /* 生成失败时也带求助资源：卡片的存在与否不该取决于模型是否可用 */
       ...(support ? { support } : {}),
+      ...(gentle ? { gentle } : {}),
     });
   }
 }

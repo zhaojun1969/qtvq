@@ -2587,3 +2587,102 @@ a.feature-card-link:focus-visible {
   font-size: 12px;
   color: var(--text-faint);
 }
+
+/*
+ * 第二档窄提示（痛苦表述）。
+ *
+ * 视觉上的三条硬约束，都是为了"出现得起"：
+ *   1. 高度压到一行：不挤占回答的可见区域，用户不需要滚过它；
+ *   2. 冷色低饱和，不用卡片的红色系：它不是警报，是一次轻的询问；
+ *   3. 有明确的「×」「不再提示」：用户可以关掉，而且关了就不再回来。
+ * 若哪天它需要"更显眼才能被看到"，说明这一档已经退化成噪音了 ——
+ * 正确做法是收窄判定，不是加粗样式。
+ */
+.gentle-tip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 170, 220, 0.28);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(120, 170, 220, 0.06);
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.gentle-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.gentle-phone {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-bright);
+  text-decoration: none;
+  letter-spacing: 0.5px;
+}
+
+.gentle-phone:hover,
+.gentle-phone:focus-visible {
+  text-decoration: underline;
+}
+
+.gentle-actions {
+  display: inline-flex;
+}
+
+.gentle-more {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gentle-more:hover {
+  color: var(--text-bright);
+}
+
+.gentle-list {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
+  padding: 0 0 0 2px;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gentle-list a {
+  color: var(--text-soft);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.gentle-list a:hover {
+  text-decoration: underline;
+}
+
+.gentle-close {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.gentle-close:hover {
+  color: var(--text-bright);
+}

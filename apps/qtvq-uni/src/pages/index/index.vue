@@ -82,6 +82,31 @@
               <text v-if="r.note" class="support-note">{{ r.note }}</text>
             </view>
           </view>
+          <!--
+            第二档：痛苦表述的窄提示条（不是卡片）。
+            与 support 互斥；一次启动只显示一条；点「不再提示」永久关闭。
+            v-for 的索引 i 参与判断，所以只有被钉住的那条消息会渲染它。
+          -->
+          <view v-if="m.gentle && i === gentleAt" class="gentle-tip">
+            <text class="gentle-text">{{ m.gentle.text }}</text>
+            <view class="gentle-row">
+              <text class="gentle-phone" @tap="callSupport(m.gentle.primary.phone)">{{ m.gentle.primary.phone }}</text>
+              <text v-if="m.gentle.resources && m.gentle.resources.length > 1" class="gentle-more" @tap="gentleOpen = !gentleOpen">
+                {{ gentleOpen ? '收起' : '还有别的可以联系' }}
+              </text>
+              <text class="gentle-close" @tap="dismissGentle">不再提示</text>
+            </view>
+            <view v-if="gentleOpen" class="gentle-list">
+              <text
+                v-for="(r, ri) in m.gentle.resources"
+                :key="ri"
+                class="gentle-item"
+                @tap="callSupport(r.phone)"
+              >
+                {{ r.phone }} {{ r.name }}
+              </text>
+            </view>
+          </view>
         </view>
         <view v-if="loading" class="msg msg-ai">思考中…</view>
         <view class="scroll-bottom-spacer" />
@@ -261,6 +286,34 @@ function callSupport(phone) {
   });
 }
 
+/*
+ * 第二档窄提示的状态。
+ *
+ * `gentleAt` 钉住"在哪条消息下展示"，`-1` 表示本启动内不再展示 ——
+ * 用索引而不是布尔值，是因为窄条只该出现在**触发它的那条回答**下面；
+ * 用布尔值的话刷新消息列表后会跑到最后一条下面，指错上下文。
+ * `gentleOff` 从本地读，用户点过「不再提示」就永久不再出现。
+ */
+const gentleAt = ref(-1);
+const gentleOpen = ref(false);
+const gentleOff = ref(false);
+try {
+  gentleOff.value = uni.getStorageSync('qtvq_gentle_tip_off') === '1';
+} catch {
+  /* 存储不可用：按未关闭处理，最多多出现一次 */
+}
+
+function dismissGentle() {
+  gentleOff.value = true;
+  gentleAt.value = -1;
+  gentleOpen.value = false;
+  try {
+    uni.setStorageSync('qtvq_gentle_tip_off', '1');
+  } catch {
+    /* 记不住就算了 */
+  }
+}
+
 async function doAsk(followUp = false) {
   const text = followUp ? lastQuestion : question.value.trim();
   if (!text) {
@@ -281,7 +334,17 @@ async function doAsk(followUp = false) {
       text: data.reply,
       // 危机求助资源（服务端只在 level=urgent 时下发；没有就是 undefined，模板不渲染）
       support: data.support || null,
+      // 第二档窄提示（痛苦表述）。与 support 互斥，服务端已保证，这里再挡一次
+      gentle: data.support ? null : data.gentle || null,
     });
+    /*
+     * 窄条一次启动只出现一次：把"展示位置"钉在某一条消息上，
+     * 后续就算每条都命中也不会再渲染 —— 频次是这一档能存在的前提，
+     * 每问都出现它就成了壁纸（见 packages/safety/src/distress.js 开头）。
+     */
+    if (data.gentle && !data.support && !gentleOff.value && gentleAt.value < 0) {
+      gentleAt.value = messages.value.length - 1;
+    }
     /*
      * 激活口径（`server/src/services/metrics.js::ACTIVATION_EVENTS`）：
      * 「完成资料」或「首问」。**只在真的拿到回答之后**报 ——
@@ -702,5 +765,64 @@ onMounted(async () => {
   .support-note {
     font-size: 22rpx;
     color: $color-text-faint;
+  }
+
+  /*
+   * 第二档窄提示（痛苦表述）。与 card 的区别全在"重量"：
+   * 单行、细边、冷色，不遮挡回答；用户点「不再提示」永久关闭。
+   * 如果哪天需要"更显眼才能被看到"，说明判定太宽了 —— 应该收窄判定，不是加粗样式。
+   */
+  .gentle-tip {
+    margin-top: 16rpx;
+    padding: 16rpx 18rpx;
+    border-left: 6rpx solid rgba(120, 170, 220, 0.45);
+    border-radius: $radius-sm;
+    background: rgba(120, 170, 220, 0.06);
+  }
+
+  .gentle-text {
+    display: block;
+    font-size: 24rpx;
+    line-height: 1.6;
+    color: $color-text-soft;
+  }
+
+  .gentle-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 10rpx;
+  }
+
+  .gentle-phone {
+    font-size: 30rpx;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: $color-text-bright;
+    margin-right: 20rpx;
+  }
+
+  .gentle-more {
+    font-size: 22rpx;
+    color: $color-text-muted;
+    text-decoration: underline;
+    margin-right: 20rpx;
+  }
+
+  .gentle-close {
+    font-size: 22rpx;
+    color: $color-text-faint;
+    margin-left: auto;
+  }
+
+  .gentle-list {
+    margin-top: 8rpx;
+  }
+
+  .gentle-item {
+    display: block;
+    font-size: 22rpx;
+    color: $color-text-muted;
+    padding: 6rpx 0;
   }
 </style>

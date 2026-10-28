@@ -195,3 +195,11 @@ export function localCheck(text, { field = 'default' } = {}) {
  * 不必知道内部拆了几个文件。
  */
 export { crisisCheck, crisisMeta, CRISIS_RESOURCES, buildSupportCard } from './crisis.js';
+
+/**
+ * 痛苦表述（第二档）：明确级命中时客户端不展示本档，见 `distress.js` 开头。
+ * 与 crisis 分开导出而不是合并成一个 `check()`，是为了让调用方**必须显式**
+ * 决定"这一档要显示成什么"—— 合并后很容易被顺手当成 crisis 用，
+ * 那就等于把卡片变成了"话多就说你有危险"。
+ */
+export { distressCheck, distressMeta, buildGentleTip } from './distress.js';
