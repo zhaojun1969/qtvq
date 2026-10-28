@@ -1,0 +1,17 @@
+{
+  /*
+    应用级字符串资源 —— 覆盖自动生成的 AppScope/resources/base/element/string.json。
+    `mic_reason` 是上面 module.json5 申请麦克风权限时引用的用途说明
+    （鸿蒙要求权限必须写明用途，缺失会导致上架审核被拒）。
+  */
+  "string": [
+    {
+      "name": "app_name",
+      "value": "我心永恒 Q问"
+    },
+    {
+      "name": "mic_reason",
+      "value": "用于语音输入提问，仅在您主动点击录音时使用"
+    }
+  ]
+}

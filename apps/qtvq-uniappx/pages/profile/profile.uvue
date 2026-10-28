@@ -1,0 +1,159 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">我的</text>
+      <text class="hint">{{ userLabelText }}</text>
+      <text class="hint">设备编号 {{ clientIdShort }}</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">缘值</text>
+      <text class="balance">¥{{ balanceText }}</text>
+      <text class="hint">{{ memberText }}</text>
+      <button class="btn-primary" @click="go('/pages/wallet/wallet')">查看余额与流水</button>
+    </view>
+
+    <view class="card">
+      <text class="card-title">我的资料（配对的前置条件）</text>
+      <text class="hint">昵称与性别必填，否则配对功能不可用。</text>
+      <input v-model="nickname" class="input" placeholder="昵称" />
+      <input v-model="city" class="input" placeholder="城市（选填）" />
+      <button class="btn-secondary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存资料' }}</button>
+      <text v-if="saveMsg.length > 0" class="hint">{{ saveMsg }}</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">账户</text>
+      <view class="row" @click="go('/pages/account/account')">
+        <text class="row-label">我的账户 / 登录注册</text>
+        <text class="row-arrow">›</text>
+      </view>
+      <view class="row" @click="go('/pages/report/report')">
+        <text class="row-label">配对报告</text>
+        <text class="row-arrow">›</text>
+      </view>
+      <view class="row" @click="go('/pages/abuse/abuse')">
+        <text class="row-label">举报违规</text>
+        <text class="row-arrow">›</text>
+      </view>
+    </view>
+
+    <text class="footer">我心永恒（北京）网络科技有限公司 · 客户留言：qtvq@qtvq.cn</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { fetchWallet, fetchMyProfile, saveMyProfile } from '@/utils/api.uts'
+  import { clientId, token, userLabel, isLoggedIn } from '@/utils/session.uts'
+
+  const balanceText = ref<string>('0.00')
+  const memberText = ref<string>('未开通会员')
+  const userLabelText = ref<string>(userLabel())
+  const clientIdShort = ref<string>('')
+  const nickname = ref<string>('')
+  const city = ref<string>('')
+  const saving = ref<boolean>(false)
+  const saveMsg = ref<string>('')
+
+  onShow(() => {
+    const id : string = clientId()
+    clientIdShort.value = id.length > 16 ? `${id.substring(0, 16)}…` : id
+    userLabelText.value = userLabel()
+    loadWallet()
+    loadProfile()
+  })
+
+  function loadWallet() {
+    if (!isLoggedIn()) {
+      balanceText.value = '—'
+      memberText.value = '登录后可查看缘值'
+      return
+    }
+    fetchWallet(token, (data : UTSJSONObject) => {
+      const w = data['wallet']
+      if (w != null) {
+        const wallet : UTSJSONObject = w as UTSJSONObject
+        const bal = wallet['balance']
+        if (bal != null) balanceText.value = (bal as number).toFixed(2)
+      }
+      const m = data['membership']
+      if (m != null) {
+        const mm : UTSJSONObject = m as UTSJSONObject
+        const active = mm['active']
+        memberText.value = (active != null && (active as boolean)) ? '会员生效中' : '未开通会员'
+      }
+    }, (_ : string) => {
+      balanceText.value = '—'
+      memberText.value = '读取失败，稍后重试'
+    })
+  }
+
+  function loadProfile() {
+    if (!isLoggedIn()) return
+    fetchMyProfile(token, (data : UTSJSONObject) => {
+      const p = data['profile']
+      if (p == null) return
+      const prof : UTSJSONObject = p as UTSJSONObject
+      const n = prof['nickname']
+      if (n != null) nickname.value = n as string
+      const c = prof['city']
+      if (c != null) city.value = c as string
+    }, (_ : string) => {})
+  }
+
+  function save() {
+    if (!isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    if (nickname.value.trim().length == 0) {
+      uni.showToast({ title: '昵称必填', icon: 'none' })
+      return
+    }
+    saving.value = true
+    saveMsg.value = ''
+    const body : UTSJSONObject = { nickname: nickname.value.trim(), city: city.value.trim() }
+    saveMyProfile(body, token, (_ : UTSJSONObject) => {
+      saving.value = false
+      saveMsg.value = '已保存'
+      uni.showToast({ title: '已保存', icon: 'success' })
+    }, (msg : string) => {
+      saving.value = false
+      saveMsg.value = msg
+      uni.showToast({ title: msg, icon: 'none' })
+    })
+  }
+
+  function go(url : string) {
+    uni.navigateTo({ url: url })
+  }
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .balance { font-size: 26px; color: #ff6b81; font-weight: bold; margin: 6px 0; }
+  .input {
+    height: 40px;
+    background-color: #0f0e17;
+    color: #f5f5f7;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #2a2940;
+    border-radius: 8px;
+    padding: 0 8px;
+    margin: 6px 0;
+    font-size: 14px;
+  }
+  .row {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+  .row-label { font-size: 14px; color: #f5f5f7; }
+  .row-arrow { font-size: 14px; color: #a0a0b0; }
+  .footer { font-size: 11px; color: #707080; text-align: center; margin-top: 12px; }
+</style>

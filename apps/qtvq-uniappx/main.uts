@@ -1,0 +1,21 @@
+/**
+ * uni-app x 工程入口（鸿蒙原生应用）
+ *
+ * 与 `apps/qtvq-uni`（老的 uni-app，走小程序矩阵）是**两套编译器、两份工程**，
+ * 刻意不共享构建 —— 这是业务方 2026-09-21 明确选择的方案（B）：
+ * 鸿蒙 NEXT 的官方主推路线是 uni-app x，与老 uni-app 的 Vue3 线不是同一套运行时。
+ *
+ * 能共享的是**契约**，不是代码：
+ *   · `utils/api.uts`    —— 统一 API 基址与请求封装（同一套接口）
+ *   · `utils/update.uts` —— 各端「专用端口」`GET /api/app/bootstrap?channel=harmony` 的解析
+ *   · 服务端只有一处实现，端侧按同一份契约解析即可
+ */
+import App from './App.uvue'
+import { createSSRApp } from 'vue'
+
+export function createApp() {
+  const app = createSSRApp(App)
+  return {
+    app
+  }
+}

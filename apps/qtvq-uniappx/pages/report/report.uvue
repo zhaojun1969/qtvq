@@ -1,0 +1,155 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">配对报告</text>
+      <text class="hint">按档位生成深度分析。报告正文由服务端模型链生成，端侧只负责下单与展示。</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">选择档位</text>
+      <view class="tier" v-for="(t, idx) in tiers" :key="idx" @click="select(idx)">
+        <text :class="idx == selected ? 'tier-name-on' : 'tier-name'">{{ t.label }}</text>
+        <text :class="idx == selected ? 'tier-price-on' : 'tier-price'">¥{{ t.price }}</text>
+      </view>
+      <button class="btn-primary" :disabled="busy" @click="create">{{ busy ? '生成中…' : '生成报告（从缘值扣费）' }}</button>
+      <text v-if="statusText.length > 0" class="hint">{{ statusText }}</text>
+    </view>
+
+    <view class="card" v-if="content.length > 0">
+      <text class="card-title">报告内容</text>
+      <text class="content">{{ content }}</text>
+    </view>
+
+    <view class="card" v-if="reportId.length > 0">
+      <text class="card-title">这份报告</text>
+      <text class="hint">编号 {{ reportId }}</text>
+      <button class="btn-secondary" @click="share">分享这份报告</button>
+      <button class="btn-secondary" @click="goAbuse">举报报告里的对象</button>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { API_BASE } from '@/utils/api.uts'
+  import { token, isLoggedIn } from '@/utils/session.uts'
+
+  /** 档位：与服务端 constants 的档位一致（basic ¥1 / advanced ¥5 / deep ¥20） */
+  type Tier = {
+    key : string
+    label : string
+    price : number
+  }
+
+  const tiers = ref<Tier[]>([
+    { key: 'basic', label: '缘分一转', price: 1 } as Tier,
+    { key: 'advanced', label: '心动三转', price: 5 } as Tier,
+    { key: 'deep', label: '深度配对', price: 20 } as Tier,
+  ])
+  const selected = ref<number>(2)
+  const busy = ref<boolean>(false)
+  const statusText = ref<string>('')
+  const content = ref<string>('')
+  const reportId = ref<string>('')
+  const targetUid = ref<string>('')
+  const targetName = ref<string>('')
+
+  function select(idx : number) {
+    selected.value = idx
+  }
+
+  function create() {
+    if (!isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    busy.value = true
+    statusText.value = '正在生成，请稍候…'
+    const tier : Tier = tiers.value[selected.value]
+
+    uni.request({
+      url: `${API_BASE}/v1/report/generate`,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token!}` },
+      data: { tier: tier.key } as UTSJSONObject,
+      dataType: 'json',
+      timeout: 60000,
+      success: (res) => {
+        busy.value = false
+        const raw = res.data
+        if (raw == null) {
+          statusText.value = '服务端返回为空'
+          return
+        }
+        const body : UTSJSONObject = raw as UTSJSONObject
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          const err = body['error']
+          statusText.value = err != null ? (err as string) : `HTTP ${res.statusCode}`
+          return
+        }
+        const data = body['data']
+        if (data == null) {
+          statusText.value = '报告数据为空'
+          return
+        }
+        const d : UTSJSONObject = data as UTSJSONObject
+        const c = d['content']
+        content.value = c != null ? (c as string) : ''
+        const rid = d['reportId']
+        reportId.value = rid != null ? (rid as string) : ''
+        const t = d['target']
+        if (t != null) {
+          const tt : UTSJSONObject = t as UTSJSONObject
+          const uid = tt['uid']
+          const nick = tt['nickname']
+          targetUid.value = uid != null ? (uid as string) : ''
+          targetName.value = nick != null ? (nick as string) : ''
+        }
+        statusText.value = '已生成'
+      },
+      fail: (err) => {
+        busy.value = false
+        statusText.value = '网络失败：' + err.errMsg
+      },
+    })
+  }
+
+  /** 系统分享：鸿蒙端不需要第三方凭据，直接调系统分享面板 */
+  function share() {
+    const text : string = content.value
+    if (text.length == 0) {
+      uni.showToast({ title: '还没有报告内容', icon: 'none' })
+      return
+    }
+    uni.shareWithSystem({
+      summary: text.substring(0, 80),
+      success: () => {},
+      fail: (err) => {
+        uni.showToast({ title: '分享未完成：' + err.errMsg, icon: 'none' })
+      },
+    })
+  }
+
+  function goAbuse() {
+    uni.navigateTo({
+      url: `/pages/abuse/abuse?uid=${encodeURIComponent(targetUid.value)}&name=${encodeURIComponent(targetName.value)}`,
+    })
+  }
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .tier {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+  .tier-name { font-size: 14px; color: #d8d8e2; }
+  .tier-name-on { font-size: 14px; color: #ff8fa3; }
+  .tier-price { font-size: 14px; color: #a0a0b0; }
+  .tier-price-on { font-size: 14px; color: #ff6b81; }
+  .content { font-size: 14px; color: #f5f5f7; line-height: 1.8; }
+</style>

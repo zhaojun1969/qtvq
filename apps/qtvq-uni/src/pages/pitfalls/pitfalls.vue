@@ -1,148 +1,369 @@
 <template>
+
   <view class="page">
-    <view class="head card">
-      <text class="title">爱情避坑大全</text>
-      <text class="desc">50+ 真实案例 · 直线方案 · 按代价筛选（MVP 展示精选）</text>
-    </view>
-    <view v-for="item in list" :key="item.id" class="card item" @click="openDetail(item)">
-      <view class="row">
-        <text class="cat">{{ item.category }}</text>
-        <text class="cost">{{ item.cost }}</text>
+
+    <BrandNavBar
+
+      :status-bar-px="statusBarPx"
+
+      :nav-bar-px="navBarPx"
+
+      :nav-total-px="navTotalPx"
+
+      center-title="避坑"
+
+    />
+
+    <view class="page-inner">
+
+      <view class="head card">
+
+        <text class="title">爱情避坑大全</text>
+
+        <text class="desc">50+ 真实案例 · 直线方案 · 本页展示精选 {{ list.length }} 条</text>
+
       </view>
-      <text class="item-title">{{ item.title }}</text>
-      <text class="meta">已帮 {{ item.helped }} 人避开</text>
+
+      <view
+
+        v-for="item in list"
+
+        :key="item.id"
+
+        class="card item"
+
+        hover-class="item-hover"
+
+        @tap="openDetail(item)"
+
+      >
+
+        <view class="row">
+
+          <text class="cat">{{ item.category }}</text>
+
+          <text class="cost">{{ item.cost }}</text>
+
+        </view>
+
+        <text class="item-title">{{ item.title }}</text>
+
+        <text class="meta">已帮 {{ item.helped }} 人避开 · 点击查看直线方案</text>
+
+      </view>
+
     </view>
-    <view v-if="detail" class="modal" @click="detail = null">
-      <view class="modal-box card" @click.stop>
+
+    <view v-if="detail" class="modal" @tap="detail = null">
+
+      <view class="modal-box card" @tap.stop>
+
         <text class="modal-title">{{ detail.title }}</text>
+
         <text class="modal-body">{{ detailSteps }}</text>
-        <button class="btn-primary" @click="askAbout(detail)">用 Q问 咨询此坑</button>
-        <button class="btn-secondary modal-close" @click="detail = null">知道了</button>
+
+        <button class="btn-primary" @tap="askAbout(detail)">用 Q问 咨询此坑</button>
+
+        <button class="btn-secondary modal-close" @tap="detail = null">知道了</button>
+
       </view>
+
     </view>
+
   </view>
+
 </template>
 
+
+
 <script setup>
+
 import { ref } from 'vue';
+
+import { onShow } from '@dcloudio/uni-app';
+
 import sample from '../../data/pitfalls-sample.json';
 
+import BrandNavBar from '../../components/BrandNavBar.vue';
+
+import { useNavBar } from '../../utils/navBar.js';
+
+
+
+const { statusBarPx, navBarPx, navTotalPx, initNavBar } = useNavBar();
+
 const list = ref(sample);
+
 const detail = ref(null);
+
 const detailSteps = ref('');
 
-const STEPS = {
-  1: '1. 未见面绝不转账\n2. 任何借钱请求直接拒绝\n3. 已转账保留聊天记录',
-  2: '1. 设定3个月期限\n2. 到期直接问是否正式在一起\n3. 回避或拖延=离开',
-  3: '1. 发底线信息要求沟通期限\n2. 到期无回应则止损\n3. 停止反复道歉',
-  4: '1. 大额支出书面约定\n2. 见家长礼物适度\n3. 急催结婚需放慢了解',
-  5: '1. 明确边界底线\n2. 原谅需伴随断联行动\n3. 反复越界=重新选择',
+
+
+const PROMPTS = {
+
+  1: '网恋没见面就借钱该借吗？',
+
+  2: '暧昧半年不确认关系怎么办？',
+
+  3: '对方冷暴力已读不回怎么办？',
+
+  4: '第一次见家长礼物买太贵了怎么办？',
+
+  5: '彩礼大额支付前要注意什么？',
+
+  6: '发现出轨后只有道歉没有行动怎么办？',
+
+  7: '相亲只谈房车不谈相处怎么办？',
+
+  8: '朋友圈对我单身对别人恋爱中怎么办？',
+
+  9: '网恋照片和真人差距很大怎么办？',
+
+  10: '吵架对方就拉黑消失一周怎么办？',
+
 };
 
+
+
 function openDetail(item) {
+
   detail.value = item;
-  detailSteps.value = STEPS[item.id] || '详见 Web 版避坑大全完整内容。';
+
+  detailSteps.value = item.steps || '详见 Web 版避坑大全完整内容。';
+
 }
+
+
 
 function askAbout(item) {
-  const prompts = {
-    1: '网恋没见面就借钱该借吗？',
-    2: '暧昧半年不确认关系怎么办？',
-    3: '对方冷暴力已读不回怎么办？',
-    4: '彩礼大额支付前要注意什么？',
-    5: '发现出轨后只有道歉没有行动怎么办？',
-  };
-  const q = prompts[item.id] || item.title;
+
+  const q = PROMPTS[item.id] || item.title;
+
   uni.setStorageSync('qtvq_prefill', q);
+
   uni.switchTab({ url: '/pages/index/index' });
+
 }
+
+
+
+onShow(initNavBar);
+
 </script>
 
+
+
 <style lang="scss" scoped>
+
 .page {
-  padding: 24rpx;
-  padding-bottom: 120rpx;
+
+  background: $color-bg;
+
+  min-height: 100%;
+
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+
+  box-sizing: border-box;
+
 }
+
+
+
+.page-inner {
+
+  padding: 0 24rpx 32rpx;
+
+  box-sizing: border-box;
+
+}
+
+
+
+.item-hover {
+
+  opacity: 0.85;
+
+}
+
+
 
 .head {
+
   margin-bottom: 20rpx;
+
 }
+
+
 
 .title {
+
   display: block;
+
   font-size: 34rpx;
+
   font-weight: 700;
-  color: #ff8fa3;
+
+  color: $color-pink-light;
+
 }
+
+
 
 .desc {
+
   display: block;
+
   font-size: 24rpx;
-  color: #a0a0b0;
+
+  color: $color-text-muted;
+
   margin-top: 8rpx;
+
+  line-height: 1.5;
+
 }
 
-.item-title {
-  display: block;
-  font-size: 30rpx;
-  margin: 12rpx 0;
+
+
+.item {
+
+  margin-bottom: 16rpx;
+
 }
+
+
 
 .row {
+
   display: flex;
+
   justify-content: space-between;
+
+  margin-bottom: 8rpx;
+
 }
+
+
 
 .cat {
-  color: #6c5ce7;
-  font-size: 24rpx;
+
+  font-size: 22rpx;
+
+  color: $color-purple;
+
 }
+
+
 
 .cost {
-  color: #ff6b81;
+
   font-size: 22rpx;
+
+  color: $color-pink;
+
 }
+
+
+
+.item-title {
+
+  display: block;
+
+  font-size: 28rpx;
+
+  font-weight: 600;
+
+  margin-bottom: 8rpx;
+
+}
+
+
 
 .meta {
+
   font-size: 22rpx;
-  color: #a0a0b0;
+
+  color: $color-text-faint;
+
 }
+
+
 
 .modal {
+
   position: fixed;
+
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+
+  background: rgba(0, 0, 0, 0.72);
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
-  padding: 40rpx;
-  z-index: 99;
+
+  padding: 32rpx;
+
+  z-index: 200;
+
 }
+
+
 
 .modal-box {
+
   width: 100%;
-  max-width: 600rpx;
+
+  max-width: 640rpx;
+
 }
+
+
 
 .modal-title {
+
   display: block;
+
   font-size: 32rpx;
-  font-weight: 600;
-  margin-bottom: 20rpx;
-  color: #ff8fa3;
+
+  font-weight: 700;
+
+  color: $color-pink-light;
+
+  margin-bottom: 16rpx;
+
 }
+
+
 
 .modal-body {
+
   display: block;
-  white-space: pre-wrap;
-  font-size: 28rpx;
+
+  font-size: 26rpx;
+
+  color: $color-text-soft;
+
   line-height: 1.6;
+
+  white-space: pre-wrap;
+
   margin-bottom: 24rpx;
-  color: #f5f5f7;
+
 }
 
+
+
 .modal-close {
-  margin-top: 16rpx;
+
+  margin-top: 12rpx;
+
   width: 100%;
+
 }
+
 </style>
+
+

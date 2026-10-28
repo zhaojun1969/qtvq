@@ -11,7 +11,7 @@ export function request(options) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
         } else {
-          const err = new Error(res.data?.error || `HTTP ${res.statusCode}`);
+          const err = new Error(res.data?.error || res.data?.message || `HTTP ${res.statusCode}`);
           err.code = res.data?.code;
           err.data = res.data;
           err.statusCode = res.statusCode;

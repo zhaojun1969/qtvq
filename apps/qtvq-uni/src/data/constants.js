@@ -37,7 +37,7 @@ export const PLANS = [
 ];
 
 /** 与 manifest versionName 同步，便于核对是否为新包 */
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.6';
 
 /** Q问首页 · 空状态引导 */
 export const USAGE_STEPS = [
@@ -51,6 +51,12 @@ export const EXAMPLE_QUESTIONS = [
   '网恋没见面就借钱，该不该借？',
   '对方冷暴力已读不回，第一条消息怎么发？',
   '第一次见家长，礼物和话术怎么准备？',
+  '发现出轨后只有道歉没有行动，怎么办？',
+  '家长反对异地恋，我该坚持还是放手？',
+  '他说 busy 但还在刷朋友圈，还要等吗？',
+  '相亲几次没下文，是我哪里出了问题？',
+  '想分手但怕伤害对方，怎么说更合适？',
+  '异地恋多久见一次面才算正常？',
 ];
 
 export const WEB_BASE = 'https://qtvq.cn';

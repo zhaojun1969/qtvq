@@ -1,0 +1,72 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">避坑大全</text>
+      <text class="hint">真实案例 + 直线做法。列表来自服务端，端侧不写死内容。</text>
+    </view>
+
+    <view class="card" v-for="(item, idx) in items" :key="idx">
+      <text class="item-title">{{ item.title }}</text>
+      <text class="item-cat">{{ item.category }}</text>
+      <text class="item-text">{{ item.text }}</text>
+    </view>
+
+    <view class="card" v-if="items.length == 0">
+      <text class="hint">{{ statusText }}</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { fetchPitfalls } from '@/utils/api.uts'
+
+  /** 列表项：UTS 里用明确的 type，而不是 any（类型不明确会在编译期就报错） */
+  type PitfallItem = {
+    title : string
+    category : string
+    text : string
+  }
+
+  const items = ref<PitfallItem[]>([])
+  const statusText = ref<string>('加载中…')
+
+  onLoad(() => {
+    fetchPitfalls((data : UTSJSONObject) => {
+      const raw = data['items']
+      if (raw == null) {
+        statusText.value = '暂无数据'
+        return
+      }
+      const arr : Array<UTSJSONObject> = raw as Array<UTSJSONObject>
+      const list : PitfallItem[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const o : UTSJSONObject = arr[i]
+        const title = o['title']
+        const category = o['category']
+        // 正文优先"教训"（lesson），没有则退回"步骤"（steps）—— 服务端两个字段都给，
+        // 原来我写成读 `text`，而 pitfalls 集合里根本没有这个字段（内容会全空）
+        const lesson = o['lesson']
+        const steps = o['steps']
+        let text : string = lesson != null ? (lesson as string) : ''
+        if (text.length == 0 && steps != null) text = steps as string
+        list.push({
+          title: title != null ? (title as string) : '未命名',
+          category: category != null ? (category as string) : '',
+          text: text,
+        } as PitfallItem)
+      }
+      items.value = list
+      statusText.value = list.length > 0 ? '' : '暂无数据'
+    }, (msg : string) => {
+      statusText.value = '加载失败：' + msg
+    })
+  })
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .item-title { font-size: 15px; color: #f5f5f7; }
+  .item-cat { font-size: 11px; color: #ff8fa3; margin-top: 2px; }
+  .item-text { font-size: 13px; color: #c8c8d8; line-height: 1.7; margin-top: 6px; }
+</style>

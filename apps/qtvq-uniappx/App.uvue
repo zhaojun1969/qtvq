@@ -1,0 +1,65 @@
+<script setup lang="uts">
+  import { checkAppUpdate, appVersion } from '@/utils/update.uts'
+  import { loadSession } from '@/utils/session.uts'
+
+  onLaunch((_: OnLaunchOptions) => {
+    // 登录态：从本地存储恢复（token + 用户信息）
+    loadSession()
+
+    /**
+     * 各端「专用端口」：启动时问一次 `/api/app/bootstrap?channel=harmony&version=`。
+     * 结论由服务端给（该不该更新 / 要不要强制），端侧只按结论行动。
+     * 失败静默 —— 启动阶段任何网络问题都不该影响使用（见 utils/update.uts 的说明）。
+     */
+    checkAppUpdate(appVersion(), false)
+  })
+</script>
+
+<style>
+  /*
+   * 全局样式。
+   *
+   * ⚠️ uvue 的样式限制（2026-09-22 编译时实测到，不是文档推测）：
+   *   · **只支持 class 选择器** —— 写 `page { ... }` 会报
+   *     "Selector `page` is not supported. uvue only support classname selector"，
+   *     所以页面底色统一由 pages.json 的 globalStyle（backgroundColor / backgroundColorContent）负责，
+   *     这里只放 class。
+   *   · `min-height` 只接受 number | pixel，写 `100%` 会报错。
+   */
+
+  .card {
+    background-color: #1a1928;
+    border-radius: 12px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #2a2940;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    color: #ff8fa3;
+    margin-bottom: 6px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #a0a0b0;
+    line-height: 1.6;
+  }
+
+  .btn-primary {
+    background-color: #ff6b81;
+    color: #ffffff;
+    border-radius: 999px;
+    font-size: 14px;
+  }
+
+  .btn-secondary {
+    background-color: #2a2940;
+    color: #d8d8e2;
+    border-radius: 999px;
+    font-size: 14px;
+  }
+</style>

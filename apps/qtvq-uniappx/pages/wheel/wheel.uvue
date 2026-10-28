@@ -1,0 +1,295 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">转盘配对</text>
+      <text class="hint">从真实异性用户里转出一位；每次 ¥{{ priceText }}（会员每日免一次），从缘值扣。</text>
+      <text class="hint" v-if="!needsProfile">候选 {{ candidates.length }} 位 · 第 {{ spins }} 次</text>
+      <text class="hint" v-if="needsProfile">还没有资料：转盘只出异性候选，需要先填「昵称 + 性别」。</text>
+      <button v-if="needsProfile" class="btn-secondary" @click="go('/pages/profile/profile')">去填资料</button>
+    </view>
+
+    <!-- 老虎机形态：中间固定指针，卡片横向滚动停到服务端指定的扇区。
+         为什么不做成圆形转盘：uvue 里做圆形扇区绘制成本高、且"指针与盘同时转"本来就难判读
+         （网页端也特意改成了老虎机形态，理由写在 js/wheel.js 的注释里）。 -->
+    <view class="card reel-card">
+      <view class="marker"></view>
+      <view class="reel" :style="reelStyle">
+        <view class="slot" v-for="(c, idx) in candidates" :key="idx">
+          <image class="avatar" :src="c.avatar" mode="aspectFill" />
+          <text class="slot-name">{{ c.nickname }}</text>
+          <text class="slot-meta">{{ c.meta }}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card">
+      <button class="btn-primary" :disabled="spinning || needsProfile" @click="spin">
+        {{ spinning ? '转动中…' : spinning0 ? '再转一次' : '开始转动' }}
+      </button>
+      <text v-if="statusText.length > 0" class="hint">{{ statusText }}</text>
+    </view>
+
+    <view class="card" v-if="resultName.length > 0">
+      <text class="card-title">本次结果</text>
+      <text class="result-name">{{ resultName }}</text>
+      <text class="hint">初步契合度 {{ resultScore }}</text>
+      <text class="hint">{{ billingText }}</text>
+      <button class="btn-secondary" @click="go('/pages/report/report')">生成配对报告</button>
+      <button class="btn-secondary" @click="goAbuse">举报这个资料</button>
+    </view>
+
+    <view class="card">
+      <text class="card-title">历史转动</text>
+      <view v-if="history.length == 0"><text class="hint">还没有转动记录</text></view>
+      <view class="row" v-for="(h, idx) in history" :key="idx">
+        <text class="row-label">{{ h.name }}</text>
+        <text class="row-value">{{ h.time }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { API_BASE } from '@/utils/api.uts'
+  import { token, isLoggedIn } from '@/utils/session.uts'
+
+  type Candidate = {
+    uid : string
+    nickname : string
+    avatar : string
+    meta : string
+  }
+
+  type HistoryRow = {
+    name : string
+    time : string
+  }
+
+  const candidates = ref<Candidate[]>([])
+  const priceText = ref<string>('1')
+  const spins = ref<number>(0)
+  const needsProfile = ref<boolean>(false)
+  const spinning = ref<boolean>(false)
+  const spinning0 = ref<boolean>(false)
+  const statusText = ref<string>('')
+  const resultName = ref<string>('')
+  const resultScore = ref<string>('')
+  const billingText = ref<string>('')
+  const resultUid = ref<string>('')
+  const offset = ref<number>(0)
+  const slotWidth = 120
+  const history = ref<HistoryRow[]>([])
+
+  /** 位移由"服务端给的目标序号"算出 —— 端侧不含任何随机数决定落点 */
+  function reelStyle() : string {
+    return `transform: translateX(${offset.value}px)`
+  }
+
+  onShow(() => {
+    if (!isLoggedIn()) {
+      statusText.value = '请先登录后再转盘'
+      return
+    }
+    loadCandidates()
+    loadQuote()
+    loadHistory()
+  })
+
+  function req(path : string, method : string, body : UTSJSONObject | null, cb : (data : UTSJSONObject) => void) {
+    uni.request({
+      url: `${API_BASE}${path}`,
+      method: method as RequestMethod,
+      header: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token!}` },
+      data: body,
+      dataType: 'json',
+      timeout: 30000,
+      success: (res) => {
+        const raw = res.data
+        if (raw == null) {
+          statusText.value = '服务端返回为空'
+          return
+        }
+        const body2 : UTSJSONObject = raw as UTSJSONObject
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          const err = body2['error']
+          statusText.value = err != null ? (err as string) : `HTTP ${res.statusCode}`
+          return
+        }
+        const d = body2['data']
+        if (d != null) cb(d as UTSJSONObject)
+      },
+      fail: (err) => {
+        statusText.value = '网络失败：' + err.errMsg
+      },
+    })
+  }
+
+  function loadCandidates() {
+    req('/v1/wheel/candidates?limit=10', 'GET', null, (data : UTSJSONObject) => {
+      const np = data['needsProfile']
+      needsProfile.value = np != null ? (np as boolean) : false
+      const total = data['total']
+      if (total != null) spins.value = total as number
+
+      const raw = data['items']
+      if (raw == null) return
+      const arr : Array<UTSJSONObject> = raw as Array<UTSJSONObject>
+      const list : Candidate[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const o : UTSJSONObject = arr[i]
+        const uid = o['uid']
+        const nick = o['nickname']
+        const avatar = o['avatar']
+        const age = o['age']
+        const city = o['city']
+        let meta : string = ''
+        if (age != null) meta = `${age as number} 岁`
+        if (city != null && (city as string).length > 0) meta = meta.length > 0 ? `${meta} · ${city as string}` : (city as string)
+        list.push({
+          uid: uid != null ? (uid as string) : '',
+          nickname: nick != null ? (nick as string) : 'TA',
+          avatar: avatar != null ? (avatar as string) : '',
+          meta: meta.length > 0 ? meta : '资料未填全',
+        } as Candidate)
+      }
+      candidates.value = list
+    })
+  }
+
+  function loadQuote() {
+    req('/v1/wheel/quote', 'GET', null, (data : UTSJSONObject) => {
+      const p = data['price']
+      if (p != null) priceText.value = (p as number).toFixed(0)
+    })
+  }
+
+  function loadHistory() {
+    req('/v1/wheel/history?limit=10', 'GET', null, (data : UTSJSONObject) => {
+      const raw = data['items']
+      if (raw == null) return
+      const arr : Array<UTSJSONObject> = raw as Array<UTSJSONObject>
+      const rows : HistoryRow[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const o : UTSJSONObject = arr[i]
+        const t = o['target']
+        const c = o['createdAt']
+        let name : string = '—'
+        if (t != null) {
+          const tt : UTSJSONObject = t as UTSJSONObject
+          const nick = tt['nickname']
+          if (nick != null) name = nick as string
+        }
+        rows.push({
+          name: name,
+          time: c != null ? (c as string).substring(0, 16).replace('T', ' ') : '',
+        } as HistoryRow)
+      }
+      history.value = rows
+    })
+  }
+
+  function spin() {
+    if (spinning.value) return
+    if (!isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    spinning.value = true
+    statusText.value = '转动中…'
+    resultName.value = ''
+
+    // 幂等键：重复提交（网络重试）不会重复扣费，服务端会返回上一次结果
+    const key : string = `spin_${Date.now()}`
+    req('/v1/wheel/spin', 'POST', { idempotencyKey: key } as UTSJSONObject, (data : UTSJSONObject) => {
+      const idxRaw = data['targetIndex']
+      const idx : number = idxRaw != null ? (idxRaw as number) : 0
+
+      // 把目标卡片移到中间：左侧留半屏，所以偏移 = 序号 * 卡宽
+      offset.value = -(idx * slotWidth)
+
+      const b = data['billing']
+      if (b != null) {
+        const bb : UTSJSONObject = b as UTSJSONObject
+        const label = bb['label']
+        const charged = bb['charged']
+        let text : string = label != null ? (label as string) : ''
+        if (charged != null && (charged as number) > 0) text = `本次扣除 ¥${(charged as number).toFixed(2)}`
+        billingText.value = text
+      }
+
+      const t = data['target']
+      if (t != null) {
+        const tt : UTSJSONObject = t as UTSJSONObject
+        const nick = tt['nickname']
+        const uid = tt['uid']
+        resultName.value = nick != null ? (nick as string) : 'TA'
+        resultUid.value = uid != null ? (uid as string) : ''
+      }
+      const score = data['score']
+      if (score != null) resultScore.value = `${Math.round((score as number) * 100)}%`
+
+      // 等动画落定再收尾
+      setTimeout(() => {
+        spinning.value = false
+        spinning0.value = true
+        statusText.value = ''
+        loadHistory()
+      }, 2600)
+    })
+  }
+
+  function go(url : string) {
+    uni.navigateTo({ url: url })
+  }
+
+  function goAbuse() {
+    if (resultUid.value.length == 0) {
+      uni.showToast({ title: '请先转一次', icon: 'none' })
+      return
+    }
+    uni.navigateTo({
+      url: `/pages/abuse/abuse?uid=${encodeURIComponent(resultUid.value)}&name=${encodeURIComponent(resultName.value)}`,
+    })
+  }
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .reel-card { padding-top: 20px; padding-bottom: 20px; overflow: hidden; }
+  .marker {
+    width: 100%;
+    height: 2px;
+    background-color: #ff6b81;
+    margin-bottom: 8px;
+  }
+  .reel {
+    flex-direction: row;
+    transition-property: transform;
+    transition-duration: 2500ms;
+    transition-timing-function: ease-out;
+  }
+  .slot {
+    width: 120px;
+    align-items: center;
+  }
+  .avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 12px;
+    background-color: #2a2940;
+  }
+  .slot-name { font-size: 13px; color: #f5f5f7; margin-top: 4px; }
+  .slot-meta { font-size: 11px; color: #a0a0b0; }
+  .result-name { font-size: 18px; color: #ff6b81; }
+  .row {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+  .row-label { font-size: 13px; color: #f5f5f7; }
+  .row-value { font-size: 12px; color: #a0a0b0; }
+</style>

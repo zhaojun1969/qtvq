@@ -1,0 +1,181 @@
+<template>
+  <view class="page">
+    <view class="hero card">
+      <text class="hero-title">Q问</text>
+      <text class="hero-sub">问出爱情真谛</text>
+      <text class="hint">鸿蒙原生版 · {{ platformLabel }}</text>
+    </view>
+
+    <!-- 版本提示：来自「专用端口」的结论（端侧不自己比版本号） -->
+    <view class="card" v-if="updateHint.length > 0">
+      <text class="card-title">版本提示</text>
+      <text class="hint">{{ updateHint }}</text>
+      <button v-if="downloadUrl != null" class="btn-primary" @click="openDownload">去下载新版本</button>
+    </view>
+
+    <view class="card">
+      <text class="card-title">我可以帮你</text>
+      <view class="entry" @click="go('/pages/chat/chat')">
+        <text class="entry-title">问一问</text>
+        <text class="hint">情感问题先问 AI，给可执行的三步方案</text>
+      </view>
+      <view class="entry" @click="goTab('/pages/pitfalls/pitfalls')">
+        <text class="entry-title">避坑大全</text>
+        <text class="hint">网恋/暧昧/冷暴力/彩礼…真实案例与直线做法</text>
+      </view>
+      <view class="entry" @click="go('/pages/wheel/wheel')">
+        <text class="entry-title">转盘配对</text>
+        <text class="hint">从真实异性用户里转出一位（每次 ¥1，会员每日免一次）</text>
+      </view>
+      <view class="entry" @click="go('/pages/report/report')">
+        <text class="entry-title">配对报告</text>
+        <text class="hint">按档位生成深度配对分析（从缘值扣费）</text>
+      </view>
+      <view class="entry" @click="go('/pages/wallet/wallet')">
+        <text class="entry-title">缘值钱包</text>
+        <text class="hint">余额、流水与充值（微信在线支付自动到账）</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <text class="card-title">能力状态</text>
+      <text class="hint">下面这些开关由服务端下发（专用端口），端侧只按结论显示/隐藏，避免出现"点了没反应"的功能。</text>
+      <view class="cap-row">
+        <text class="cap-name">AI 问答</text>
+        <text :class="caps.llm ? 'cap-on' : 'cap-off'">{{ caps.llm ? '可用' : '不可用' }}</text>
+      </view>
+      <view class="cap-row">
+        <text class="cap-name">避坑检索</text>
+        <text :class="caps.rag ? 'cap-on' : 'cap-off'">{{ caps.rag ? '可用' : '不可用' }}</text>
+      </view>
+      <view class="cap-row">
+        <text class="cap-name">语音输入</text>
+        <text :class="caps.voiceInput ? 'cap-on' : 'cap-off'">{{ caps.voiceInput ? '可用' : '不可用' }}</text>
+      </view>
+      <view class="cap-row">
+        <text class="cap-name">微信支付</text>
+        <text :class="caps.payHarmony ? 'cap-on' : 'cap-off'">{{ caps.payHarmony ? '可用' : '未对鸿蒙端开放' }}</text>
+      </view>
+    </view>
+
+    <text class="footer">我心永恒（北京）网络科技有限公司 · qtvq.cn</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { lastHint, lastDownloadUrl, fetchCapabilities } from '@/utils/update.uts'
+
+  const platformLabel = ref<string>('HarmonyOS')
+  const updateHint = ref<string>(lastHint)
+  const downloadUrl = ref<string | null>(lastDownloadUrl)
+
+  /** 能力开关：默认全部 false（拿不到清单时保守处理，而不是假装可用） */
+  const caps = ref<UTSJSONObject>({
+    llm: false,
+    rag: false,
+    voiceInput: false,
+    payHarmony: false,
+  } as UTSJSONObject)
+
+  onShow(() => {
+    // 更新结论可能在本页显示之前才拿到（启动检查是异步的），onShow 时再同步一次
+    updateHint.value = lastHint
+    downloadUrl.value = lastDownloadUrl
+
+    fetchCapabilities((raw : UTSJSONObject) => {
+      const pay = raw['pay']
+      let payHarmony : boolean = false
+      if (pay != null) {
+        const p : UTSJSONObject = pay as UTSJSONObject
+        const v = p['harmony']
+        if (v != null) payHarmony = v as boolean
+      }
+      caps.value = {
+        llm: raw['llm'] != null ? (raw['llm'] as boolean) : false,
+        rag: raw['rag'] != null ? (raw['rag'] as boolean) : false,
+        voiceInput: raw['voiceInput'] != null ? (raw['voiceInput'] as boolean) : false,
+        payHarmony: payHarmony,
+      } as UTSJSONObject
+    })
+  })
+
+  function go(url : string) {
+    uni.navigateTo({ url: url })
+  }
+
+  /** tabBar 页面必须用 switchTab，用 navigateTo 会失败（这是 uni-app 的硬规则） */
+  function goTab(url : string) {
+    uni.switchTab({ url: url })
+  }
+
+  function openDownload() {
+    const url : string | null = downloadUrl.value
+    if (url == null) return
+    uni.openURL({ url: url })
+  }
+</script>
+
+<style>
+  .page {
+    padding: 12px;
+    background-color: #0f0e17;
+    }
+
+  .hero {
+    align-items: center;
+    padding: 20px 12px;
+  }
+
+  .hero-title {
+    font-size: 30px;
+    color: #ff6b81;
+    font-weight: bold;
+  }
+
+  .hero-sub {
+    font-size: 13px;
+    color: #a0a0b0;
+    margin-top: 4px;
+  }
+
+  .entry {
+    padding: 10px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+
+  .entry-title {
+    font-size: 15px;
+    color: #f5f5f7;
+  }
+
+  .cap-row {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+
+  .cap-name {
+    font-size: 13px;
+    color: #d8d8e2;
+  }
+
+  .cap-on {
+    font-size: 13px;
+    color: #7bed9f;
+  }
+
+  .cap-off {
+    font-size: 13px;
+    color: #a0a0b0;
+  }
+
+  .footer {
+    font-size: 11px;
+    color: #707080;
+    text-align: center;
+    margin-top: 12px;
+  }
+</style>

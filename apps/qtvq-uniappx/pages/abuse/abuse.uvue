@@ -1,0 +1,164 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">举报</text>
+      <text class="hint">
+        举报会提交给运营人工核实。请描述具体情况（涉黄赌毒诈、引流、骚扰等）。
+        恶意举报也会被记录。
+      </text>
+      <text class="hint" v-if="targetName.length > 0">举报对象：{{ targetName }}</text>
+      <text class="hint" v-else>未指定对象：请从配对报告页进入本页</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">举报原因（必选）</text>
+      <!-- 原因必须从服务端白名单里选：自由文本会被 400 E_BAD_REASON 拒绝（这是踩过的坑） -->
+      <view class="reasons">
+        <text
+          v-for="(r, idx) in reasons"
+          :key="idx"
+          :class="idx == reasonIndex ? 'chip-on' : 'chip'"
+          @click="reasonIndex = idx"
+        >{{ r }}</text>
+      </view>
+      <text class="card-title">补充说明（选填，最多 500 字）</text>
+      <textarea v-model="detail" class="input-area" placeholder="例如：资料里留微信号引导加好友" :maxlength="500" />
+      <button class="btn-primary" :disabled="sending" @click="submit">{{ sending ? '提交中…' : '提交举报' }}</button>
+      <text v-if="msg.length > 0" class="hint">{{ msg }}</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">我的举报记录</text>
+      <view v-if="mine.length == 0"><text class="hint">还没有举报记录</text></view>
+      <view class="mine" v-for="(m, idx) in mine" :key="idx">
+        <text class="mine-reason">{{ m.reason }}</text>
+        <text class="mine-status">{{ m.status }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { submitReport, get, API_BASE } from '@/utils/api.uts'
+  import { token, isLoggedIn } from '@/utils/session.uts'
+
+  type MineRow = {
+    reason : string
+    status : string
+  }
+
+  /** 举报原因白名单：必须与 server/src/services/moderation.js 的 REPORT_REASONS 完全一致 */
+  const reasons = ref<string[]>(['涉黄', '广告', '诈骗', '辱骂', '头像违规', '虚假资料', '其他'])
+  const reasonIndex = ref<number>(0)
+  const detail = ref<string>('')
+  const sending = ref<boolean>(false)
+  const msg = ref<string>('')
+  const mine = ref<MineRow[]>([])
+  const targetUid = ref<string>('')
+  const targetName = ref<string>('')
+
+  onLoad((options : OnLoadOptions) => {
+    const uid = options['uid']
+    const name = options['name']
+    if (uid != null) targetUid.value = decodeURIComponent(uid as string)
+    if (name != null) targetName.value = decodeURIComponent(name as string)
+    loadMine()
+  })
+
+  function statusText(s : string) : string {
+    if (s == 'pending') return '待审核'
+    if (s == 'approved') return '已处理'
+    if (s == 'rejected') return '未通过'
+    return s
+  }
+
+  function loadMine() {
+    if (!isLoggedIn()) return
+    get('/v1/moderation/mine?limit=20', token, (data : UTSJSONObject) => {
+      const raw = data['items']
+      if (raw == null) return
+      const arr : Array<UTSJSONObject> = raw as Array<UTSJSONObject>
+      const rows : MineRow[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const o : UTSJSONObject = arr[i]
+        const r = o['reason']
+        const s = o['status']
+        rows.push({
+          reason: r != null ? (r as string) : '—',
+          status: statusText(s != null ? (s as string) : ''),
+        } as MineRow)
+      }
+      mine.value = rows
+    }, (_ : string) => {})
+  }
+
+  function submit() {
+    if (!isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    if (targetUid.value.length == 0) {
+      uni.showToast({ title: '缺少举报对象：请从报告页进入', icon: 'none' })
+      return
+    }
+    sending.value = true
+    msg.value = ''
+    submitReport(targetUid.value, reasons.value[reasonIndex.value], detail.value.trim(), token,
+      (data : UTSJSONObject) => {
+        sending.value = false
+        const dup = data['duplicate']
+        msg.value = (dup != null && (dup as boolean)) ? '今天已经举报过这个对象了' : '举报已提交，运营会尽快核实'
+        detail.value = ''
+        loadMine()
+      },
+      (err : string) => {
+        sending.value = false
+        msg.value = err
+      })
+  }
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .reasons { flex-direction: row; flex-wrap: wrap; margin: 6px 0; }
+  .chip {
+    padding: 6px 12px;
+    margin: 0 6px 6px 0;
+    background-color: #2a2940;
+    color: #d8d8e2;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  .chip-on {
+    padding: 6px 12px;
+    margin: 0 6px 6px 0;
+    background-color: #ff6b81;
+    color: #ffffff;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  .input-area {
+    width: 100%;
+    height: 90px;
+    background-color: #0f0e17;
+    color: #f5f5f7;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #2a2940;
+    border-radius: 8px;
+    padding: 8px;
+    margin: 6px 0;
+    font-size: 14px;
+  }
+  .mine {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+  .mine-reason { font-size: 13px; color: #f5f5f7; }
+  .mine-status { font-size: 12px; color: #a0a0b0; }
+</style>

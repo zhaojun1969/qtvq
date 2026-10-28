@@ -1,0 +1,14 @@
+# uni-app x 工程（鸿蒙原生）
+# 编译产物与依赖不提交：unpackage 是 HBuilderX 的构建输出（含 .hap、生成的鸿蒙工程，
+# 体积几十 MB 且每次编译都会变），oh_modules 是鸿蒙依赖。
+
+unpackage/
+oh_modules/
+node_modules/
+.hvigor/
+build/
+*.hap
+*.app
+
+# HBuilderX 的本地状态
+.hbuilderx/

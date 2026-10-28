@@ -1,0 +1,20 @@
+{
+  /*
+    鸿蒙工程覆盖配置 —— 这个目录里的文件会在构建时**覆盖自动生成的鸿蒙工程**同名文件。
+    参考：https://uniapp.dcloud.net.cn/tutorial/harmony/runbuild.html#config-dir
+
+    为什么必须放这里而不是 manifest.json：
+      2026-09-22 实测 —— manifest.json 里写 `app-harmony.distribute.bundleName` 后，
+      生成的 `AppScope/app.json5` 仍然是 uni-app x 的默认包名 `io.dcloud.uniappx`，
+      构建日志也提示"未正确配置鸿蒙应用的包名"。包名是**上架标识且不可重复**，
+      必须用 harmony-configs 覆盖才生效。
+  */
+  "app": {
+    "bundleName": "cn.qtvq.harmony",
+    "vendor": "qtvq",
+    "versionCode": 106,
+    "versionName": "1.0.6",
+    "icon": "$media:layered_image",
+    "label": "$string:app_name"
+  }
+}

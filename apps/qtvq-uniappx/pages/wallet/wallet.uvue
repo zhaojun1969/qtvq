@@ -1,0 +1,316 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <text class="card-title">缘值钱包</text>
+      <text class="balance">¥{{ balanceText }}</text>
+      <text class="hint">缘值用于配对报告与转盘扣费；会员费不含缘值，两笔钱互不通用。</text>
+      <text class="hint">{{ memberText }}</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">充值（微信在线支付 · 自动到账）</text>
+      <text class="hint">¥1 – ¥2000。付款成功后缘值自动加上，不需要联系客服。</text>
+      <input v-model="amount" class="input" type="number" placeholder="充值金额" />
+      <view class="presets">
+        <text class="preset" @click="pick('10')">¥10</text>
+        <text class="preset" @click="pick('30')">¥30</text>
+        <text class="preset" @click="pick('50')">¥50</text>
+        <text class="preset" @click="pick('100')">¥100</text>
+      </view>
+      <button class="btn-primary" :disabled="paying" @click="recharge">{{ paying ? '创建订单中…' : '微信支付' }}</button>
+      <text v-if="payMsg.length > 0" :class="payPaid ? 'pay-ok' : 'hint'">{{ payMsg }}</text>
+      <text class="hint">充值的钱只进缘值，不会开通会员；开通会员请到账户页。</text>
+    </view>
+
+    <view class="card">
+      <text class="card-title">流水（最近 {{ ledger.length }} 笔）</text>
+      <view v-if="ledger.length == 0"><text class="hint">还没有流水记录</text></view>
+      <view class="ledger" v-for="(l, idx) in ledger" :key="idx">
+        <view class="ledger-left">
+          <text class="ledger-reason">{{ l.reason }}</text>
+          <text class="ledger-time">{{ l.time }}</text>
+        </view>
+        <text :class="l.amount > 0 ? 'amount-in' : 'amount-out'">{{ l.amount > 0 ? '+' : '' }}{{ l.amount.toFixed(2) }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+  import { ref } from 'vue'
+  import { fetchWallet, fetchWalletLedger, post } from '@/utils/api.uts'
+  import { token, clientId, isLoggedIn } from '@/utils/session.uts'
+
+  type LedgerRow = {
+    reason : string
+    time : string
+    amount : number
+  }
+
+  const balanceText = ref<string>('0.00')
+  const memberText = ref<string>('未开通会员')
+  const amount = ref<string>('10')
+  const paying = ref<boolean>(false)
+  const payPaid = ref<boolean>(false)
+  const payMsg = ref<string>('')
+  const ledger = ref<LedgerRow[]>([])
+
+  /** 与后端 reason 枚举对应；未知原因原样显示，便于发现新增类型 */
+  function reasonText(reason : string) : string {
+    if (reason == 'topup') return '缘值充值'
+    if (reason == 'admin_credit') return '人工入账'
+    if (reason == 'wheel_spin' || reason == 'member_daily_spin') return '转盘'
+    if (reason == 'report_charge' || reason == 'member_daily_free' || reason == 'free_tier') return '配对报告'
+    if (reason == 'refund') return '退款回冲'
+    return reason.length > 0 ? reason : '—'
+  }
+
+  onShow(() => {
+    if (!isLoggedIn()) {
+      payMsg.value = '请先登录后再查看缘值'
+      return
+    }
+    load()
+  })
+
+  function pick(v : string) {
+    amount.value = v
+  }
+
+  function load() {
+    fetchWallet(token, (data : UTSJSONObject) => {
+      const w = data['wallet']
+      if (w != null) {
+        const wallet : UTSJSONObject = w as UTSJSONObject
+        const bal = wallet['balance']
+        if (bal != null) balanceText.value = (bal as number).toFixed(2)
+      }
+      const m = data['membership']
+      if (m != null) {
+        const mm : UTSJSONObject = m as UTSJSONObject
+        const active = mm['active']
+        memberText.value = (active != null && (active as boolean)) ? '会员生效中' : '当前不是会员'
+      }
+    }, (msg : string) => {
+      payMsg.value = msg
+    })
+
+    fetchWalletLedger(token, 50, (data : UTSJSONObject) => {
+      const raw = data['items']
+      if (raw == null) return
+      const arr : Array<UTSJSONObject> = raw as Array<UTSJSONObject>
+      const rows : LedgerRow[] = []
+      for (let i = 0; i < arr.length; i++) {
+        const o : UTSJSONObject = arr[i]
+        const r = o['reason']
+        const a = o['amount']
+        const c = o['createdAt']
+        rows.push({
+          reason: reasonText(r != null ? (r as string) : ''),
+          time: c != null ? (c as string).substring(0, 16).replace('T', ' ') : '',
+          amount: a != null ? (a as number) : 0,
+        } as LedgerRow)
+      }
+      ledger.value = rows
+    }, (_ : string) => {})
+  }
+
+  /**
+   * 充值下单：与网页端同一条链路（plan=topup + uid），付款后服务端自动入账。
+   *
+   * 三种结果都要有出路（不出现"点了没反应"）：
+   *   ① 返回 orderInfo → 调 `uni.requestPayment` 直接拉起微信（鸿蒙 4.61+ 支持）；
+   *   ② 返回 stub 且带原因（例如未配「微信开放平台移动应用」appid）→ 显示原因，
+   *      并退回扫码支付（向服务端要 native 二维码链接）；
+   *   ③ 参数/网络错误 → 显示服务端原话。
+   */
+  function recharge() {
+    if (!isLoggedIn()) {
+      uni.showToast({ title: '请先登录后再充值', icon: 'none' })
+      return
+    }
+    const n : number = parseFloat(amount.value)
+    if (isNaN(n) || n < 1 || n > 2000) {
+      uni.showToast({ title: '充值金额需在 ¥1 – ¥2000 之间', icon: 'none' })
+      return
+    }
+    paying.value = true
+    payMsg.value = ''
+    payPaid.value = false
+
+    const body : UTSJSONObject = {
+      clientId: clientId(),
+      plan: 'topup',
+      amount: n,
+      // App 端用 app 渠道：服务端走 trade_type=APP，返回 orderInfo
+      channel: 'app',
+      uid: uidOrNull(),
+    }
+    post('/api/payment/wechat/create', body, token, (data : UTSJSONObject) => {
+      const err = data['error']
+      if (err != null) {
+        paying.value = false
+        payMsg.value = err as string
+        return
+      }
+      const orderInfo = data['orderInfo']
+      const orderId = data['orderId']
+      if (orderInfo != null && (orderInfo as string).length > 0) {
+        requestWechatPay(orderInfo as string, orderId != null ? (orderId as string) : '')
+        return
+      }
+      const msg = data['message']
+      payMsg.value = msg != null ? (msg as string) : '当前无法直接拉起微信支付'
+      paying.value = false
+      startQrFallback(n)
+    }, (msg : string) => {
+      paying.value = false
+      payMsg.value = msg
+    })
+  }
+
+  /** 拉起微信支付；成功后轮询订单状态（到账由服务端确认，端侧不自行判定） */
+  function requestWechatPay(orderInfo : string, orderId : string) {
+    uni.requestPayment({
+      provider: 'wxpay',
+      orderInfo: orderInfo,
+      success: () => {
+        payMsg.value = '支付完成，正在确认到账…'
+        pollForPaid(orderId, 0)
+      },
+      fail: (err) => {
+        paying.value = false
+        payMsg.value = '未完成支付：' + err.errMsg
+      },
+    } as RequestPaymentOptions)
+  }
+
+  /**
+   * 轮询订单是否已支付（最多 10 次 × 3 秒）。
+   * 为什么必须轮询：微信回调可能比客户端返回晚；不轮询用户会觉得"付了没反应"。
+   */
+  function pollForPaid(orderId : string, attempt : number) {
+    if (orderId.length == 0) {
+      paying.value = false
+      return
+    }
+    if (attempt >= 10) {
+      paying.value = false
+      payMsg.value = '支付结果确认超时：若已扣款，缘值会稍后自动到账（可下拉刷新查看）'
+      return
+    }
+    setTimeout(() => {
+      const url : string = `/api/payment/wechat/query?orderId=${encodeURIComponent(orderId)}&clientId=${encodeURIComponent(clientId())}`
+      uni.request({
+        url: url,
+        method: 'GET',
+        dataType: 'json',
+        timeout: 15000,
+        success: (res) => {
+          const raw = res.data
+          if (raw == null) {
+            pollForPaid(orderId, attempt + 1)
+            return
+          }
+          const body : UTSJSONObject = raw as UTSJSONObject
+          const order = body['order']
+          if (order != null) {
+            const o : UTSJSONObject = order as UTSJSONObject
+            const st = o['status']
+            if (st != null && (st as string) == 'paid') {
+              paying.value = false
+              payPaid.value = true
+              payMsg.value = '✓ 支付成功，缘值已到账'
+              uni.showToast({ title: '充值成功', icon: 'success' })
+              load()
+              return
+            }
+          }
+          pollForPaid(orderId, attempt + 1)
+        },
+        fail: (_) => pollForPaid(orderId, attempt + 1),
+      })
+    }, 3000)
+  }
+
+  /** 退回扫码支付：向服务端要 native 二维码链接，复制给用户去微信扫 */
+  function startQrFallback(n : number) {
+    const body : UTSJSONObject = {
+      clientId: clientId(),
+      plan: 'topup',
+      amount: n,
+      channel: 'native',
+      uid: uidOrNull(),
+    }
+    post('/api/payment/wechat/create', body, token, (data : UTSJSONObject) => {
+      paying.value = false
+      const codeUrl = data['codeUrl']
+      if (codeUrl != null && (codeUrl as string).length > 0) {
+        uni.setClipboardData({
+          data: codeUrl as string,
+          success: (_) => {
+            uni.showToast({ title: '支付链接已复制，请在微信中打开', icon: 'none' })
+          },
+        })
+        payMsg.value = payMsg.value + '\n已复制支付链接：在微信里打开它即可完成付款。'
+      } else {
+        const m = data['message']
+        payMsg.value = payMsg.value + (m != null ? `\n${m as string}` : '\n扫码支付暂不可用，请用网页版 qtvq.cn 充值。')
+      }
+    }, (msg : string) => {
+      paying.value = false
+      payMsg.value = msg
+    })
+  }
+
+  /** 服务端钱包的 uid 就是登录用户的 id（Pages 与 Node 复用同一个 uid） */
+  function uidOrNull() : string | null {
+    const u = uni.getStorageSync('qtvq_user')
+    if (u == null) return null
+    const obj : UTSJSONObject = u as UTSJSONObject
+    const id = obj['id']
+    return id != null ? (id as string) : null
+  }
+</script>
+
+<style>
+  .page { padding: 12px; background-color: #0f0e17; }
+  .balance { font-size: 30px; color: #ff6b81; font-weight: bold; margin: 6px 0; }
+  .input {
+    height: 42px;
+    background-color: #0f0e17;
+    color: #f5f5f7;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #2a2940;
+    border-radius: 8px;
+    padding: 0 8px;
+    margin: 6px 0;
+    font-size: 15px;
+  }
+  .presets { flex-direction: row; justify-content: space-between; margin: 6px 0; }
+  .preset {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    margin-right: 6px;
+    background-color: #2a2940;
+    color: #d8d8e2;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .ledger {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #2a2940;
+  }
+  .ledger-left { flex-direction: column; }
+  .ledger-reason { font-size: 14px; color: #f5f5f7; }
+  .ledger-time { font-size: 11px; color: #a0a0b0; }
+  .amount-in { font-size: 15px; color: #7bed9f; }
+  .pay-ok { font-size: 13px; color: #7bed9f; line-height: 1.7; }
+  .amount-out { font-size: 15px; color: #ff8a8a; }
+</style>

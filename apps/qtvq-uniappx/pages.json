@@ -1,0 +1,102 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "Q问",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/chat/chat",
+      "style": {
+        "navigationBarTitleText": "问一问",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/pitfalls/pitfalls",
+      "style": {
+        "navigationBarTitleText": "避坑大全",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/wheel/wheel",
+      "style": {
+        "navigationBarTitleText": "转盘配对",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },    {
+      "path": "pages/report/report",
+      "style": {
+        "navigationBarTitleText": "配对报告",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/wallet/wallet",
+      "style": {
+        "navigationBarTitleText": "缘值钱包",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/profile/profile",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/account/account",
+      "style": {
+        "navigationBarTitleText": "我的账户",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/abuse/abuse",
+      "style": {
+        "navigationBarTitleText": "举报",
+        "navigationBarBackgroundColor": "#0f0e17",
+        "navigationBarTextStyle": "white"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "我心永恒 Q问",
+    "navigationBarBackgroundColor": "#0f0e17",
+    "backgroundColor": "#0f0e17",
+    "backgroundColorContent": "#0f0e17"
+  },
+  "tabBar": {
+    "color": "#a0a0b0",
+    "selectedColor": "#ff6b81",
+    "backgroundColor": "#1a1928",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "Q问"
+      },
+      {
+        "pagePath": "pages/pitfalls/pitfalls",
+        "text": "避坑"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  }
+}

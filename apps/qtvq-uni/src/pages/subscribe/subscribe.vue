@@ -18,11 +18,29 @@
     </view>
 
     <view class="card pay-online-card">
+      <!-- 动态在线支付卡。
+           2026-10-11 修正：这里原来只写 `#ifdef MP-WEIXIN`，于是 **H5 与桌面壳的会员页整张卡被剪掉**，
+           桌面端只剩静态收款码 —— 用户付了钱不会自动到账、系统里也查不到记录（业务方实测两次）。
+           H5/App 与网页端一样有能力走"下单 → 二维码 → 轮询自动到账"，所以放宽到这三个平台。
+           JSAPI（直接扣款）只有微信小程序能做，用**运行时判断** canJsapi 门控而不是嵌套 ifdef ——
+           uni-app **不支持嵌套条件编译**：先前在外层 ifdef 里嵌套了一层 MP-WEIXIN，内层被静默忽略，
+           结果 H5/桌面端也渲染了它，而它调用 uni.login/uni.requestPayment 在 H5 上必然失败。 -->
+      <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
       <text class="section-title">微信在线支付（自动到账）</text>
-      <text class="hint pay-hint">生成专属订单码，支付成功后自动开通，无需人工核实。</text>
-      <button class="btn-primary btn-block" :disabled="onlineLoading" @click="startOnlinePay">
-        {{ onlineLoading ? '创建订单中…' : '微信在线支付' }}
+      <text class="hint pay-hint form-readable">支付成功后自动开通，无需人工核实。</text>
+      <button v-if="canJsapi" class="btn-primary btn-block" :disabled="onlineLoading" @click="startWalletPay">
+        {{ onlineLoading ? '创建订单中…' : `微信支付 ¥${selectedPrice}（直接扣款）` }}
       </button>
+      <button class="btn-secondary btn-block btn-outline" :disabled="onlineLoading" @click="startQrPay">
+        扫码支付（二维码，可选）
+      </button>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
+      <text class="section-title">办理会员</text>
+      <text class="hint pay-hint form-readable">
+        界面与微信小程序一致：请使用下方静态收款码或对公汇款，提交核实后开通（月卡 ¥29 / 季卡 ¥79 / 年卡 ¥299）。
+      </text>
+      <!-- #endif -->
     </view>
 
     <view class="card">
@@ -50,16 +68,21 @@
       <button class="btn-secondary btn-block" @click="copyBank">复制账号</button>
     </view>
 
-    <view id="payment-form" class="card">
-      <text class="section-title">提交汇款核实</text>
-      <text class="hint pay-hint">扫码或对公汇款后填写，便于核对开通会员。</text>
-      <input v-model="form.payerName" class="field" placeholder="汇款人姓名" />
-      <input v-model="form.amount" class="field" type="digit" placeholder="汇款金额（元）" />
-      <input v-model="form.remark" class="field" placeholder="备注 / 设备编号" />
-      <button class="btn-primary btn-block" :disabled="submitting" @click="submit">我已汇款，提交核实</button>
+    <view id="payment-form" class="card form-card">
+      <text class="section-title form-section-title">提交汇款核实</text>
+      <text class="hint pay-hint form-readable">扫码或对公汇款后填写以下信息，便于核对开通会员。</text>
+      <text class="form-label">汇款人姓名</text>
+      <input v-model="form.payerName" class="field field-lg" placeholder="请填写汇款人姓名" />
+      <text class="form-label">汇款金额（元）</text>
+      <input v-model="form.amount" class="field field-lg" type="digit" placeholder="请按所选套餐金额填写" />
+      <text class="form-label">备注 / 设备编号</text>
+      <input v-model="form.remark" class="field field-lg" placeholder="建议填写设备编号" />
+      <button class="btn-primary btn-block btn-lg" :disabled="submitting" @click="submit">
+        {{ submitting ? '提交中…' : '我已汇款，提交核实' }}
+      </button>
     </view>
 
-    <text class="legal">收款方：我心永恒（北京）网络科技有限公司。核实到账后开通会员。</text>
+    <text class="legal legal-lg">收款方：我心永恒（北京）网络科技有限公司。核实到账后开通会员。</text>
 
     <view v-if="viewerOpen" class="pay-viewer" @click="closePayViewer">
       <view class="pay-viewer-box" @click.stop>
@@ -79,6 +102,12 @@
           show-menu-by-longpress
           @click="previewViewerImage"
         />
+        <!-- 二维码本地绘制的画布：位置移出可视区，仅用于生成图片 -->
+        <canvas
+          canvas-id="payQrCanvas"
+          id="payQrCanvas"
+          class="pay-qr-canvas"
+        />
         <text class="pay-viewer-tip">{{ viewerTip }}</text>
         <view class="pay-viewer-actions">
           <button class="btn-secondary btn-sm" @click="closePayViewer">关闭</button>
@@ -93,14 +122,55 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { PLANS } from '../../data/constants.js';
-import { PAY_CHANNELS } from '../../data/pay-channels.js';
+import { PAY_CHANNELS, channelTip } from '../../data/pay-channels.js';
 import { fetchPaymentInfo, submitPayment } from '../../api/quota.js';
 import { createWechatPayOrder, pollWechatPayOrder } from '../../api/payment-wechat.js';
-import { qrCodeImageUrl } from '../../utils/qr-render.js';
+import { wechatLoginCode } from '../../api/auth.js';
+import { qrMatrix, drawQrToCanvas } from '../../utils/qr-render.js';
+// JSAPI（直接扣款）只有微信小程序可用 —— 用运行时判断给按钮做门控（见模板里的说明）
+import { supportsWechatJsapiPay } from '../../utils/platform.js';
+
+/**
+ * 把订单码画到隐藏 canvas 并导出临时图片路径。
+ * 小程序没有 DOM canvas，必须走 canvas → canvasToTempFilePath 这条路；
+ * 导出后仍用 <image :src> 显示，页面其它逻辑无需改动。
+ */
+function drawOrderQr(codeUrl, size = 280) {
+  return new Promise((resolve, reject) => {
+    let matrix;
+    try {
+      matrix = qrMatrix(codeUrl);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    const ctx = uni.createCanvasContext('payQrCanvas');
+    drawQrToCanvas(ctx, matrix, size);
+    ctx.draw(false, () => {
+      uni.canvasToTempFilePath(
+        {
+          canvasId: 'payQrCanvas',
+          x: 0,
+          y: 0,
+          width: size,
+          height: size,
+          destWidth: size * 2,
+          destHeight: size * 2,
+          success: (res) => resolve(res.tempFilePath),
+          fail: (err) => reject(new Error(err?.errMsg || '二维码导出失败')),
+        },
+      );
+    });
+  });
+}
+
 import { getClientId } from '../../utils/clientId.js';
+import { track } from '../../utils/track.js';
 
 const plans = PLANS;
 const payChannels = PAY_CHANNELS;
+/** 能否走"直接扣款"（JSAPI）：仅微信小程序为 true；H5/App/其它小程序为 false */
+const canJsapi = supportsWechatJsapiPay();
 const selected = ref('month');
 const company = ref(null);
 const submitting = ref(false);
@@ -117,6 +187,30 @@ const clientId = ref('');
 const form = ref({ payerName: '', amount: '', remark: '' });
 let stopPoll = null;
 
+/**
+ * 会员开通成功的埋点出口。
+ *
+ * 会员单同样落在服务端 `orders` 集合，营收/付费用户**只认 `orders`**；
+ * `membership_purchase` 只表示「客户端看到一次开通成功」，与看板不叠加。
+ * 按订单号去重：扫码与直接扣款是两条独立轮询，同一单不能记两次。
+ */
+const paidTracked = new Set();
+function trackMembershipPaid(orderId, via) {
+  const key = orderId || `no-order:${selected.value}`;
+  if (paidTracked.has(key)) return;
+  paidTracked.add(key);
+  try {
+    track('membership_purchase', {
+      plan: selected.value,
+      price: selectedPrice.value,
+      via,
+      orderId,
+    });
+  } catch {
+    /* 埋点永不打断主流程 */
+  }
+}
+
 const selectedPrice = computed(() => plans.find((p) => p.id === selected.value)?.price || 29);
 
 function selectPlan(id) {
@@ -128,7 +222,7 @@ function openPayViewer(ch) {
   stopPolling();
   viewerMode.value = 'static';
   viewerTitle.value = `${ch.label} · 扫码付款`;
-  viewerTip.value = ch.tip;
+  viewerTip.value = channelTip(ch.id, selectedPrice.value);
   viewerImage.value = ch.image;
   viewerOrderId.value = '';
   viewerStatus.value = '';
@@ -136,7 +230,7 @@ function openPayViewer(ch) {
   viewerOpen.value = true;
 }
 
-function openOnlineViewer(data) {
+function openOnlineViewer(data, mode = 'qr') {
   stopPolling();
   viewerMode.value = 'online';
   viewerOrderId.value = data.orderId || '';
@@ -151,24 +245,27 @@ function openOnlineViewer(data) {
     return;
   }
 
+  if (mode === 'wallet' && data.jsapi) {
+    invokeMiniProgramPay(data.jsapi, data.orderId);
+    return;
+  }
+
   viewerTitle.value = '微信在线支付 · 扫码付款';
   viewerTip.value = '请用微信扫一扫；支付成功后自动开通会员。';
-  viewerImage.value = data.codeUrl ? qrCodeImageUrl(data.codeUrl, 280) : '';
-  viewerStatus.value = '等待支付中…';
+  viewerStatus.value = data.codeUrl ? '等待支付中…' : '未获取到二维码，请重试或改用直接扣款';
   viewerOpen.value = true;
-
-  if (data.jsapi) {
-    uni.requestPayment({
-      provider: 'wxpay',
-      timeStamp: data.jsapi.timeStamp,
-      nonceStr: data.jsapi.nonceStr,
-      package: data.jsapi.package,
-      signType: data.jsapi.signType || 'RSA',
-      paySign: data.jsapi.paySign,
-      fail: () => {
-        /* 用户取消则继续展示二维码 */
-      },
-    });
+  // 二维码改为**本地绘制**：小程序不能像网页那样把订单码交给境外图片服务（国内加载不出来，
+  // 而且小程序对境外域名有额外限制）。这里画到隐藏 canvas 再导出临时图片，
+  // 后面的 <image :src> 与预览逻辑完全不用改。
+  viewerImage.value = '';
+  if (data.codeUrl) {
+    drawOrderQr(data.codeUrl)
+      .then((path) => {
+        if (path) viewerImage.value = path;
+      })
+      .catch(() => {
+        viewerStatus.value = '二维码生成失败，请重试';
+      });
   }
 
   if (data.orderId) {
@@ -177,9 +274,44 @@ function openOnlineViewer(data) {
         viewerStatus.value = '✓ 支付成功，会员已开通';
         viewerPaid.value = true;
         uni.showToast({ title: '会员已开通', icon: 'success' });
+        trackMembershipPaid(data.orderId, 'qr');
       },
     });
   }
+}
+
+function invokeMiniProgramPay(jsapi, orderId) {
+  if (orderId) {
+    stopPoll = pollWechatPayOrder(orderId, {
+      onPaid: () => {
+        uni.showToast({ title: '会员已开通', icon: 'success' });
+        trackMembershipPaid(orderId, 'jsapi');
+      },
+    });
+  }
+  uni.requestPayment({
+    provider: 'wxpay',
+    timeStamp: jsapi.timeStamp,
+    nonceStr: jsapi.nonceStr,
+    package: jsapi.package,
+    signType: jsapi.signType || 'RSA',
+    paySign: jsapi.paySign,
+    success: () => {
+      uni.showToast({ title: '支付成功', icon: 'success' });
+    },
+    fail: (err) => {
+      const cancelled = err?.errMsg?.includes('cancel');
+      uni.showModal({
+        title: cancelled ? '已取消支付' : '支付未完成',
+        content: cancelled ? '您可点「扫码支付」改用二维码，或稍后再试。' : '请重试直接扣款，或改用扫码支付。',
+        confirmText: '扫码支付',
+        cancelText: '知道了',
+        success: (res) => {
+          if (res.confirm) startQrPay();
+        },
+      });
+    },
+  });
 }
 
 function stopPolling() {
@@ -199,14 +331,32 @@ function previewViewerImage() {
   uni.previewImage({ urls: [viewerImage.value] });
 }
 
-async function startOnlinePay() {
+async function startWalletPay() {
+  onlineLoading.value = true;
+  try {
+    const code = await wechatLoginCode();
+    const data = await createWechatPayOrder(selected.value, 'jsapi', { code });
+    if (data.stub && !data.jsapi) {
+      uni.showToast({ title: data.message || '在线支付未配置', icon: 'none' });
+      openOnlineViewer(data, 'qr');
+      return;
+    }
+    openOnlineViewer(data, 'wallet');
+  } catch (e) {
+    uni.showToast({ title: e.message || '创建订单失败', icon: 'none' });
+  } finally {
+    onlineLoading.value = false;
+  }
+}
+
+async function startQrPay() {
   onlineLoading.value = true;
   try {
     const data = await createWechatPayOrder(selected.value, 'native');
     if (data.stub && !data.codeUrl) {
       uni.showToast({ title: data.message || '在线支付未配置', icon: 'none' });
     }
-    openOnlineViewer(data);
+    openOnlineViewer(data, 'qr');
   } catch (e) {
     uni.showToast({ title: e.message || '创建订单失败', icon: 'none' });
   } finally {
@@ -291,6 +441,9 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+/* 二维码绘制用画布：移出可视区，避免占用版面 */
+.pay-qr-canvas { position: fixed; left: -9999px; top: 0; width: 280px; height: 280px; }
+
 .page {
   padding: 24rpx;
   padding-bottom: 48rpx;
@@ -300,13 +453,13 @@ onUnmounted(() => {
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #ff8fa3;
+  color: $color-pink-light;
 }
 
 .hint {
   display: block;
   font-size: 24rpx;
-  color: #a0a0b0;
+  color: $color-text-muted;
   margin-top: 12rpx;
   line-height: 1.5;
 }
@@ -329,7 +482,7 @@ onUnmounted(() => {
 }
 
 .plan-active {
-  border-color: #ff6b81;
+  border-color: $color-pink;
   background: rgba(255, 107, 129, 0.12);
 }
 
@@ -342,14 +495,14 @@ onUnmounted(() => {
   display: block;
   font-size: 32rpx;
   font-weight: 700;
-  color: #ff6b81;
+  color: $color-pink;
   margin-top: 8rpx;
 }
 
 .section-title {
   display: block;
   font-size: 28rpx;
-  color: #ff8fa3;
+  color: $color-pink-light;
   margin-bottom: 16rpx;
 }
 
@@ -375,29 +528,83 @@ onUnmounted(() => {
 .pay-label {
   display: block;
   font-size: 24rpx;
-  color: #c8c8d8;
+  color: $color-text-soft;
   margin-top: 8rpx;
 }
 
 .bank-line {
   display: block;
   font-size: 26rpx;
-  color: #c8c8d8;
+  color: $color-text-soft;
   margin-bottom: 8rpx;
   line-height: 1.5;
 }
 
-.field {
+.form-card {
+  padding-bottom: 8rpx;
+}
+
+.form-section-title {
+  font-size: 32rpx;
+  margin-bottom: 12rpx;
+}
+
+.form-readable {
+  font-size: 28rpx;
+  color: $color-text-soft;
+  line-height: 1.6;
+}
+
+.form-label {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $color-text;
+  margin-bottom: 12rpx;
+  margin-top: 8rpx;
+}
+
+.field,
+.field-lg {
+  display: block;
   width: 100%;
-  background: #0f0e17;
+  box-sizing: border-box;
+  margin-bottom: 16rpx;
+  padding: 0 24rpx;
+  background: $color-bg;
   border: 1rpx solid rgba(108, 92, 231, 0.4);
   border-radius: 12rpx;
-  padding: 20rpx;
-  color: #f5f5f7;
-  font-size: 28rpx;
-  margin-bottom: 16rpx;
-  box-sizing: border-box;
+  color: $color-text;
 }
+
+.field {
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 28rpx;
+}
+
+.field-lg {
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 30rpx;
+}
+
+.btn-lg {
+  font-size: 32rpx;
+  padding: 24rpx;
+  margin-top: 16rpx;
+}
+
+.btn-outline {
+  margin-top: 16rpx;
+}
+
+.legal-lg {
+  font-size: 26rpx;
+  color: #9090a8;
+  line-height: 1.6;
+}
+
 
 .btn-block {
   width: 100%;
@@ -420,7 +627,7 @@ onUnmounted(() => {
 .legal {
   display: block;
   font-size: 22rpx;
-  color: #707080;
+  color: $color-text-faint;
   margin-top: 24rpx;
   line-height: 1.5;
   padding: 0 8rpx;
@@ -440,7 +647,7 @@ onUnmounted(() => {
 .pay-viewer-box {
   width: 100%;
   max-width: 640rpx;
-  background: #1a1925;
+  background: $color-bg-card-alt;
   border-radius: 24rpx;
   padding: 32rpx;
   border: 1rpx solid rgba(108, 92, 231, 0.45);
@@ -450,13 +657,13 @@ onUnmounted(() => {
   display: block;
   font-size: 32rpx;
   font-weight: 700;
-  color: #ff8fa3;
+  color: $color-pink-light;
 }
 
 .pay-viewer-amount {
   display: block;
   font-size: 30rpx;
-  color: #ff6b81;
+  color: $color-pink;
   font-weight: 700;
   margin-top: 16rpx;
 }
@@ -472,7 +679,7 @@ onUnmounted(() => {
 .client-text {
   flex: 1;
   font-size: 22rpx;
-  color: #a0a0b0;
+  color: $color-text-muted;
   word-break: break-all;
 }
 
@@ -486,7 +693,7 @@ onUnmounted(() => {
 .pay-viewer-tip {
   display: block;
   font-size: 22rpx;
-  color: #a0a0b0;
+  color: $color-text-muted;
   margin-top: 16rpx;
   line-height: 1.5;
 }
@@ -499,7 +706,7 @@ onUnmounted(() => {
 .pay-viewer-order {
   display: block;
   font-size: 22rpx;
-  color: #a0a0b0;
+  color: $color-text-muted;
   margin-top: 12rpx;
   word-break: break-all;
 }
@@ -508,12 +715,12 @@ onUnmounted(() => {
   display: block;
   text-align: center;
   font-size: 24rpx;
-  color: #ff8fa3;
+  color: $color-pink-light;
   margin-top: 12rpx;
 }
 
 .pay-viewer-status.is-paid {
-  color: #7bed9f;
+  color: $color-success-bright;
 }
 
 .pay-viewer-actions {

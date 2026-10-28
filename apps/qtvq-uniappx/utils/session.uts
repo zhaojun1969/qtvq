@@ -1,0 +1,80 @@
+/**
+ * 会话与设备标识（uni-app x / 鸿蒙端）
+ *
+ * 与其它端保持同一套口径：
+ *   · `clientId` —— 设备编号（`q_` 前缀），首次启动生成并持久化。
+ *     **它必须稳定**：服务端的配额、订单、付款核实全都按它归属；换一个就等于换了个人。
+ *   · `token`    —— 登录令牌（`Authorization: Bearer`）。
+ *
+ * UTS 注意：`uni.getStorageSync` 返回 `any | null`，取值前必须判空并断言类型。
+ */
+
+export const CLIENT_ID_KEY : string = 'qtvq_client_id'
+export const TOKEN_KEY : string = 'qtvq_token'
+export const USER_KEY : string = 'qtvq_user'
+
+/** 当前登录令牌（未登录为 null） */
+export let token : string | null = null
+/** 当前用户（未登录为 null；只放展示需要的字段） */
+export let user : UTSJSONObject | null = null
+
+/**
+ * 设备编号：没有就生成一个并持久化。
+ * 生成规则与网站/小程序一致（`q_` + 时间戳 + 随机串），便于运营在后台一眼认出是自有端。
+ */
+export function clientId() : string {
+  const saved = uni.getStorageSync(CLIENT_ID_KEY)
+  if (saved != null) {
+    const s : string = saved as string
+    if (s.length > 0) return s
+  }
+  const rand : string = Math.random().toString(36).substring(2, 10)
+  const id : string = `q_${Date.now().toString(36)}_${rand}`
+  uni.setStorageSync(CLIENT_ID_KEY, id)
+  return id
+}
+
+/** 启动时恢复登录态（App.uvue 调用一次） */
+export function loadSession() : void {
+  const t = uni.getStorageSync(TOKEN_KEY)
+  if (t != null) {
+    const s : string = t as string
+    token = s.length > 0 ? s : null
+  }
+  const u = uni.getStorageSync(USER_KEY)
+  if (u != null) {
+    user = u as UTSJSONObject
+  }
+  clientId()
+}
+
+/** 登录成功后写入（由账户页调用） */
+export function setSession(newToken : string, newUser : UTSJSONObject) : void {
+  token = newToken
+  user = newUser
+  uni.setStorageSync(TOKEN_KEY, newToken)
+  uni.setStorageSync(USER_KEY, newUser)
+}
+
+/** 退出登录 / 注销后清空 */
+export function clearSession() : void {
+  token = null
+  user = null
+  uni.removeStorageSync(TOKEN_KEY)
+  uni.removeStorageSync(USER_KEY)
+}
+
+/** 是否已登录 */
+export function isLoggedIn() : boolean {
+  return token != null && token!.length > 0
+}
+
+/** 当前用户展示名（未登录时给"未登录"） */
+export function userLabel() : string {
+  if (user == null) return '未登录'
+  const phone = user!['phone']
+  if (phone != null) return `手机号 ${phone as string}`
+  const nick = user!['nickname']
+  if (nick != null) return nick as string
+  return '已登录'
+}

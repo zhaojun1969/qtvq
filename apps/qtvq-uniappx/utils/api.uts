@@ -1,0 +1,134 @@
+/**
+ * 统一 API 客户端（uni-app x / 鸿蒙端）
+ *
+ * 与 `apps/qtvq-uni/src/api/config.js`、网站 `js/config.js` 用**同一个基址**：
+ * 自有备案域名 `https://qtvq.cn`（nginx 反代 `/api/` → Cloudflare Pages、`/v1/` → 自有 Node 服务）。
+ * 不用 `pages.dev`：小程序/鸿蒙应用的网络请求都要求已备案域名，境外域名会被直接拦截。
+ *
+ * UTS 写法要点（与 TS 的差别）：
+ *   · 所有变量/参数带类型；泛型回调用明确的 `UTSJSONObject` 而不是 `any`；
+ *   · `uni.request` 的 `res.data` 类型是 `any | null`，需要显式断言成 `UTSJSONObject` 再取值；
+ *   · 错误分支必须处理，UTS 对空值更严格（`== null` 判断而不是 `?.`）。
+ */
+
+export const API_BASE : string = 'https://qtvq.cn'
+
+/** 请求选项：只暴露本项目真正用到的字段，避免端侧各写一套 */
+export type ApiOptions = {
+  method? : 'GET' | 'POST'
+  body? : UTSJSONObject | null
+  token? : string | null
+  success : (data : UTSJSONObject) => void
+  fail? : (message : string) => void
+}
+
+/**
+ * 统一请求。
+ * 失败时**一定**回调 fail（除非调用方没传），并把服务端的 error 文案带出来 ——
+ * 端侧最怕的是"点了没反应"：这里保证每个失败都有可展示的原因。
+ */
+export function request(path : string, options : ApiOptions) : void {
+  const method : string = options.method != null ? (options.method as string) : 'GET'
+  const header : UTSJSONObject = { 'Content-Type': 'application/json' }
+  const token : string | null = options.token != null ? options.token : null
+  if (token != null && token.length > 0) {
+    header['Authorization'] = `Bearer ${token}`
+  }
+
+  uni.request({
+    url: `${API_BASE}${path}`,
+    method: method as RequestMethod,
+    header: header,
+    data: options.body != null ? options.body : undefined,
+    dataType: 'json',
+    timeout: 15000,
+    success: (res) => {
+      const status : number = res.statusCode
+      const raw = res.data
+      const obj : UTSJSONObject | null = raw != null ? (raw as UTSJSONObject) : null
+
+      if (status >= 200 && status < 300) {
+        if (obj != null) {
+          options.success(obj)
+        } else if (options.fail != null) {
+          options.fail('服务端返回为空')
+        }
+        return
+      }
+      // 4xx/5xx：把服务端给的 error 直接展示，比"请求失败"有用得多
+      let message : string = `HTTP ${status}`
+      if (obj != null) {
+        const err = obj['error']
+        if (err != null) message = err as string
+      }
+      if (options.fail != null) options.fail(message)
+    },
+    fail: (err) => {
+      if (options.fail != null) {
+        const msg : string = err.errMsg.length > 0 ? err.errMsg : '网络不可用'
+        options.fail(msg)
+      }
+    },
+  })
+}
+
+/** GET 便捷封装 */
+export function get(path : string, token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  request(path, { method: 'GET', token: token, success: success, fail: fail } as ApiOptions)
+}
+
+/** POST 便捷封装 */
+export function post(path : string, body : UTSJSONObject, token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  request(path, { method: 'POST', body: body, token: token, success: success, fail: fail } as ApiOptions)
+}
+
+/* ───────────────────────── 常用接口（与其它端同名同义） ───────────────────────── */
+
+/** 缘值钱包：余额 + 会员状态 + 各档位价格 */
+export function fetchWallet(token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  get('/v1/wallet', token, success, fail)
+}
+
+/** 钱包流水 */
+export function fetchWalletLedger(token : string | null, limit : number, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  get(`/v1/wallet/ledger?limit=${limit}`, token, success, fail)
+}
+
+/** 额度与会员状态（Pages 侧） */
+export function fetchQuota(token : string | null, clientId : string, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  get(`/api/quota?clientId=${clientId}`, token, success, fail)
+}
+
+/** Q问问答（Pages 侧 /api/chat）：返回 reply / qCoins / wisdom / fallback */
+export function askAI(message : string, clientId : string, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  const body : UTSJSONObject = { message: message, clientId: clientId }
+  post('/api/chat', body, null, success, fail)
+}
+
+/**
+ * 避坑列表（Node 服务 `/v1/pitfalls`，公开无需登录）。
+ *
+ * 注意：这个端点原本**不存在** —— 网页端的避坑内容读的是本地静态数据（`js/data.js`），
+ * 服务端只把 pitfalls 集合用于报告生成的向量检索。
+ * 我第一版凭记忆写成了 `/v1/profile/pitfalls`（那个路由不存在，会 404 → 页面变死胡同），
+ * 核对路由后补了服务端端点 `GET /v1/pitfalls`，各端共用同一份内容、不再各抄一份。
+ */
+export function fetchPitfalls(success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  get('/v1/pitfalls?pageSize=30', null, success, fail)
+}
+
+/** 我的资料（转盘前置：需要昵称 + 性别） */
+export function fetchMyProfile(token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  get('/v1/profile/me', token, success, fail)
+}
+
+/** 保存资料 */
+export function saveMyProfile(profile : UTSJSONObject, token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  post('/v1/profile/me', profile, token, success, fail)
+}
+
+/** 提交举报（原因必须是服务端白名单里的值） */
+export function submitReport(targetId : string, reason : string, detail : string, token : string | null, success : (data : UTSJSONObject) => void, fail : (msg : string) => void) : void {
+  const body : UTSJSONObject = { targetType: 'user', targetId: targetId, reason: reason, detail: detail }
+  post('/v1/moderation/report', body, token, success, fail)
+}

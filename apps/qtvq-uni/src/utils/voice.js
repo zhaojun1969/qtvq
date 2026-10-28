@@ -1,15 +1,23 @@
 /**
- * 小程序录音 → /api/speech（mp3/pcm）
- * 微信 / 支付宝均走 uni.getRecorderManager
+ * 小程序录音 → /api/speech
+ * 微信用 PCM 16k，与阿里云一句话识别匹配
  */
 
-import { transcribeAudio, probeSpeechConfigured } from '../api/speech.js';
+import { probeSpeechConfigured } from '../api/speech.js';
 
 const MAX_MS = 30000;
 
+// #ifdef MP-WEIXIN
+const RECORD_FORMAT = 'pcm';
+const RECORDER_FORMAT = 'PCM';
+// #endif
+// #ifndef MP-WEIXIN
+const RECORD_FORMAT = 'mp3';
+const RECORDER_FORMAT = 'mp3';
+// #endif
+
 let recorder = null;
 let recording = false;
-let stopResolve = null;
 
 function getRecorder() {
   if (!recorder) recorder = uni.getRecorderManager();
@@ -42,19 +50,25 @@ export function startRecording() {
       return;
     }
     const rm = getRecorder();
-    rm.onStart(() => {
+    const onStart = () => {
+      rm.offStart?.(onStart);
       recording = true;
       resolve();
-    });
-    rm.onError((err) => {
+    };
+    const onError = (err) => {
+      rm.offStart?.(onStart);
+      rm.offError?.(onError);
       recording = false;
       reject(err);
-    });
+    };
+    rm.onStart(onStart);
+    rm.onError(onError);
     rm.start({
       duration: MAX_MS,
       sampleRate: 16000,
       numberOfChannels: 1,
-      format: 'mp3',
+      encodeBitRate: 48000,
+      format: RECORDER_FORMAT,
     });
   });
 }
@@ -66,23 +80,25 @@ export function stopRecording() {
       return;
     }
     const rm = getRecorder();
-    rm.onStop(async (res) => {
+    const onStop = async (res) => {
+      rm.offStop?.(onStop);
+      rm.offError?.(onError);
       recording = false;
       try {
         const b64 = await readFileBase64(res.tempFilePath);
-        resolve({ base64: b64, format: 'mp3', sampleRate: 16000 });
+        resolve({ base64: b64, format: RECORD_FORMAT, sampleRate: 16000 });
       } catch (e) {
         reject(e);
       }
-    });
-    rm.onError(reject);
+    };
+    const onError = (err) => {
+      rm.offStop?.(onStop);
+      rm.offError?.(onError);
+      recording = false;
+      reject(err);
+    };
+    rm.onStop(onStop);
+    rm.onError(onError);
     rm.stop();
   });
-}
-
-export async function recordAndTranscribe() {
-  await startRecording();
-  const audio = await stopRecording();
-  const result = await transcribeAudio(audio.base64, audio.format, audio.sampleRate);
-  return result.text || '';
 }

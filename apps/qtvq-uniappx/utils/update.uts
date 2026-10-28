@@ -1,0 +1,145 @@
+/**
+ * 各端「专用端口」：`GET /api/app/bootstrap?channel=harmony&version=`
+ *
+ * 与 uni-app 端（`apps/qtvq-uni/src/utils/update.js`）、Windows 桌面端调用的是**同一个端点**，
+ * 返回同一个契约（`docs/全端交付能力盘点.md` 第六节）。鸿蒙端只需按同一份字段解析。
+ *
+ * ## 鸿蒙端的更新边界（必须说清楚，别让用户空等）
+ * 鸿蒙应用由 **AppGallery（应用市场）** 负责分发与更新，**端侧无法自行下载安装新版本**。
+ * 所以拿到 `update.force` 时能做的只有：明确提示"请到应用市场更新"，
+ * 而不是假装能静默升级。这与 FTVF 项目的处理一致。
+ * 真正"拦在启动页"的能力要等接入 AppGallery 的强制升级能力后再补。
+ *
+ * ## 纪律
+ * 失败静默：网络不通、服务端未部署该端点，都只记一条日志、不影响启动。
+ * 版本号非法时服务端不会返回 force（见契约的第 3 条），所以这里也**不会**把用户锁死。
+ */
+
+import { API_BASE } from './api.uts'
+
+/** 本端渠道标识（与契约的 channel 取值一致） */
+export const CHANNEL : string = 'harmony'
+
+/** 最近一次的结论（供页面读取；启动时写入，页面 onShow 时展示） */
+export let lastHint : string = ''
+export let lastForce : boolean = false
+export let lastDownloadUrl : string | null = null
+
+/**
+ * 本工程版本号。
+ * 刻意在这里写常量而**不去读 manifest**：UTS 里没有稳定的运行时可读接口，
+ * 硬读 manifest 会在不同平台编译失败。改版本时**必须同时改 manifest.json 与这里**
+ * （检查脚本 tools/scripts/check-uniappx.mjs 会核对两者一致）。
+ */
+export function appVersion() : string {
+  return '1.0.6'
+}
+
+function parseBool(obj : UTSJSONObject | null, key : string) : boolean {
+  if (obj == null) return false
+  const v = obj[key]
+  if (v == null) return false
+  return v as boolean
+}
+
+function parseString(obj : UTSJSONObject | null, key : string) : string {
+  if (obj == null) return ''
+  const v = obj[key]
+  if (v == null) return ''
+  return v as string
+}
+
+/**
+ * 检查更新。
+ * @param currentVersion 本端版本
+ * @param silent true 时不弹提示（仅记录结论，供页面自行展示）
+ */
+export function checkAppUpdate(currentVersion : string, silent : boolean) : void {
+  const url : string = `${API_BASE}/api/app/bootstrap?channel=${CHANNEL}&version=${currentVersion}`
+  uni.request({
+    url: url,
+    method: 'GET',
+    dataType: 'json',
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode != 200) {
+        console.log('[update] app/bootstrap HTTP ' + res.statusCode)
+        return
+      }
+      const raw = res.data
+      if (raw == null) return
+      const body : UTSJSONObject = raw as UTSJSONObject
+      const update = body['update']
+      if (update == null) return
+      const u : UTSJSONObject = update as UTSJSONObject
+
+      const needs : boolean = parseBool(u, 'needsUpdate')
+      const force : boolean = parseBool(u, 'force')
+      const latest : string = parseString(u, 'latest')
+      const notes : string = parseString(u, 'notes')
+      const dl : string = parseString(u, 'downloadUrl')
+
+      lastForce = force
+      lastDownloadUrl = dl.length > 0 ? dl : null
+
+      if (!needs) {
+        lastHint = ''
+        console.log('[update] 已是最新版本 ' + currentVersion)
+        return
+      }
+
+      lastHint = force
+        ? `当前版本已停止服务，请到应用市场更新到 ${latest}`
+        : `有新版本 ${latest}${notes.length > 0 ? '：' + notes : ''}`
+
+      console.log('[update] ' + lastHint)
+
+      if (silent) return
+
+      // 鸿蒙端无法自行安装：只能提示去应用市场（有下载地址时给"去下载"按钮）
+      uni.showModal({
+        title: force ? '需要更新后才能继续使用' : '发现新版本',
+        content: `${lastHint}\n（鸿蒙应用请在华为应用市场更新）`,
+        showCancel: !force,
+        confirmText: dl.length > 0 ? '去下载' : '知道了',
+        cancelText: '稍后',
+        success: (r) => {
+          if (r.confirm && dl.length > 0) {
+            // 有下载地址就走系统浏览器/应用市场；没有则只提示
+            uni.openURL({ url: dl })
+          }
+        },
+      })
+    },
+    fail: (err) => {
+      // 启动阶段网络问题不影响使用
+      console.log('[update] app/bootstrap 请求失败：' + err.errMsg)
+    },
+  })
+}
+
+/**
+ * 能力清单：服务端下发"这一端现在有什么"。
+ * 页面用它决定显示/隐藏 —— 不再各自去探测一串接口（漏探测 = 点了没反应的功能）。
+ */
+export function fetchCapabilities(success : (caps : UTSJSONObject) => void) : void {
+  const url : string = `${API_BASE}/api/app/bootstrap?channel=${CHANNEL}`
+  uni.request({
+    url: url,
+    method: 'GET',
+    dataType: 'json',
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode != 200) return
+      const raw = res.data
+      if (raw == null) return
+      const body : UTSJSONObject = raw as UTSJSONObject
+      const caps = body['capabilities']
+      if (caps == null) return
+      success(caps as UTSJSONObject)
+    },
+    fail: (_) => {
+      // 拿不到能力清单时各页面按"不可用"处理（保守），不弹错
+    },
+  })
+}

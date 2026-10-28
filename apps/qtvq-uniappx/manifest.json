@@ -1,0 +1,89 @@
+{
+  "name": "我心永恒 Q问",
+  "appid": "__UNI__QTVQX01",
+  "description": "Q问 · 鸿蒙原生应用（uni-app x 工程）",
+  "versionName": "1.0.6",
+  "versionCode": 106,
+
+  "uni-app-x": {
+    "vapor": false,
+    "styleIsolationVersion": "2"
+  },
+
+  "vueVersion": "3",
+
+  "app": {
+    "distribute": {
+      "icons": {
+        "android": {
+          "hdpi": "static/app/icon-72.png",
+          "xhdpi": "static/app/icon-96.png",
+          "xxhdpi": "static/app/icon-144.png",
+          "xxxhdpi": "static/app/icon-192.png"
+        },
+        "ios": {
+          "appstore": "static/app/icon-1024.png"
+        }
+      }
+    }
+  },
+
+  "app-harmony": {
+    "distribute": {
+      "bundleName": "cn.qtvq.harmony",
+      "icons": {
+        "foreground": "static/app/icon-foreground.png",
+        "background": "static/app/icon-background.png"
+      },
+      "splashScreens": {
+        "startWindowIcon": "static/app/icon-256.png",
+        "startWindowBackground": "#0f0e17"
+      },
+      "deviceTypes": ["phone", "tablet"],
+      "deviceArchs": ["arm64-v8a"],
+      "modules": {
+        "uni-payment": {
+          "wxpay": {},
+          "alipay": {}
+        },
+        "uni-oauth": {
+          "huawei": {},
+          "weixin": {
+            "appid": ""
+          }
+        },
+        "uni-share": {
+          "weixin": {
+            "appid": ""
+          }
+        }
+      }
+    }
+  },
+
+  "app-android": {
+    "distribute": {
+      "minSdkVersion": 21,
+      "targetSdkVersion": 34,
+      "permissions": [
+        "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+        "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
+      ]
+    }
+  },
+
+  "app-ios": {
+    "distribute": {
+      "privacyDescription": {
+        "NSMicrophoneUsageDescription": "用于语音输入提问"
+      }
+    }
+  },
+
+  "web": {
+    "router": {
+      "base": "./",
+      "mode": "hash"
+    }
+  }
+}

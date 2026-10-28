@@ -1,0 +1,47 @@
+// 由 tools/scripts/gen-tokens.mjs 从 packages/tokens 生成，请勿手改
+// uni-app 会自动把本文件注入每个 SFC 的 <style lang="scss">，因此变量可直接使用
+
+// ---- 颜色 ----
+$color-pink: #ff6b81;
+$color-pink-light: #ff8fa3;
+$color-pink-soft: #ff9db0;
+$color-purple: #6c5ce7;
+$color-purple-dark: #5a4bd1;
+$color-purple-light: #8b7cf0;
+$color-bg: #0f0e17;
+$color-bg-deep: #14141c;
+$color-bg-card: #1a1928;
+$color-bg-elevated: #242338;
+$color-text: #f5f5f7;
+$color-text-bright: #e8e8f0;
+$color-text-soft: #c8c8d8;
+$color-text-softer: #d8d8e2;
+$color-text-muted: #a0a0b0;
+$color-text-dim: #9a9ab0;
+$color-text-faint: #707080;
+$color-success-soft: #5ad07a;
+$color-success-bright: #7bed9f;
+$color-warning: #ffd479;
+$color-danger-soft: #ff8a8a;
+$color-bg-sunken: #1c1c28;
+$color-bg-raised: #2a2940;
+$color-bg-card-alt: #1a1925;
+
+// ---- 圆角（rpx，750 设计稿）----
+$radius-sm: 16rpx;
+$radius-md: 24rpx;
+$radius-lg: 32rpx;
+$radius-pill: 1998rpx;
+
+// ---- 间距（rpx）----
+$space-xs: 8rpx;
+$space-sm: 16rpx;
+$space-md: 24rpx;
+$space-lg: 32rpx;
+$space-xl: 48rpx;
+$space-xxl: 64rpx;
+
+// ---- 字体与视觉 ----
+$font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+$gradient-brand: linear-gradient(135deg, #ff6b81 0%, #6c5ce7 100%);
+$shadow-card: 0 8px 32px rgba(108, 92, 231, 0.25);

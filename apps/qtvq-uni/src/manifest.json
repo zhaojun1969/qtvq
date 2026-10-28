@@ -2,8 +2,8 @@
   "name": "我心永恒 Q问",
   "appid": "__UNI__QTVQ001",
   "description": "情感避坑 + AI 智慧问答",
-  "versionName": "1.0.2",
-  "versionCode": "102",
+  "versionName": "1.0.6",
+  "versionCode": "106",
   "transformPx": false,
   "app-plus": {
     "usingComponents": true,
@@ -22,7 +22,26 @@
         ]
       },
       "ios": {},
-      "sdkConfigs": {}
+      "sdkConfigs": {
+        "oauth": {
+          "weixin": {
+            "appid": "",
+            "appsecret": "",
+            "UniversalLinks": ""
+          }
+        },
+        "payment": {
+          "weixin": {
+            "appid": "",
+            "__platform__": ["ios", "android"]
+          }
+        },
+        "share": {
+          "weixin": {
+            "appid": ""
+          }
+        }
+      }
     }
   },
   "quickapp": {},
@@ -34,7 +53,6 @@
       "minified": true
     },
     "usingComponents": true,
-    "lazyCodeLoading": "requiredComponents",
     "permission": {
       "scope.record": {
         "desc": "用于语音输入提问"
@@ -44,10 +62,75 @@
   "mp-alipay": {
     "appid": "",
     "usingComponents": true,
-    "component2": true
+    "component2": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
   },
   "mp-toutiao": {
-    "usingComponents": true
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-xhs": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-qq": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-baidu": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-kuaishou": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-lark": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
+  },
+  "mp-jd": {
+    "appid": "",
+    "usingComponents": true,
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    }
   },
   "uniStatistics": {
     "enable": false

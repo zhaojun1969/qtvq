@@ -1,0 +1,9 @@
+平台: mp-weixin
+时间: 2026-10-28T04:03:41.441Z
+输出目录: D:\qtvq\apps\qtvq-uni\dist\build\mp-weixin
+文件数: 99
+
+微信开发者工具 → 导入项目 → 选上面「输出目录」
+注意: dist 在 .gitignore，Cursor 左侧可能看不到，请按路径打开或看本文件。
+
+四端同 UI 编译: npm run build:mp-all
