@@ -141,7 +141,7 @@ export function buildCapabilities(env = process.env) {
     moderation: true, // 举报与内容安全（词表 + 人工审核）
     profile: true, // 个人资料
     deactivateAccount: true, // 自助注销（已上线并验证）
-    dataExport: false, // 未开放自助导出（DSAR：仍需人工受理）
+    dataExport: true, // 自助导出本人数据（GET /v1/me/export；白名单式、10 分钟冷却）
     /*
      * 2026-10-28 修正：这两项此前一直是 false，但实现早已存在 / 本轮补齐。
      * 这个文件的价值全在"如实"二字 —— 客户端会据此决定要不要渲染入口，

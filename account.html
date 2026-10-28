@@ -215,6 +215,21 @@
         <p id="pay-history-empty" class="modal-hint">暂无记录</p>
       </div>
 
+      <!-- 我的数据：个保法「可携带」的自助出口。放在注销之前 —— 先让用户能把东西拿走，再谈删号 -->
+      <div class="account-panel" id="data-export-panel">
+        <h3>导出我的数据</h3>
+        <p class="modal-hint">
+          一次下载包含：<strong>个人资料、问答记录、订单、缘值与流水、报告列表、我提交的举报</strong>。
+          文件是 JSON，可用记事本打开。
+          <br>不含<strong>他人信息</strong>与<strong>登录凭据</strong>（密码、微信 openid 原文、报告正文）。
+          同一账号 10 分钟内只能导出一次。
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="btn-export-data" class="btn btn-secondary">下载我的数据（JSON）</button>
+        </div>
+        <p class="modal-hint" id="export-status" hidden></p>
+      </div>
+
       <!-- 注销账号：破坏性操作，单独放在最后一栏并醒目标注后果 -->
       <div class="account-panel danger-zone">
         <h3>注销账号</h3>

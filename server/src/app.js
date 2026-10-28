@@ -29,6 +29,7 @@ import authRoutes from './routes/auth.js';
 import contactRoutes from './routes/contact.js';
 import paymentRoutes from './routes/payment.js';
 import trackRoutes from './routes/track.js';
+import dataExportRoutes from './routes/data-export.js';
 
 const app = express();
 
@@ -78,6 +79,11 @@ app.use((req, res, next) => {
 });
 
 app.use('/v1/health', healthRoutes);
+/*
+ * 自助导出挂在 `/v1/me`：语义是"我自己的东西"，与 `/v1/profile/me` 的读写分开。
+ * 单独一个前缀是为了让 nginx 侧只需放行 `/v1/`（已放行），不必新增精确路径。
+ */
+app.use('/v1/me', dataExportRoutes);
 app.use('/v1/profile', profileRoutes);
 app.use('/v1/report', reportRoutes);
 app.use('/v1/wallet', walletRoutes);

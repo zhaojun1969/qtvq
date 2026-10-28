@@ -102,7 +102,7 @@ export function buildCapabilities(env) {
     moderation: true, // 举报与内容安全（词表 + 人工审核）
     profile: true, // 个人资料
     deactivateAccount: true, // 自助注销（已上线并验证）
-    dataExport: false, // 未开放自助导出（DSAR：仍需人工受理）
+    dataExport: true, // 自助导出本人数据（Node GET /v1/me/export；白名单式、10 分钟冷却）
     /* 2026-10-28 修正：这两项此前为 false，但实现早已存在 / 本轮补齐。必须与
      * `server/src/lib/app-release.js` 一字不差（check-app-bootstrap-gate 会判红）。 */
     crisisReferral: true, // 危机转介卡片（packages/safety/src/crisis.js + /api/chat 的 support 字段）

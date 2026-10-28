@@ -698,6 +698,73 @@ document.getElementById('btn-subscribe')?.addEventListener('click', () => {
   location.href = 'index.html?subscribe=1';
 });
 
+/*
+ * 导出我的数据（个保法「可携带」）
+ *
+ * 走 fetch + Blob 而不是直接 `location.href = '/v1/me/export'`：
+ * 这个接口要 `Authorization` 头，而浏览器直接跳转不会带上；把 token 拼进
+ * query 虽然接口支持，但 token 会进浏览器历史、代理日志与 Referer ——
+ * 为了省一次 Blob，把会话凭据散到一个会被记录的地方，不划算。
+ */
+document.getElementById('btn-export-data')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export-data');
+  const status = document.getElementById('export-status');
+  if (!isLoggedIn()) {
+    showToast('请先登录后再导出');
+    return;
+  }
+  const original = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '正在打包…';
+  }
+  if (status) {
+    status.hidden = true;
+    status.textContent = '';
+  }
+  try {
+    const res = await apiFetch('/v1/me/export');
+    if (!res.ok) {
+      // 429 的文案在服务端写好了（含还要等几分钟），原样展示比"导出失败"有用
+      let msg = '导出失败，请稍后再试';
+      try {
+        const j = await res.json();
+        if (j?.error) msg = j.error;
+      } catch {
+        /* 非 JSON 响应，用默认文案 */
+      }
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `我心永恒-我的数据-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // 立刻 revoke 在部分浏览器会让下载中断，延后释放
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    if (status) {
+      status.hidden = false;
+      status.textContent =
+        '已开始下载。文件里没有他人信息与登录凭据；如需更早的完整记录，可邮件 qtvq@qtvq.cn 申请。';
+    }
+  } catch (err) {
+    showToast(err.message || '导出失败');
+    if (status) {
+      status.hidden = false;
+      status.textContent = err.message || '导出失败';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = original || '下载我的数据（JSON）';
+    }
+  }
+});
+
 // 注销账号：先本地确认，服务端再按策略拦（未到期会员 / 待核实付款）
 document.getElementById('btn-delete-account')?.addEventListener('click', async () => {
   const me = getAuthUser() || {};

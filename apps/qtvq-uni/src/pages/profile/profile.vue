@@ -72,6 +72,11 @@
           <text>隐私说明</text>
           <text class="arrow">›</text>
         </view>
+        <!-- 自助导出：审核与个保法都要求"可携带"，入口必须自己找得到，不能只在网页版 -->
+        <view class="menu-item" hover-class="menu-item-hover" @tap="exportData">
+          <text>导出我的数据</text>
+          <text class="arrow">›</text>
+        </view>
         <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('download')">
           <text>客户端下载</text>
           <text class="arrow">›</text>
@@ -163,6 +168,8 @@ import { fetchQuota } from '../../api/quota.js';
 import { fetchMyProfile, saveMyProfile } from '../../api/profile.js';
 import { track } from '../../utils/track.js';
 import { fetchWallet } from '../../api/wallet.js';
+import { fetchMyData, shareMyData } from '../../api/export.js';
+import { isLoggedIn } from '../../utils/auth.js';
 import { platformLabel } from '../../utils/platform.js';
 import { WEB_BASE, APP_VERSION } from '../../data/constants.js';
 import BrandNavBar from '../../components/BrandNavBar.vue';
@@ -334,6 +341,45 @@ function copyClientId() {
     data: clientId.value,
     success: () => uni.showToast({ title: '已复制', icon: 'none' }),
   });
+}
+
+/**
+ * 导出我的数据。
+ *
+ * 为什么要有这个入口：`dataExport` 以前是 false，DSAR 只能人工受理 ——
+ * 那是"用户要发邮件、等人处理"，不是"用了就能拿走"。现在接口有了，
+ * 入口就必须放在用户找得到的地方（我的 → 导出我的数据），
+ * 而不是藏在某个只在网页版出现的角落。
+ */
+let exporting = false;
+async function exportData() {
+  if (exporting) return;
+  if (!isLoggedIn()) {
+    uni.showToast({ title: '请先登录后再导出', icon: 'none' });
+    return;
+  }
+  exporting = true;
+  uni.showLoading({ title: '正在打包…', mask: true });
+  try {
+    const data = await fetchMyData();
+    uni.hideLoading();
+    const { mode } = await shareMyData(data);
+    if (mode === 'file') {
+      uni.showModal({
+        title: '已生成文件',
+        content: '在发送面板里选「文件传输助手」发给自己，即可保存到电脑。文件不含他人信息与登录凭据。',
+        showCancel: false,
+        confirmText: '知道了',
+      });
+    } else {
+      uni.showToast({ title: '数据已复制，可粘贴保存', icon: 'none', duration: 3000 });
+    }
+  } catch (err) {
+    uni.hideLoading();
+    uni.showToast({ title: err?.message || '导出失败，请稍后再试', icon: 'none', duration: 3000 });
+  } finally {
+    exporting = false;
+  }
 }
 
 async function loadProfile() {
