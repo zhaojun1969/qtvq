@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统骨骼与全链路检测图 · 我心永恒 Q问</title>
+<style>
+  :root{
+    --pink:#ff6b81; --pink-light:#ff8fa3; --purple:#6c5ce7; --purple-light:#8b7cf0;
+    --ink:#1b1a24; --ink-2:#4a4858; --ink-3:#7c7a8c;
+    --line:#e6e4ef; --bg:#f7f7fa; --card:#ffffff;
+    --ok:#1f9d55; --warn:#b7791f; --bad:#c53030; --skip:#7c7a8c;
+    --ok-bg:#e9f7ef; --warn-bg:#fdf6e3; --bad-bg:#fdecec; --skip-bg:#f1f0f5;
+    --mono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 "PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:28px}
+  .kicker{font-size:12px;letter-spacing:.18em;color:var(--purple);font-weight:600;text-transform:uppercase}
+  h1{margin:8px 0 6px;font-size:30px;letter-spacing:-.01em}
+  .sub{color:var(--ink-3);font-size:14px}
+  h2{font-size:20px;margin:44px 0 14px;padding-left:12px;border-left:4px solid var(--pink)}
+  h3{font-size:15px;margin:24px 0 8px;color:var(--ink-2)}
+  p{margin:8px 0}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:22px 0 6px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat b{display:block;font-size:26px;line-height:1.2;letter-spacing:-.02em}
+  .stat span{font-size:12px;color:var(--ink-3)}
+  .stat.ok b{color:var(--ok)} .stat.fix b{color:var(--purple)} .stat.warn b{color:var(--warn)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+  .card.flat{padding:0;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#faf9fd;font-weight:600;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  code{font-family:var(--mono);font-size:12.5px;background:#f4f2fa;border-radius:5px;padding:1px 5px;color:#4b3fa8}
+  .pill{display:inline-block;font-size:11.5px;line-height:1.6;padding:1px 8px;border-radius:999px;white-space:nowrap;font-weight:600}
+  .p-ok{background:var(--ok-bg);color:var(--ok)}
+  .p-warn{background:var(--warn-bg);color:var(--warn)}
+  .p-bad{background:var(--bad-bg);color:var(--bad)}
+  .p-skip{background:var(--skip-bg);color:var(--skip)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin:10px 0 0}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+  .scroll{overflow-x:auto}
+  .note{font-size:13px;color:var(--ink-3);margin-top:10px}
+  .note b{color:var(--ink-2)}
+  details{margin:10px 0}
+  summary{cursor:pointer;font-weight:600;font-size:14px;padding:6px 0;color:var(--ink-2)}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-3)}
+  .route{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
+  .route em{font-style:normal;color:var(--pink);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">System Skeleton &amp; Route Audit</div>
+  <h1>系统骨骼与全链路检测图</h1>
+  <p class="sub">我心永恒 · Q问 ｜ 体检时间 2026-10-28 ｜ 检查门 <code>npm run check:all</code> —— 39 项（31 本地 + 8 在线）全绿</p>
+</header>
+
+<div class="summary">
+  <div class="stat ok"><b>39 / 39</b><span>检查门通过（0 失败）</span></div>
+  <div class="stat fix"><b>5</b><span>本次修掉的硬伤</span></div>
+  <div class="stat ok"><b>11 / 14</b><span>渠道有发布记录（其余 3 端无包·已豁免）</span></div>
+  <div class="stat ok"><b>0</b><span>小程序/鸿蒙端令牌外色值</span></div>
+  <div class="stat warn"><b>3</b><span>仍缺材料的端（Android/iOS/鸿蒙）</span></div>
+</div>
+
+<h2>一、骨骼图（一份源码 → 五种分发）</h2>
+
+<svg viewBox="0 0 1000 470" width="100%" role="img" aria-label="系统分层骨骼图">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#b9b6ca"/>
+    </marker>
+    <style>
+      .bx{fill:#fff;stroke:#dcd9ea;stroke-width:1.2;rx:10}
+      .lb{font:600 12.5px "PingFang SC",sans-serif;fill:#1b1a24}
+      .sm{font:11px "JetBrains Mono",monospace;fill:#7c7a8c}
+      .band{font:600 11.5px "PingFang SC",sans-serif;fill:#8b7cf0;letter-spacing:.12em}
+      .ln{stroke:#b9b6ca;stroke-width:1.2;fill:none;marker-end:url(#ar)}
+      .hot{stroke:#ff6b81;stroke-width:1.6;fill:none;marker-end:url(#ar)}
+    </style>
+  </defs>
+
+  <!-- 层标签 -->
+  <text class="band" x="14" y="24">L1 客户端</text>
+  <text class="band" x="14" y="150">L2 接入 / 分发</text>
+  <text class="band" x="14" y="286">L3 服务</text>
+  <text class="band" x="14" y="404">L4 数据 / 外部</text>
+
+  <!-- L1 客户端 -->
+  <rect class="bx" x="120" y="40" width="168" height="62" rx="10"/>
+  <text class="lb" x="132" y="64">主站静态页（15 页）</text>
+  <text class="sm" x="132" y="84">html + css + js（无构建）</text>
+
+  <rect class="bx" x="300" y="40" width="140" height="62" rx="10"/>
+  <text class="lb" x="312" y="64">H5 应用 /h5/</text>
+  <text class="sm" x="312" y="84">uni-app build:h5</text>
+
+  <rect class="bx" x="452" y="40" width="150" height="62" rx="10"/>
+  <text class="lb" x="464" y="64">Windows 桌面</text>
+  <text class="sm" x="464" y="84">Electron 壳 + 主站页</text>
+
+  <rect class="bx" x="614" y="40" width="172" height="62" rx="10"/>
+  <text class="lb" x="626" y="64">小程序 8 端</text>
+  <text class="sm" x="626" y="84">mp-weixin / kuaishou …</text>
+
+  <rect class="bx" x="798" y="40" width="150" height="62" rx="10"/>
+  <text class="lb" x="810" y="64">鸿蒙 / Android</text>
+  <text class="sm" x="810" y="84">uni-app x 工程</text>
+
+  <!-- L2 -->
+  <rect class="bx" x="120" y="168" width="250" height="66" rx="10"/>
+  <text class="lb" x="132" y="192">nginx（阿里云 ECS 源站）</text>
+  <text class="sm" x="132" y="212">qtvq.cn · 静态 + 反代 · 指纹 ?v=</text>
+
+  <rect class="bx" x="386" y="168" width="250" height="66" rx="10"/>
+  <text class="lb" x="398" y="192">Cloudflare Pages</text>
+  <text class="sm" x="398" y="212">qtvq-api.pages.dev · Functions</text>
+
+  <rect class="bx" x="652" y="168" width="296" height="66" rx="10"/>
+  <text class="lb" x="664" y="192">平台托管（微信/快手/支付宝…）</text>
+  <text class="sm" x="664" y="212">版本包 + 小程序码 + getUpdateManager</text>
+
+  <!-- L3 -->
+  <rect class="bx" x="120" y="304" width="240" height="72" rx="10"/>
+  <text class="lb" x="132" y="328">Node 服务（qtvq-report）</text>
+  <text class="sm" x="132" y="348">/v1/* · /api/chat · /api/auth</text>
+  <text class="sm" x="132" y="364">18 个路由模块 · 境内直连</text>
+
+  <rect class="bx" x="376" y="304" width="240" height="72" rx="10"/>
+  <text class="lb" x="388" y="328">Pages Functions</text>
+  <text class="sm" x="388" y="348">/api/app/bootstrap · 短信 · 微信登录</text>
+  <text class="sm" x="388" y="364">与 Node 逐字段对齐（双端闸门）</text>
+
+  <rect class="bx" x="632" y="304" width="316" height="72" rx="10"/>
+  <text class="lb" x="644" y="328">共享纯函数层 packages/</text>
+  <text class="sm" x="644" y="348">tokens（27 色）· safety（危机/痛苦）· i18n</text>
+  <text class="sm" x="644" y="364">三端引用，禁平台 API</text>
+
+  <!-- L4 -->
+  <rect class="bx" x="120" y="418" width="200" height="40" rx="10"/>
+  <text class="lb" x="132" y="443">MongoDB</text>
+
+  <rect class="bx" x="336" y="418" width="200" height="40" rx="10"/>
+  <text class="lb" x="348" y="443">LLM / RAG / 语音</text>
+
+  <rect class="bx" x="552" y="418" width="180" height="40" rx="10"/>
+  <text class="lb" x="564" y="443">支付（微信/聚合码）</text>
+
+  <rect class="bx" x="748" y="418" width="200" height="40" rx="10"/>
+  <text class="lb" x="760" y="443">SMTP / 短信 / OSS</text>
+
+  <!-- 连线：客户端 → 接入 -->
+  <path class="ln" d="M204,102 L220,166"/>
+  <path class="ln" d="M370,102 L370,120 L300,120 L300,166"/>
+  <path class="ln" d="M527,102 L527,166"/>
+  <path class="ln" d="M700,102 L700,130 L520,130 L520,166"/>
+  <path class="hot" d="M760,102 L760,166"/>
+  <!-- 接入 → 服务 -->
+  <path class="ln" d="M240,234 L240,302"/>
+  <path class="hot" d="M470,234 L470,302"/>
+  <path class="ln" d="M300,234 L300,270 L180,270 L180,302"/>
+  <!-- 服务 → 数据 -->
+  <path class="ln" d="M200,376 L200,416"/>
+  <path class="ln" d="M430,376 L430,416"/>
+  <path class="ln" d="M520,376 L560,416"/>
+  <path class="ln" d="M700,376 L740,416"/>
+</svg>
+
+<div class="legend">
+  <span><i style="background:#ff6b81"></i>本次修复涉及的链路</span>
+  <span><i style="background:#b9b6ca"></i>既有链路</span>
+  <span>注：小程序 8 端不经 Cloudflare，直连 qtvq.cn（备案域名白名单）</span>
+</div>
+
+<h2>二、分支路线检测图</h2>
+
+<p class="note">每条链路按「入口 → 传输 → 服务 → 落地」四段验证。状态以 <b>线上实测</b> 为准，不只看代码。</p>
+
+<div class="card flat scroll">
+<table>
+  <thead>
+    <tr><th style="width:150px">分支</th><th>路线（实测路径）</th><th style="width:86px">状态</th><th style="width:220px">验证方式</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>主站页面</b></td>
+      <td class="route">浏览器 → nginx → <em>15 个 html</em> → css/js?v=6721e221</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>32 个内链全在本地；线上指纹与长缓存已生效</td>
+    </tr>
+    <tr>
+      <td><b>主站问答</b></td>
+      <td class="route">js/chat.js → POST /api/chat → Node → LLM</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>实测 200，返回 reply/quota/rag 字段</td>
+    </tr>
+    <tr>
+      <td><b>小程序问答</b></td>
+      <td class="route">api/chat.js → <em>https://qtvq.cn/api/chat</em> → Node</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>实测 200（与 /v1/chat 同契约）</td>
+    </tr>
+    <tr>
+      <td><b>账号 / 登录</b></td>
+      <td class="route">/api/auth·/v1/auth → Node；/api/auth/sms → Pages</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>未登录 401（而非 404/500）；43 项接口测试通过</td>
+    </tr>
+    <tr>
+      <td><b>数据导出</b></td>
+      <td class="route">/v1/me/export → 白名单 7 集合 → JSON</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>未登录 401；47 项断言 + 10 条变异通过</td>
+    </tr>
+    <tr>
+      <td><b>H5 应用</b></td>
+      <td class="route">qtvq.cn/h5/ → 55 文件 → /api/*</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>线上 assets 已更新；本次才纳入自动发布</td>
+    </tr>
+    <tr>
+      <td><b>桌面客户端</b></td>
+      <td class="route">exe → 加载 qtvq.cn → electron-updater 读 latest.yml</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>清单指向的包公网 200，长度 82788547 一致</td>
+    </tr>
+    <tr>
+      <td><b>桌面自动更新</b></td>
+      <td class="route">latest.yml → qtvq-desktop-Setup-1.0.6.exe</td>
+      <td><span class="pill p-ok">通</span><br><span class="pill p-bad">修复前：404</span></td>
+      <td>修复前清单写的是 Q问-Setup-1.0.6.exe（不存在）</td>
+    </tr>
+    <tr>
+      <td><b>小程序热更新</b></td>
+      <td class="route">uni.getUpdateManager → 平台下载 → 提示重启</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>产物内实测存在 getUpdateManager 调用</td>
+    </tr>
+    <tr>
+      <td><b>版本 / 能力端口</b></td>
+      <td class="route">/api/app/bootstrap?channel=<em>wechat</em>&amp;version=1.0.6</td>
+      <td><span class="pill p-ok">通</span><br><span class="pill p-bad">修复前：400</span></td>
+      <td>14 渠道目录；Pages 与 Node 逐字段一致</td>
+    </tr>
+    <tr>
+      <td><b>发布记录覆盖</b></td>
+      <td class="route">app-releases.json → 11 渠道 → 两侧 generated</td>
+      <td><span class="pill p-ok">通</span><br><span class="pill p-warn">修复前：3/14</span></td>
+      <td>4 渠道实测 latest=1.0.6 / up_to_date</td>
+    </tr>
+    <tr>
+      <td><b>微信小程序</b></td>
+      <td class="route">wx 包 → 平台审核 → 虚拟支付（iOS 禁用）</td>
+      <td><span class="pill p-warn">待上传</span></td>
+      <td>产物已重建；上传私钥需人工生成</td>
+    </tr>
+    <tr>
+      <td><b>快手小程序</b></td>
+      <td class="route">ks 包（ks651051624357102489）→ 快手审核</td>
+      <td><span class="pill p-warn">待上传</span></td>
+      <td>产物已重建；限入类目需申请</td>
+    </tr>
+    <tr>
+      <td><b>Android / iOS</b></td>
+      <td class="route">— 无安装包 —</td>
+      <td><span class="pill p-bad">未开通</span></td>
+      <td>无 APK/AAB/IPA，故不给发布记录（避免假更新）</td>
+    </tr>
+    <tr>
+      <td><b>鸿蒙</b></td>
+      <td class="route">uni-app x 工程 → HAP → 华为审核</td>
+      <td><span class="pill p-bad">未打包</span></td>
+      <td>工程与路由检查通过；缺开发者账号与真机编译</td>
+    </tr>
+    <tr>
+      <td><b>配色一致</b></td>
+      <td class="route">packages/tokens → css:root + uni.scss + uvue 字面量</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>29 文件 139 处色值全部可溯源到 27 个令牌</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>三、端口状态表（谁在跑、跑什么版本）</h2>
+
+<div class="card flat scroll">
+<table>
+  <thead>
+    <tr><th>端</th><th>入口</th><th>API 基址</th><th>版本来源</th><th>本次结论</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>主站</td><td>qtvq.cn</td><td>同源 + api.qtvq.cn 竞速</td><td>release/version.json</td><td><span class="pill p-ok">正常</span></td></tr>
+    <tr><td>H5</td><td>qtvq.cn/h5/</td><td>https://qtvq.cn</td><td>version.json 的 web.build</td><td><span class="pill p-ok">正常</span>（本次起自动发布）</td></tr>
+    <tr><td>Windows</td><td>release/desktop/</td><td>继承页面</td><td>latest.yml（electron-updater）</td><td><span class="pill p-ok">正常</span>（清单已修）</td></tr>
+    <tr><td>微信小程序</td><td>wx489fbca28401e4e0</td><td>https://qtvq.cn</td><td>平台托管 + 1.0.6</td><td><span class="pill p-warn">待上传</span></td></tr>
+    <tr><td>快手小程序</td><td>ks651051624357102489</td><td>https://qtvq.cn</td><td>平台托管 + 1.0.6</td><td><span class="pill p-warn">待上传</span></td></tr>
+    <tr><td>支付宝/抖音/小红书/QQ/百度/京东</td><td>未申请 appid</td><td>—</td><td>1.0.6（已登记）</td><td><span class="pill p-skip">缺账号</span></td></tr>
+    <tr><td>360 小程序</td><td>服务端预留</td><td>—</td><td>1.0.6（已登记）</td><td><span class="pill p-skip">无构建端</span></td></tr>
+    <tr><td>Android / iOS</td><td>—</td><td>—</td><td>无记录（已豁免）</td><td><span class="pill p-bad">无安装包</span></td></tr>
+    <tr><td>鸿蒙</td><td>—</td><td>https://qtvq.cn</td><td>无记录（已豁免）</td><td><span class="pill p-bad">未打包</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>四、本次修掉的 5 个硬伤（含"为什么一直没被发现"）</h2>
+
+<div class="card">
+  <h3>① 渠道名对不上 —— 能力清单与更新结论从未生效</h3>
+  <p>客户端 <code>runtimeTag()</code> 返回 <code>mp-weixin</code> / <code>h5</code> / <code>app</code>，服务端 <code>APP_CHANNELS</code> 只认 <code>wechat</code> / <code>web</code> / <code>android|ios</code>。线上 <code>?channel=mp-weixin</code> 直接 <b>400 E_UNKNOWN_CHANNEL</b>，客户端见 <code>ok:false</code> 就返回 null，静默退回静态清单。</p>
+  <p class="note"><b>为什么没被发现：</b>接口能连通、客户端设计成"拿不到就兜底"、功能表面正常 —— 两端各说各的名字，人工点不出来，只能靠断言。现由 <code>check-channel-contract.mjs</code> 守住。</p>
+
+  <h3>② 缓存指纹从来没进过线上</h3>
+  <p>指纹注入只写在 <code>package-static.ps1</code>（打 ZIP 用），而线上真跑的是 <code>sync-static-from-windows.ps1</code>（scp 到源站）—— 那条路没有注入。于是线上首页从来没有 <code>?v=</code>，CSS/JS 无法长缓存。</p>
+  <p class="note"><b>为什么没被发现：</b>检查器 <code>check-cache-policy</code> 一直在报红，但它是"在线检查"的最后一项，容易被当成环境问题跳过。修法是抽出 <code>inject-asset-version.ps1</code> 让两条通道共用，并在远端 <code>grep</code> 断言 <code>?v=</code> 存在。</p>
+
+  <h3>③ 桌面自动更新指向一个不存在的文件</h3>
+  <p>线上 <code>latest.yml</code> 写的是 <code>Q问-Setup-1.0.6.exe</code>（公网 404），真实包是 <code>qtvq-desktop-Setup-1.0.6.exe</code>；连 size 都差 8 字节（82788539 vs 82788547），sha512 也对不上。</p>
+  <p class="note"><b>为什么没被发现：</b>下载页读的是另一份配置（download-config.js），手动下载一切正常；只有客户端自动更新会失败，而失败是静默的。上传脚本原来只校验"文件能下载、大小对得上"，没校验"清单里引用的那个文件是否存在"。</p>
+
+  <h3>④ 统一升级只有 3/14 渠道有记录</h3>
+  <p>其余 11 个渠道走兜底 <code>latest: 1.0.0</code> —— 比客户端真实的 1.0.6 还低。发版时这些端拿到的仍是"已最新"，<b>等于没发</b>。</p>
+  <p class="note">补齐 11 条（8 小程序 + web + 已有 windows/wechat）。Android/iOS/鸿蒙没有安装包，<b>刻意不给记录</b>：给了 version 就必须给 downloadUrl，否则就是"提示有新版但点不动"的假更新。豁免理由写进 JSON 的 <code>_未发布渠道</code>，由检查器核对。</p>
+
+  <h3>⑤ H5 产物不在发布流水线里</h3>
+  <p>改了源码、重建了 H5，但没有任何脚本负责上传，线上 <code>/h5/</code> 停在 9 月那一版 —— 手机上打开网页版，看到的界面与小程序不一致。</p>
+  <p class="note">现在 <code>sync-static</code> 会把 <code>dist/build/h5</code> 一并发布（含远端 <code>test -f h5/index.html</code> 断言）；产物不存在时明确告警而不是静默跳过。</p>
+</div>
+
+<h2>五、配色一致性（各端是否同一套视觉）</h2>
+
+<div class="card">
+  <p>唯一来源 <code>packages/tokens/src/index.js</code>（27 色）→ 生成 <code>css/styles.css</code> 的 <code>:root</code> 与 <code>apps/qtvq-uni/src/uni.scss</code>。鸿蒙 uvue 不支持变量注入，只能写字面量，因此对"值必须等于令牌"单独断言。</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>端</th><th>用法</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td>主站</td><td><code>var(--pink)</code> 等 CSS 变量</td><td><span class="pill p-ok">同源</span></td></tr>
+      <tr><td>小程序 8 端</td><td><code>$color-pink</code> 等 SCSS 变量</td><td><span class="pill p-ok">29 文件 / 139 处，0 野色</span></td></tr>
+      <tr><td>H5</td><td>同小程序源码</td><td><span class="pill p-ok">同源（产物已含新色）</span></td></tr>
+      <tr><td>鸿蒙</td><td>uvue 字面量</td><td><span class="pill p-ok">值全部命中令牌</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">本次收敛了 10 个"主站根本不存在"的色值（<code>#8b8aa0</code> <code>#9090a8</code> <code>#2a2a3d</code> <code>#232333</code> <code>#e74c3c</code> <code>#ff7675</code> <code>#9b8cff</code> <code>#c0392b</code> …）。其中 account.vue 一个文件发明了 <b>3 档不同的"危险红"</b>，而主站只有一档 —— 这正是"小程序像另一个产品"的来源。为此 tokens 升格了 <code>brandWechat</code> / <code>danger</code> / <code>dangerText</code>。</p>
+</div>
+
+<h2>六、死循环 / 空链接 / 漏洞排查结果</h2>
+
+<div class="card flat scroll">
+<table>
+  <thead><tr><th style="width:130px">项</th><th>排查方式</th><th style="width:270px">结论</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>死循环</b></td>
+      <td>扫 <code>setInterval/setTimeout</code> 自递归、<code>while(true)</code>、<code>for(;;)</code>、重试无退避</td>
+      <td>4 处无限循环均有边界：报告轮询（120s 上限 + 1.5s 间隔）、SMTP 读响应（读到完成码即返回）、H5 轮询（10 分钟/次，单次提示）</td>
+    </tr>
+    <tr>
+      <td><b>无意义轮询</b></td>
+      <td>检查后台标签页是否仍在打请求</td>
+      <td><span class="pill p-warn">已修</span> account 页 30s 轮询改为 <code>document.hidden</code> 跳过，切回时补一次</td>
+    </tr>
+    <tr>
+      <td><b>空链接</b></td>
+      <td>32 个内链本地存在性 + 线上 HEAD + <code>audit-dead-ends</code></td>
+      <td>内链 0 缺失；下载页 10 个未上线入口渲染成 disabled（不产生可点空 href）</td>
+    </tr>
+    <tr>
+      <td><b>空 src</b></td>
+      <td>扫 <code>src=""</code></td>
+      <td><span class="pill p-warn">已修</span> 首页收款码图片原为 <code>src=""</code>（会让浏览器重请求当前文档），改为无 src + hidden</td>
+    </tr>
+    <tr>
+      <td><b>越权 / 鉴权</b></td>
+      <td>逐路由看 requireAuth；线上探测未登录响应</td>
+      <td>敏感接口未登录一律 401（非 404/500，不泄露存在性）；admin 组在未配 <code>ADMIN_KEY</code> 时整组 404</td>
+    </tr>
+    <tr>
+      <td><b>注入</b></td>
+      <td>84 处 <code>innerHTML</code> 逐类核对转义</td>
+      <td>用户/模型内容走 <code>escapeHtml</code>/<code>esc</code>；新增内容一律先转义再拼接</td>
+    </tr>
+    <tr>
+      <td><b>密钥泄露</b></td>
+      <td>扫 PEM / <code>sk-</code> / <code>AKIA</code> / <code>LTAI</code>；Pages 泄露自检</td>
+      <td>命中的都是 PEM <b>格式化函数</b>，非真私钥；部署后 9 个敏感路径全 404</td>
+    </tr>
+    <tr>
+      <td><b>CORS</b></td>
+      <td>看白名单是否 <code>*</code></td>
+      <td>严格白名单（qtvq.cn / www / api 子域 / 本地调试），拒绝时返回 403 而非放行</td>
+    </tr>
+    <tr>
+      <td><b>SEO 卫生</b></td>
+      <td>sitemap 与页面清单对比</td>
+      <td><span class="pill p-warn">已修</span> 补 advice/report/wheel/terms 4 页，去掉与 <code>/</code> 重复的 index.html</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>七、检查门索引（39 项）</h2>
+
+<details>
+  <summary>展开：每项守的是什么</summary>
+  <div class="card flat scroll" style="margin-top:10px">
+  <table>
+    <thead><tr><th style="width:34px">#</th><th>检查项</th><th>本次是否新增</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>小程序接线（import/导出/模板变量/生命周期/页面入口）</td><td></td></tr>
+      <tr><td>2</td><td>小程序静态（渠道一致/名单一致/图片存在）</td><td></td></tr>
+      <tr><td>3</td><td>全端平台矩阵（8 小程序 + H5 + App + 自动更新能力）</td><td></td></tr>
+      <tr><td>4</td><td>鸿蒙 uni-app x 工程（路由/uvue 样式限制/防漂移）</td><td></td></tr>
+      <tr><td>5</td><td>下载页链路（生成文件/分区/容器/同源）</td><td></td></tr>
+      <tr><td>6</td><td>Pages Functions 打包预检（esbuild）</td><td></td></tr>
+      <tr><td>7</td><td>各端专用端口契约（纯函数单测 + 数据同源）</td><td></td></tr>
+      <tr><td>8</td><td>发布记录覆盖度（14 渠道版本/豁免、版本号统一）</td><td><span class="pill p-ok">新增</span></td></tr>
+      <tr><td>9</td><td>渠道名契约（客户端 runtimeTag ↔ 服务端 APP_CHANNELS）</td><td><span class="pill p-ok">新增</span></td></tr>
+      <tr><td>10</td><td>桌面发布包自洽（latest.yml ↔ 包 ↔ 下载页）</td><td><span class="pill p-ok">新增</span></td></tr>
+      <tr><td>11</td><td>静态站死胡同（链接/锚点/按钮/导航）</td><td></td></tr>
+      <tr><td>12</td><td>内容安全词表（绕过手法 + 误伤）</td><td></td></tr>
+      <tr><td>13</td><td>文本水印（往返/截断可溯源）</td><td></td></tr>
+      <tr><td>14</td><td>设计令牌（产物是否漂移）</td><td></td></tr>
+      <tr><td>15</td><td>配色一致（页面色值必须在令牌里）</td><td><span class="pill p-ok">新增</span></td></tr>
+      <tr><td>16</td><td>共享层纯度（L0–L3 禁平台 API）</td><td></td></tr>
+      <tr><td>17</td><td>ESM 导入导出交叉校验</td><td></td></tr>
+      <tr><td>18</td><td>HTML 内联脚本语法</td><td></td></tr>
+      <tr><td>19</td><td>三端派生自 shared（单一来源）</td><td></td></tr>
+      <tr><td>20</td><td>图片格式守卫（picture 兜底/WebP）</td><td></td></tr>
+      <tr><td>21</td><td>WebP 变体（存在/更小/像素一致）</td><td></td></tr>
+      <tr><td>22</td><td>i18n 覆盖</td><td></td></tr>
+      <tr><td>23</td><td>收款渠道声明（是否自动到账）</td><td></td></tr>
+      <tr><td>24</td><td>二维码本地实现（jsQR 双模解码）</td><td></td></tr>
+      <tr><td>25</td><td>PowerShell 脚本编码（UTF-8 BOM）</td><td></td></tr>
+      <tr><td>26</td><td>增长内容矩阵（20 条 × 2 平台 + 40 渠道码）</td><td></td></tr>
+      <tr><td>27</td><td>激活事件接线（两端上报/年龄门顺序）</td><td></td></tr>
+      <tr><td>28</td><td>问答链路安全（审核/危机转介/号码单一来源）</td><td></td></tr>
+      <tr><td>29</td><td>小程序审核合规（iOS 虚拟支付/协议入口/隐私）</td><td></td></tr>
+      <tr><td>30</td><td>数据可携带与痛苦提示（白名单/两端入口）</td><td></td></tr>
+      <tr><td>31</td><td>埋点 SDK 运行时（报文/鉴权/批量/回队）</td><td></td></tr>
+      <tr><td>32</td><td>测试套件 43 项（接口/支付/账号/安全/静态页）<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>33</td><td>各端专用端口线上实测<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>34</td><td>双端闸门（Pages vs Node 逐字段）<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>35</td><td>模型链路（两侧真实探测）<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>36</td><td>线上缓存策略（指纹长缓存 / 不再清空）<span class="pill p-skip">在线</span></td><td><span class="pill p-ok">已转绿</span></td></tr>
+      <tr><td>37</td><td>静态图片双端一致（防旧收款码）<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>38</td><td>API 延迟预算（P95 ≤ 800ms）<span class="pill p-skip">在线</span></td><td></td></tr>
+      <tr><td>39</td><td>服务端代码指纹（线上 = 本地）<span class="pill p-skip">在线</span></td><td></td></tr>
+    </tbody>
+  </table>
+  </div>
+</details>
+
+<h2>八、仍需人工材料的部分（代码已尽力）</h2>
+
+<div class="card">
+  <table>
+    <tbody>
+      <tr><td style="width:180px"><b>微信小程序类目</b></td><td>「深度合成-AI问答」类目 + 算法备案编号 + 安全评估报告 —— 唯一硬阻塞，代码无法替代</td></tr>
+      <tr><td><b>上传私钥</b></td><td><code>private.wx489fbca28401e4e0.key</code> 需在微信后台生成并落到 <code>apps/qtvq-uni/</code>（<code>.gitignore</code> 已排除）</td></tr>
+      <tr><td><b>小程序码</b></td><td>下载页微信卡片目前是"待上传"占位（无码可放，不放假图）</td></tr>
+      <tr><td><b>快手限入类目</b></td><td>情感咨询属限入类目，需提交资质；担保支付需企业主体开通</td></tr>
+      <tr><td><b>移动安装包</b></td><td>Android（应用宝/华为/小米/OPPO/vivo）、iOS（Apple 开发者账号）、鸿蒙（HAP）均无包</td></tr>
+      <tr><td><b>真实用户</b></td><td>注册量仍为个位数，端到端体验需真实流量验证</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  <p>复跑：<code>npm run check:all</code>（39 项）｜ 单项：<code>npm run check:channel</code> / <code>check:app-releases</code> / <code>check:desktop-release</code> / <code>check:mini-colors</code></p>
+  <p>本文档随代码演进；若某项检查转红，先跑对应的单项脚本看完整输出，再改代码 —— 不要改断言来迁就现状。</p>
+</footer>
+
+</div>
+</body>
+</html>
