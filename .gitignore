@@ -20,3 +20,21 @@ cf.env
 obs.env
 js/version.js
 obsidian/
+
+# 微信/云厂商下载的证书私钥等原始凭据，绝不入库
+.secrets/
+
+# 2026-10-28：整理工作区时发现 .dev.vars 的历史备份没有被任何规则覆盖 ——
+# 里面有真实的 SMTP 口令、PAYMENT_ADMIN_KEY、NLS_APP_KEY。这类文件只能留在本机。
+.dev.vars.bak*
+.dev.vars.*
+# 例外要写在通配之后，否则通配会把示例文件也一起忽略掉（顺序即优先级）
+!.dev.vars.example
+
+# 排查线上问题时的临时脚本/抓包产物，属于"用完即弃"，不入库
+.tmp-*
+tmp-*.json
+tmp-live-*.js
+
+# WorkBuddy 的项目内数据（工作日志/记忆），属于本机工具状态，不是产品源码
+.workbuddy/
