@@ -392,7 +392,19 @@ export async function acceptanceGate({ days = GATE.windowDays, now = new Date() 
 
   const windowStart = await db.collection(DAILY).find({}).sort({ date: 1 }).limit(1).project({ _id: 0, date: 1 }).toArray();
   const firstDate = windowStart[0]?.date || null;
-  const coverage = rows.length;
+
+  /*
+   * 「覆盖天数」只算**当天有任何信号**的日子，不是 metrics_daily 的行数。
+   *
+   * 起因（2026-10-29）：有人为了"让看板有数"补算了 90 天，于是 90 行全零的空壳
+   * 让覆盖度从 6 天跳到 90 天，验收门立刻从"窗口不足"变成"可以下结论"——
+   * 而实际上线后才 6 天有真实流量。空壳行是补算出来的，不是观测出来的。
+   * 所以这里按"有没有真实信号"来数，补算的零行不算观测天数。
+   */
+  const SIGNAL_KEYS = ['newUsers', 'activated', 'reportViews', 'landingViews', 'reportOrders', 'reportPaid', 'shareGenerated', 'shareLanding'];
+  const hasSignal = (r) => SIGNAL_KEYS.some((k) => Number(r[k]) > 0);
+  const coverage = rows.filter(hasSignal).length;
+  const windowRows = rows.length;
   const enoughWindow = coverage >= GATE.windowDays;
 
   /*
@@ -473,7 +485,7 @@ export async function acceptanceGate({ days = GATE.windowDays, now = new Date() 
   const failed = judged.filter((c) => c.ok === false).length;
   let status = 'insufficient';
   const reasons = [];
-  if (!enoughWindow) reasons.push(`度量窗口仅 ${coverage}/${GATE.windowDays} 天`);
+  if (!enoughWindow) reasons.push(`度量窗口仅 ${coverage}/${GATE.windowDays} 天有真实数据（补算的零值日不算）`);
   if (activated < GATE.minActivated) reasons.push(`激活用户仅 ${activated} 人（需 ≥ ${GATE.minActivated}）`);
   if (cacFen == null) reasons.push('未录入渠道成本，无法计算 CAC');
   if (!reasons.length) status = failed >= 2 ? 'failed' : 'passed';
@@ -484,6 +496,7 @@ export async function acceptanceGate({ days = GATE.windowDays, now = new Date() 
     checks,
     summary,
     coverage,
+    windowRows,
     firstDate,
     activated,
     converted,
