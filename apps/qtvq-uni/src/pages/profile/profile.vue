@@ -77,12 +77,17 @@
           <text>导出我的数据</text>
           <text class="arrow">›</text>
         </view>
+        <!-- 「客户端下载」是把人引导到站外下载 App，只在微信/H5/App 出现。
+             快手《版本信息审核规范》把"官网、网址、电话、地址、第三方官方"都算引流；
+             这类平台内只保留站内的客服表单与协议页。 -->
+        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
         <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('download')">
           <text>客户端下载</text>
           <text class="arrow">›</text>
         </view>
+        <!-- #endif -->
         <view class="menu-item" hover-class="menu-item-hover" @tap="openContact">
-          <text>联系客服 qtvq@qtvq.cn</text>
+          <text>联系客服</text>
           <text class="arrow">›</text>
         </view>
         <view class="menu-item" hover-class="menu-item-hover" @tap="copyClientId">
@@ -134,7 +139,13 @@
           <text v-if="wallet">当前余额 ¥{{ Number(wallet.balance || 0).toFixed(2) }}</text>
         </text>
         <button class="btn-primary" @tap="goWallet">查看缘值余额与流水 →</button>
-        <button class="btn-secondary" @tap="goRecharge">缘值充值（微信在线支付，自动到账）</button>
+        <!-- 付费被平台规则禁用时不显示充值入口（快手/抖音等整端不提供，iOS 微信也不提供）：
+             留着按钮只会把人引到一句"本小程序不提供在线购买"，比没有入口更像坏了。
+             外层 ifdef 是第二道：别的平台包里根本不该出现"微信在线支付"这几个字，
+             只靠运行时 v-if 隐藏，字符串仍然躺在包内。 -->
+        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
+        <button v-if="canTopup" class="btn-secondary" @tap="goRecharge">缘值充值（微信在线支付，自动到账）</button>
+        <!-- #endif -->
       </view>
 
       <view class="card">
@@ -146,7 +157,14 @@
 
       <view class="card">
         <text class="section-title">关于</text>
+        <!-- 备案号保留（合规信息），域名与 API 地址只在微信/H5/App 显示：
+             其它小程序平台把它算"网址引流"，而这一行恰恰是最显眼的一处。 -->
+        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
         <text class="about">qtvq.cn · 京ICP备19045082号\n版本 {{ appVersion }} · 会员 ¥29/79/299\nAPI: qtvq.cn</text>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="about">京ICP备19045082号\n版本 {{ appVersion }} · 会员 ¥29/79/299</text>
+        <!-- #endif -->
       </view>
       </view>
     </scroll-view>
@@ -170,7 +188,7 @@ import { track } from '../../utils/track.js';
 import { fetchWallet } from '../../api/wallet.js';
 import { fetchMyData, shareMyData } from '../../api/export.js';
 import { isLoggedIn } from '../../utils/auth.js';
-import { platformLabel } from '../../utils/platform.js';
+import { platformLabel, canTopup as canTopupNow } from '../../utils/platform.js';
 import { WEB_BASE, APP_VERSION } from '../../data/constants.js';
 import BrandNavBar from '../../components/BrandNavBar.vue';
 import { useNavBar } from '../../utils/navBar.js';
@@ -181,6 +199,8 @@ const clientId = ref('');
 const user = ref(getUser());
 const quota = ref(null);
 const platformName = platformLabel();
+/** 充值入口是否出现（快手/抖音等端整端不提供，iOS 微信也不提供，见 utils/platform.js） */
+const canTopup = canTopupNow();
 const appVersion = APP_VERSION;
 const clientIdShort = computed(() => {
   const id = clientId.value || '';

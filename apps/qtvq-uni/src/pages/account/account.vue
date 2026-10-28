@@ -13,7 +13,7 @@
       <text class="hint wechat-tip">不用记密码；若曾用手机号注册，登录后自动绑定微信，忘记密码时可微信验证找回。</text>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
-      <text class="hint wechat-tip">请使用手机号注册 / 登录；界面与微信小程序「我的账户」一致。</text>
+      <text class="hint wechat-tip">请使用手机号注册 / 登录。</text>
       <!-- #endif -->
 
       <template v-if="mode !== 'forgot'">
@@ -24,7 +24,7 @@
       </template>
 
       <template v-else>
-        <text class="hint">① 短信验证码找回（推荐，不需要绑定微信）：填手机号 → 获取验证码 → 填新密码。</text>
+        <text class="hint">① 短信验证码找回（推荐，不需要额外授权）：填手机号 → 获取验证码 → 填新密码。</text>
         <input v-model="phone" class="input" type="number" maxlength="11" placeholder="注册手机号" />
         <view class="code-row">
           <input v-model="smsCode" class="input code-input" type="number" maxlength="6" placeholder="6 位验证码" />
@@ -41,7 +41,7 @@
         <text class="hint">② 或：用微信验证身份重置（须曾绑定微信）。</text>
         <button class="btn-secondary btn-block" @click="resetPwd">微信验证并重置密码</button>
         <!-- #endif -->
-        <text class="hint">两者都不行？请联系 qtvq@qtvq.cn 协助重置。</text>
+        <text class="hint">两者都不行？回到「我的」→「联系客服」提交，我们会协助重置。</text>
       </template>
     </view>
 
@@ -59,7 +59,7 @@
       <view v-if="showPwd" class="card">
         <text class="section-title">修改密码</text>
         <text v-if="user?.hasPassword === false" class="hint">
-          你这个账号还没有密码（之前用微信登录）。直接填新密码保存即可，之后就能用手机号+密码登录。
+          你这个账号还没有密码（之前用第三方账号登录）。直接填新密码保存即可，之后就能用手机号+密码登录。
         </text>
         <input v-if="user?.hasPassword !== false" v-model="oldPassword" class="input" password placeholder="原密码" />
         <input v-model="newPassword" class="input" password placeholder="新密码" />
@@ -85,7 +85,7 @@
       <view class="card danger">
         <text class="section-title">注销账号</text>
         <text class="hint">
-          注销后<text class="strong">个人资料、登录凭证、提问记录、微信绑定立即删除且不可恢复</text>；
+          注销后<text class="strong">个人资料、登录凭证、提问记录、第三方账号绑定立即删除且不可恢复</text>；
           订单以脱敏方式保留（金额/时间保留，身份信息隐去）用于财务留痕。
           会员未到期或有待核实付款时不允许自助注销，请先联系客服协商。
         </text>
@@ -411,7 +411,7 @@ async function doDelete() {
     deleteConfirm.value = '';
     uni.showToast({ title: '账号已注销', icon: 'none' });
   } catch (e) {
-    deleteMsg.value = e.message || '注销失败，请联系 qtvq@qtvq.cn';
+    deleteMsg.value = e.message || '注销失败，请通过「联系客服」提交，我们会协助处理';
     uni.showToast({ title: deleteMsg.value, icon: 'none' });
   } finally {
     deleting.value = false;

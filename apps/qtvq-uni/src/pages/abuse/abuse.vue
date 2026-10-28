@@ -29,7 +29,7 @@
         v-model="detail"
         class="textarea"
         maxlength="500"
-        placeholder="例如：对方在资料里留微信号引导加好友"
+        placeholder="例如：对方在资料里留联系方式引导站外加好友"
       />
       <text class="counter">{{ detail.length }}/500</text>
 

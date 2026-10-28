@@ -21,7 +21,7 @@
 export default {
   // ---- contact 页（留言客服）----
   'contact.title': '联系客服',
-  'contact.hint': '留言将发送至 qtvq@qtvq.cn，请勿填写银行卡密码等敏感信息。',
+  'contact.hint': '留言将由人工客服处理。请勿填写银行卡密码等敏感信息。',
   'contact.placeholderMessage': '描述您的问题或建议…',
   'contact.placeholderEmail': '方便回复的邮箱（选填）',
   'contact.submit': '提交留言',

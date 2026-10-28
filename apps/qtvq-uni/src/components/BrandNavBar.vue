@@ -10,7 +10,15 @@
       <image class="brand-logo" src="@/static/logo-108.png" mode="aspectFit" />
       <view v-if="showBrandCenter" class="brand-center">
         <text class="brand-title">Q问</text>
+        <!-- 副标题里的官网域名只在微信/H5/App 出现。
+             快手《版本信息审核规范》明确禁止"官网、网址、二维码、电话、地址"等引流，
+             在别的平台包里顶着一个域名，是最容易被巡检挑出来的那种问题。 -->
+        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
         <text class="brand-sub">我心永恒 · qtvq.cn</text>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="brand-sub">我心永恒</text>
+        <!-- #endif -->
       </view>
       <view v-else-if="centerTitle" class="brand-center">
         <text class="brand-title">{{ centerTitle }}</text>
