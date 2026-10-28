@@ -17,7 +17,20 @@
       </view>
     </view>
 
-    <view class="card pay-online-card">
+    <!--
+      iOS 端整块付费区替换成说明（E.44 · 微信审核硬项）。
+
+      不是"少一个按钮"：微信禁的是**在 iOS 小程序内完成虚拟商品交易**，
+      把直接扣款换成静态收款码属于同一条违规的另一种写法。
+      所以这里 v-if 掉整块付费区，只留说明 + 去网页版的出口。
+    -->
+    <view v-if="payBlocked" class="card pay-blocked-card">
+      <text class="section-title">iOS 端暂不支持购买</text>
+      <text class="hint pay-hint form-readable">{{ payBlockedTip }}</text>
+      <button class="btn-secondary btn-block btn-outline" @tap="copyBuyUrl">复制网页版地址</button>
+    </view>
+
+    <view v-if="!payBlocked" class="card pay-online-card">
       <!-- 动态在线支付卡。
            2026-10-11 修正：这里原来只写 `#ifdef MP-WEIXIN`，于是 **H5 与桌面壳的会员页整张卡被剪掉**，
            桌面端只剩静态收款码 —— 用户付了钱不会自动到账、系统里也查不到记录（业务方实测两次）。
@@ -43,7 +56,7 @@
       <!-- #endif -->
     </view>
 
-    <view class="card">
+    <view v-if="!payBlocked" class="card">
       <text class="section-title">静态收款码 · 点击放大</text>
       <text class="hint pay-hint">或使用下方收款码；需手填 ¥{{ selectedPrice }} 与设备编号并提交核实。</text>
       <view class="pay-grid">
@@ -59,7 +72,7 @@
       </view>
     </view>
 
-    <view v-if="company" class="card">
+    <view v-if="company && !payBlocked" class="card">
       <text class="section-title">对公银行汇款</text>
       <text class="bank-line">户名：{{ company.name }}</text>
       <text class="bank-line">账号：{{ company.cardNo }}</text>
@@ -68,7 +81,7 @@
       <button class="btn-secondary btn-block" @click="copyBank">复制账号</button>
     </view>
 
-    <view id="payment-form" class="card form-card">
+    <view v-if="!payBlocked" id="payment-form" class="card form-card">
       <text class="section-title form-section-title">提交汇款核实</text>
       <text class="hint pay-hint form-readable">扫码或对公汇款后填写以下信息，便于核对开通会员。</text>
       <text class="form-label">汇款人姓名</text>
@@ -82,7 +95,16 @@
       </button>
     </view>
 
-    <text class="legal legal-lg">收款方：我心永恒（北京）网络科技有限公司。核实到账后开通会员。</text>
+    <text v-if="!payBlocked" class="legal legal-lg">收款方：我心永恒（北京）网络科技有限公司。核实到账后开通会员。</text>
+
+    <!--
+      下单前的协议可见入口（电子商务法要求"下单前可使消费者知悉协议"）。
+      iOS 端也保留：那一端虽然不能买，用户仍然要知道自己用的是什么规则。
+    -->
+    <view class="legal-links">
+      <text class="legal-link" @tap="openDoc('terms')">《用户协议》</text>
+      <text class="legal-link" @tap="openDoc('privacy')">《隐私政策》</text>
+    </view>
 
     <view v-if="viewerOpen" class="pay-viewer" @click="closePayViewer">
       <view class="pay-viewer-box" @click.stop>
@@ -121,14 +143,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { PLANS } from '../../data/constants.js';
+import { PLANS, WEB_BASE } from '../../data/constants.js';
 import { PAY_CHANNELS, channelTip } from '../../data/pay-channels.js';
 import { fetchPaymentInfo, submitPayment } from '../../api/quota.js';
 import { createWechatPayOrder, pollWechatPayOrder } from '../../api/payment-wechat.js';
 import { wechatLoginCode } from '../../api/auth.js';
 import { qrMatrix, drawQrToCanvas } from '../../utils/qr-render.js';
 // JSAPI（直接扣款）只有微信小程序可用 —— 用运行时判断给按钮做门控（见模板里的说明）
-import { supportsWechatJsapiPay } from '../../utils/platform.js';
+import { supportsWechatJsapiPay, isVirtualPayBlocked, VIRTUAL_PAY_BLOCKED_TIP } from '../../utils/platform.js';
 
 /**
  * 把订单码画到隐藏 canvas 并导出临时图片路径。
@@ -169,8 +191,15 @@ import { track } from '../../utils/track.js';
 
 const plans = PLANS;
 const payChannels = PAY_CHANNELS;
-/** 能否走"直接扣款"（JSAPI）：仅微信小程序为 true；H5/App/其它小程序为 false */
+/** 能否走"直接扣款"（JSAPI）：仅微信小程序**且非 iOS** 为 true；H5/App/其它小程序/iOS 为 false */
 const canJsapi = supportsWechatJsapiPay();
+/**
+ * 是否整块禁用付费（当前只有 iOS 微信小程序）。
+ * 与 canJsapi 分开：canJsapi 只关掉"直接扣款"这一个按钮，
+ * payBlocked 关掉整个付费区（含静态码、对公汇款、提交核实表单）。
+ */
+const payBlocked = isVirtualPayBlocked();
+const payBlockedTip = VIRTUAL_PAY_BLOCKED_TIP;
 const selected = ref('month');
 const company = ref(null);
 const submitting = ref(false);
@@ -332,6 +361,12 @@ function previewViewerImage() {
 }
 
 async function startWalletPay() {
+  // 双保险：模板已 v-if 掉按钮，这里再挡一次 —— 以后谁把 v-if 改坏了，
+  // 也不至于在 iOS 上真的调起支付（模板与逻辑各挡一次，是这类"合规开关"的固定写法）。
+  if (payBlocked) {
+    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    return;
+  }
   onlineLoading.value = true;
   try {
     const code = await wechatLoginCode();
@@ -350,6 +385,10 @@ async function startWalletPay() {
 }
 
 async function startQrPay() {
+  if (payBlocked) {
+    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    return;
+  }
   onlineLoading.value = true;
   try {
     const data = await createWechatPayOrder(selected.value, 'native');
@@ -382,6 +421,33 @@ function copyAmount() {
 function copyBank() {
   if (!company.value?.cardNo) return;
   copyText(company.value.cardNo, '已复制账号');
+}
+
+/**
+ * iOS 端复制网页版地址。
+ *
+ * 为什么给"复制"而不是"打开 web-view"：小程序 web-view 打开自家 H5 的会员页，
+ * 会在页面里呈现完整的购买流程 —— 那等于绕开 iOS 限制，审核同样不认。
+ * 复制地址让用户自己去浏览器打开，是微信规则下最干净的做法。
+ */
+function copyBuyUrl() {
+  // 指向 account.html 而不是某个"会员页"：官网的办理/续费入口就在账户页（#btn-subscribe），
+  // 用户复制过去落地即登录 + 付费两个动作在同一页，不用再找一次。
+  copyText(`${WEB_BASE}/account.html`, '地址已复制，请在浏览器中打开');
+}
+
+/**
+ * 打开协议页（terms / privacy）。
+ *
+ * 走 web-view 而不是把协议文本塞进小程序：协议会持续修订，塞进来就要为每次修订
+ * 重新提审一遍小程序；指向官网页面则改完即可生效。标题用中文（见 DOC_TITLES）。
+ */
+const DOC_TITLES = { terms: '用户协议', privacy: '隐私政策' };
+function openDoc(name) {
+  const url = `${WEB_BASE}/${name}.html`;
+  uni.navigateTo({
+    url: `/pages/webview/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(DOC_TITLES[name] || name)}`,
+  });
 }
 
 function payDone() {
@@ -631,6 +697,20 @@ onUnmounted(() => {
   margin-top: 24rpx;
   line-height: 1.5;
   padding: 0 8rpx;
+}
+
+/** 下单前的协议入口（与 legal 同一视觉层级，但可点） */
+.legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+  padding-bottom: 8rpx;
+}
+.legal-link {
+  font-size: 22rpx;
+  color: $color-text-faint;
+  text-decoration: underline;
 }
 
 .pay-viewer {

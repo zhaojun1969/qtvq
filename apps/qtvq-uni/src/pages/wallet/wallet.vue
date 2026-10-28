@@ -13,8 +13,14 @@
       <text v-if="memberText" class="member">{{ memberText }}</text>
     </view>
 
+    <!-- iOS 端：整块充值区不出现，只留说明（E.44，微信审核硬项） -->
+    <view v-if="payBlocked" class="card">
+      <text class="section-title">iOS 端暂不支持充值</text>
+      <text class="hint">{{ payBlockedTip }}</text>
+    </view>
+
     <!-- ── 充值：金额自定，付款成功自动到账（不用人工核实） ── -->
-    <view class="card recharge">
+    <view v-if="!payBlocked" class="card recharge">
       <text class="section-title">缘值充值（微信在线支付 · 自动到账）</text>
       <text class="hint">¥1 – ¥2000，可填两位小数。付款成功后缘值自动加上，不需要联系客服。</text>
 
@@ -104,6 +110,14 @@ import { createTopupOrder, pollWechatPayOrder } from '../../api/payment-wechat.j
 import { wechatLoginCode } from '../../api/auth.js';
 import { getAuthUser } from '../../utils/auth.js';
 import { qrMatrix, drawQrToCanvas } from '../../utils/qr-render.js';
+import { isVirtualPayBlocked, VIRTUAL_PAY_BLOCKED_TIP } from '../../utils/platform.js';
+
+/**
+ * iOS 微信小程序内不能买虚拟商品（缘值就是虚拟商品），整块充值区隐藏。
+ * 与会员页同一口径，说明文案也读同一个常量（见 utils/platform.js）。
+ */
+const payBlocked = isVirtualPayBlocked();
+const payBlockedTip = VIRTUAL_PAY_BLOCKED_TIP;
 
 const balance = ref(0);
 const tiers = ref([]);
@@ -305,6 +319,11 @@ function showErr(e) {
 }
 
 async function startPay() {
+  // 双保险（模板已 v-if 掉充值区）：合规开关在模板与逻辑各挡一次
+  if (payBlocked) {
+    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    return;
+  }
   const value = validateAmount();
   if (value === null) return;
   const user = getAuthUser();
