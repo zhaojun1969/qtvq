@@ -42,3 +42,9 @@ tmp-live-*.js
 # Python 编译缓存（tools/scripts 下有几个 .py 部署脚本）
 __pycache__/
 *.pyc
+
+# 桌面端构建产物：release/ 里是 158MB 的安装包（Portable/Setup .exe），
+# web/ 是打包好的 H5（带哈希文件名）。两者都能由源码重新生成，
+# 发版靠 app-releases.json 指路，不该进 Git 历史。
+desktop/release/
+desktop/web/

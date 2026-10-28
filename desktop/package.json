@@ -1,0 +1,62 @@
+{
+  "name": "qtvq-desktop",
+  "version": "1.0.6",
+  "description": "我心永恒 Q问 · Windows 桌面客户端",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis portable",
+    "dist:all": "electron-builder --win nsis portable --publish never"
+  },
+  "build": {
+    "appId": "cn.qtvq.desktop",
+    "productName": "Q问",
+    "copyright": "我心永恒（北京）网络科技有限公司",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "preload/**/*",
+      "web/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "src/main.js"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Q问",
+      "artifactName": "qtvq-desktop-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "qtvq-desktop-Portable-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://qtvq.cn/release/desktop/",
+        "channel": "latest"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
