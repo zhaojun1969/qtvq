@@ -128,9 +128,19 @@ export async function markPaid({ orderId, transactionId, amountFen }) {
 
   // 第二道幂等闸：入账以 orderId 作为幂等键，崩溃后重放也不会重复加钱
   let credited = 0;
+  /*
+   * ⚠️ 只有**缘值充值单**（sku=topup）才给钱包入账。
+   *
+   * 2026-10-29 真实事故：这段代码原先对所有订单都 `credit()`，于是扫码付 ¥4.90
+   * 买一份避坑诊断报告，钱包又被打回 ¥4.90 —— 用户既拿到报告、余额还变多了，
+   * 等于报告免费，反复操作就是无限刷。
+   * 报告/转盘这类订单的"交付物"是报告本身（订单被消费即可），不该再折成余额。
+   * 充值单才是"钱换成余额"，那笔钱必须入账。
+   */
+  const isTopup = String(updated.sku || '') === 'topup' || String(updated.plan || '') === 'topup';
   // 0 元单（券全额抵扣）没有钱可入账，直接跳过 —— 否则 wallet.credit 会抛
   // E_BAD_AMOUNT，日志里还会留下一条误导人的"入账失败需人工补入账"。
-  if (Number(updated.amountFen) > 0) {
+  if (isTopup && Number(updated.amountFen) > 0) {
     try {
       const r = await credit(updated.uid, Number(updated.amountFen) / 100, {
         reason: 'wechat_pay',

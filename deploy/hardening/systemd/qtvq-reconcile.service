@@ -1,0 +1,18 @@
+[Unit]
+Description=Reconcile QTVQ wechat-pay orders (settle missed notify callbacks)
+# 写非 ASCII 路径会被 systemd 判 "Invalid URL, ignoring"
+Documentation=file:///opt/qtvq/server/scripts/reconcile-orders.mjs
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qtvq/server
+# 只补 2 分钟以前的单：刚支付的那几秒留给正常回调，避免和回调抢着写
+ExecStart=/usr/bin/node --env-file=.env scripts/reconcile-orders.mjs --minutes=2 --limit=100
+# 需要读 secrets/ 下的商户私钥（600 root），所以以 root 跑
+User=root
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=180
+Nice=10

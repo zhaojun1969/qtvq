@@ -31,6 +31,7 @@ const arg = (name, def = null) => {
 };
 
 const SKU = String(arg('sku', 'diagnose'));
+// 默认 uid 与 e2e 脚本**必须不同**：否则 e2e 的清理会把真实支付的订单一起删掉（2026-10-29 已踩过）
 const UID = String(arg('uid', 'u_rptprobe_billing_001'));
 const BASE = String(arg('base', 'http://127.0.0.1:3000'));
 const ORDER_ID = arg('order-id', null);
@@ -88,7 +89,7 @@ async function main() {
       console.error(`\n❌ 订单状态异常：${current.status}`);
       process.exit(1);
     }
-    console.log(`\n✅ 已支付：${current.orderId}（¥${(current.amountFen / 100).toFixed(2)}，transaction=${current.transactionId || '—'}）`);
+    console.log(`\n✅ 已支付：${current.orderId}（¥${(current.amountFen / 100).toFixed(2)}，transaction=${current.wxTransactionId || '—'}）`);
 
     // 支付成功后走真实生成接口（带 orderId → 消费订单）
     const token = signLocalToken(String(order.uid));

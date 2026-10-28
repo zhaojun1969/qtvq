@@ -1,0 +1,14 @@
+[Unit]
+Description=Every 10 minutes: reconcile wechat-pay orders
+
+[Timer]
+# 10 分钟一次：回调丢了的单最多让用户等 10 分钟
+OnCalendar=*:0/10
+# 错开整点的其它定时任务
+RandomizedDelaySec=60
+# 关机/重启错过的那次开机补跑
+Persistent=true
+Unit=qtvq-reconcile.service
+
+[Install]
+WantedBy=timers.target

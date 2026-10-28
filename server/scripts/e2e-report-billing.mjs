@@ -31,7 +31,8 @@ const arg = (name, def = null) => {
 };
 
 const KEEP = process.argv.includes('--keep');
-const UID = String(arg('uid', 'u_rptprobe_billing_001'));
+// 只在灰度名单里的**自动化**账号；真实扫码支付用的是另一个 uid（见 buy-real-report.mjs）
+const UID = String(arg('uid', 'u_e2e_report_billing_001'));
 const BASE = String(arg('base', 'http://127.0.0.1:3000'));
 
 let pass = 0;
@@ -197,6 +198,9 @@ async function main() {
       prepayError || (isWechatPayConfigured() ? '微信返回里没有 codeUrl' : '商户号未配置')
     );
 
+    // 记录支付前的余额（下面要断言报告单不会把钱折回钱包）
+    const walletBeforeReport = Number((await db.collection('wallet').findOne({ _id: UID }))?.balance || 0);
+
     // 3) 模拟"支付成功后微信回调"的结果：把订单置为已支付
     await markPaid({ orderId: order.orderId, transactionId: 'e2e_prepay:' + order.orderId, amountFen });
     const paidOrder = await getOrder(order.orderId);
@@ -225,6 +229,14 @@ async function main() {
       await new Promise((r2) => setTimeout(r2, 4000));
     }
 
+    /*
+     * 回归：报告单支付**不能**给钱包入账。
+     * 2026-10-29 事故：markPaid 对所有订单都 credit()，于是付 ¥4.90 买报告、钱包又回 ¥4.90，
+     * 等于报告免费。这条断言就是防它复发（余额必须与支付前一致）。
+     */
+    const walletAfter = Number((await db.collection('wallet').findOne({ _id: UID }))?.balance || 0);
+    check(`${c.sku} 付费后钱包余额未变（报告单不折余额）`, Math.abs(walletAfter - walletBeforeReport) < 0.005, `支付前 ${walletBeforeReport} → 支付后 ${walletAfter}`);
+
     // 订单必须被消费掉（否则说明报告是"白拿"的）
     const consumed = await getOrder(order.orderId);
     console.log(
@@ -247,21 +259,34 @@ async function main() {
       `HTTP ${replay.status} ${JSON.stringify(replayJson).slice(0, 160)}`
     );
 
-    results.push({ sku: c.sku, reportId, status: report?.status, amountFen, codeUrl, completeness: report?.completeness ?? null });
+    results.push({ sku: c.sku, orderId: order.orderId, reportId, status: report?.status, amountFen, codeUrl, completeness: report?.completeness ?? null });
   }
 
   const totalFen = results.reduce((a, r) => a + Number(r.amountFen || 0), 0);
   console.log(`\n  三张单合计 ${yuan(totalFen)}${results.every((r) => r.codeUrl) ? '（微信侧均成功下单，可扫码真实支付）' : ''}`);
   check('三单都走了"已支付订单"闭环', results.length === 3 && results.every((r) => r.status === 'ready'));
 
+  /*
+   * 清理：**只删本次真正创建的那些记录**（按 orderId / reportId 精确删）。
+   *
+   * 2026-10-29 事故：第一版清理写的是 `deleteMany({ uid: UID })`，而真实扫码支付用的
+   * 测试号恰好也是这个 uid —— 于是一次 e2e 跑完，把用户真金白银付过的订单与报告
+   * 一起删了（金额、微信 transaction_id、报告内容全没了）。
+   * 教训：测试清理的边界必须是"我造的这些 ID"，绝不能是"这个 uid 名下所有东西"。
+   * 钱包也不删：那是账号资产，测试号也该留着 welcome 余额。
+   */
   if (!KEEP) {
-    await db.collection('wallet_ledger').deleteMany({ uid: UID });
-    await db.collection('wallet').deleteOne({ _id: UID });
-    await db.collection('users').deleteOne({ _id: UID });
-    await db.collection('auth_users').deleteOne({ userId: UID });
-    await db.collection('orders').deleteMany({ uid: UID });
-    await db.collection('reports').deleteMany({ uid: UID });
-    console.log('  🗑  测试数据已清理（--keep 可保留）');
+    const orderIds = results.map((r) => r.orderId).filter(Boolean);
+    const reportIds = results.map((r) => r.reportId).filter(Boolean);
+    const { ObjectId } = await import('mongodb');
+    if (orderIds.length) {
+      await db.collection('orders').deleteMany({ orderId: { $in: orderIds } });
+      await db.collection('wallet_ledger').deleteMany({ idempotencyKey: { $in: orderIds.map((id) => 'wx:' + id) } });
+    }
+    if (reportIds.length) {
+      await db.collection('reports').deleteMany({ _id: { $in: reportIds.map((id) => new ObjectId(id)) } });
+    }
+    console.log(`  🗑  已清理本次创建的 ${orderIds.length} 张订单、${reportIds.length} 份报告（钱包与账号保留）`);
   }
 
   console.log(`\n通过 ${pass} · 失败 ${fail}`);

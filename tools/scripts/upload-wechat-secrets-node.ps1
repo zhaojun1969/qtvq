@@ -68,6 +68,25 @@ foreach ($k in $plainKeys) {
     $plain[$k] = $v
 }
 
+<#
+  ⚠️ 回调地址必须指向**自建 Node**，不能沿用 Pages 的地址。
+  2026-10-29 真实事故：`WECHAT_PAY_NOTIFY_URL` 还是 `https://qtvq.cn/api/payment/wechat/notify`，
+  而 nginx 的 `/api/` 是反代到 Cloudflare Pages 的 —— 微信回调落在 Pages 上，
+  自建 Node 永远收不到，用户付了 ¥4.90、本地订单一直 `created`，报告不出且没有任何报错。
+  Node 的回调端点是 `/v1/payment/wechat/notify`（nginx 的 `location /v1/` 直连 Node）。
+  所以这里做一次显式改写，并把结果打出来，避免又被 `.dev.vars` 里的旧值覆盖回去。
+#>
+if ($plain.Contains('WECHAT_PAY_NOTIFY_URL')) {
+    $nodeNotify = (Get-DevVarValue -Lines $lines -Key 'WECHAT_PAY_NOTIFY_URL_NODE')
+    if (-not $nodeNotify) {
+        $nodeNotify = $plain['WECHAT_PAY_NOTIFY_URL'] -replace '/api/payment/wechat/notify', '/v1/payment/wechat/notify'
+    }
+    if ($nodeNotify -eq $plain['WECHAT_PAY_NOTIFY_URL']) {
+        Write-Host "  ⚠️ 回调地址未改写（不是 /api/payment/wechat/notify 形态），请确认它落在自建 Node 上：$nodeNotify" -ForegroundColor Yellow
+    }
+    $plain['WECHAT_PAY_NOTIFY_URL'] = $nodeNotify
+}
+
 $required = @('WECHAT_MCH_ID', 'WECHAT_APP_ID', 'WECHAT_API_V3_KEY', 'WECHAT_MCH_SERIAL', 'WECHAT_PAY_NOTIFY_URL')
 $missing = $required | Where-Object { -not $plain.Contains($_) }
 if ($missing) { Fail ("缺少必需项：" + ($missing -join ', ')) }

@@ -100,6 +100,15 @@ systemctl daemon-reload >/dev/null 2>&1 || true
 systemctl enable --now qtvq-metrics.timer >/dev/null 2>&1 || true
 echo "   指标聚合定时器：$(systemctl is-active qtvq-metrics.timer 2>/dev/null || echo 未启用)"
 
+# 微信支付订单对账（2026-10-29）：回调是"尽力而为"，丢了就没有第二次。
+# 实测事故：notify_url 指着 Pages 的 /api/ 路径，Node 侧永远收不到回调，
+# 用户付了钱、本地订单一直 created。这里每 10 分钟拿待付订单去问微信，SUCCESS 就补成 paid。
+install -m 644 "$SRC_DIR/systemd/qtvq-reconcile.service" /etc/systemd/system/qtvq-reconcile.service
+install -m 644 "$SRC_DIR/systemd/qtvq-reconcile.timer" /etc/systemd/system/qtvq-reconcile.timer
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl enable --now qtvq-reconcile.timer >/dev/null 2>&1 || true
+echo "   支付对账定时器：$(systemctl is-active qtvq-reconcile.timer 2>/dev/null || echo 未启用)"
+
 # Cloudflare 边缘 IP 池（`/api/` 反代用）。
 # 为什么必须装：`qtvq-api.pages.dev` 的 DNS 只返回 172.66.44.129 / 172.66.47.127，
 # 而这两个 IP 从本站 ECS 出发 **ICMP 通但 HTTPS 被阻断**（实测 HTTP 000 超时），
