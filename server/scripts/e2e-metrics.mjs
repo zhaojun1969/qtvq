@@ -139,6 +139,15 @@ async function main() {
   for (let i = 1; i <= 4; i += 1) await addUser(`m1_u${i}`, D, 'xhs01');
   await addEvent(D, 'profile_complete', 'm1_u1');
   await addEvent(D, 'question_asked', 'm1_u2');
+  /*
+   * 无 uid 的激活事件：**必须不计入激活**，也不能把 anonId 当成用户去重。
+   *
+   * 这条是线上"激活恒为 0"事故的回归用例：埋点没带 Authorization 时
+   * 服务端 `resolveIdentity` 拿到 null，事件照样落库、`activated` 永远是 0，
+   * 而看板上与"还没有用户"完全无法区分。造数时若只造带 uid 的事件，
+   * 这类口径错误一次都测不出来。
+   */
+  await addEvent(D, 'question_asked', null, { ch: 'xhs01' });
   await addEvent(D1, 'login', 'm1_u1'); // 次日仍活跃的只有 u1（事件必须落在 D+1）
   await addEvent(D, 'report_landing_view', 'm1_u1');
   await addEvent(D, 'report_landing_view', 'm1_u2');
@@ -152,7 +161,7 @@ async function main() {
 
   const row = await metrics.aggregateDay(dayKey(D));
   check('新增用户 = 4', row.newUsers, 4);
-  check('激活（profile_complete/question_asked 去重）= 2', row.activated, 2);
+  check('激活（3 条激活事件里 1 条无 uid，只算带 uid 的 2 人）', row.activated, 2);
   check('次日留存可判定样本 = 4', row.d1Eligible, 4);
   check('次日留存 = 1/4', row.d1Retained, 1);
   check('次日留存率 = 0.25', row.d1Rate, 0.25);
