@@ -26,9 +26,11 @@ import { recordLedger } from './moderation-ledger.js';
  * `localCheck` 继续从这里再导出：路由与 `tools/scripts/check-content-safety.mjs` 的
  * 既有 import 路径不必改动（也是刻意保持的兼容面）。
  */
-import { localCheck, wordlistMeta } from '../../../packages/safety/src/index.js';
+import { localCheck, wordlistMeta, crisisCheck, crisisMeta, buildSupportCard } from '../../../packages/safety/src/index.js';
 
-export { localCheck };
+/* 危机识别与词表比对是两套语义（拦 vs 帮），但出口统一在这里，
+ * 让路由只需要 import 一个模块。语义差异见 packages/safety/src/crisis.js 开头。 */
+export { localCheck, crisisCheck, crisisMeta, buildSupportCard };
 
 /*
  * 启动即打印词表装载情况。
@@ -216,7 +218,38 @@ export async function assertSafe(text, { field = 'default', label = '内容' } =
 }
 
 /**
- * 内容安全现状（供 `/v1/safety/status` 与运营台展示）。
+ * 热路径审核：只跑本地词表 + 写台账，**不调远端**，并附带危机识别。
+ *
+ * 为什么不直接复用 `checkText`
+ * ---------------------------
+ * `checkText` 会 `await` 阿里云 Green 与微信内容安全（每层 50–300ms，平台退化时到秒级）。
+ * 而 `/v1/chat` 的延迟预算见 `check-api-perf`（P95 ≤ 800ms），每问都叠一次远端调用
+ * 会把对话延迟翻倍，换来的却是"再判一遍本地词表已经判过的东西"。
+ *
+ * 所以热路径的定位是：**本地判定（微秒级）+ 台账留痕**，不是网络审核。
+ * 台账是这里真正的价值：它让"这条提问当时判了什么、由哪一层判的"可回溯。
+ *
+ * 注意 `action` 在当前 `chat_question` 策略下**不会**是 block（见 `packages/safety`
+ * 的 POLICY 注释：提问是叙述处境，拦掉会把受害者挡在门外）。保留 block 分支是为了
+ * 将来策略调整时调用方不必改动。
+ */
+export async function quickCheck(text, { field = 'default', uid = null, clientId = null } = {}) {
+  const result = localCheck(text, { field });
+  await recordLedger({
+    field,
+    uid,
+    clientId,
+    text,
+    action: result.action,
+    provider: 'local',
+    categories: result.categories || [],
+    hits: result.hits || [],
+    degraded: false,
+  });
+  return result;
+}
+
+/** 内容安全现状（供 `/v1/safety/status` 与运营台展示）。
  *
  * 这里的每一个字段都是**运维必须能一眼看到的真相**：
  *   · 本地词表版本/词数 —— 确认新词表真的被加载了（改完词表没重启是最常见的"改了没生效"）；

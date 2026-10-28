@@ -92,10 +92,29 @@ export function wordlistMeta() {
  *
  * 未列出的类别回落到词表自身的 `severity`。
  */
+/**
+ * 热路径字段：**全类别 review，一律不拦**。
+ *
+ * 这是本轮特意做的取舍，理由必须写清，否则以后有人会"顺手改回 block"：
+ *   · 首页问答里用户是在**叙述处境**，不是在**发布内容**。
+ *     「我男朋友约炮了」「我 14 岁，父母离婚了」都会命中涉黄/未成年人词表，
+ *     按 block 处理等于**把受害者挡在门外**，而他们恰恰是最需要帮助的人。
+ *   · 词表里的「未成年人」类含「高中生」「14岁」这类**身份描述**，
+ *     在"发布招嫖信息"语境下是违规证据，在"求助"语境下是受害者特征 —— 词表分不出语境。
+ *   · 真正要防的不良**生成**，由输出侧与模型自身策略承担，不该靠拦提问来实现。
+ * 因此这里的作用是**留痕可回溯**（台账 + 申诉依据），不是准入控制。
+ */
+function reviewOnly() {
+  return Object.fromEntries(Object.keys(categories).map((c) => [c, 'review']));
+}
+
 export const POLICY = {
   profile: { 涉黄: 'block', 涉赌: 'block', 涉毒: 'block', 诈骗: 'block', 引流: 'block', 辱骂: 'review', 广告法: 'review', 未成年人: 'block', 歧视攻击: 'review' },
   question: { 涉黄: 'block', 涉赌: 'block', 涉毒: 'block', 诈骗: 'block', 引流: 'review', 辱骂: 'review', 广告法: 'review', 未成年人: 'block', 歧视攻击: 'review' },
   moderation: { 涉黄: 'review', 涉赌: 'review', 涉毒: 'review', 诈骗: 'review', 引流: 'review', 辱骂: 'review', 广告法: 'review', 未成年人: 'block', 歧视攻击: 'review' },
+  /* 首页问答的热路径：不拦（见上方说明） */
+  chat_question: reviewOnly(),
+  ai_output: reviewOnly(),
   default: { 涉黄: 'review', 涉赌: 'review', 涉毒: 'review', 诈骗: 'review', 引流: 'review', 辱骂: 'review', 广告法: 'review', 未成年人: 'block', 歧视攻击: 'review' },
 };
 
@@ -166,3 +185,13 @@ export function localCheck(text, { field = 'default' } = {}) {
     provider: 'local',
   };
 }
+/* ------------------------------------------------------------ 危机转介（re-export） */
+
+/**
+ * 危机识别与求助资源。**与上面的违规词表是两套语义**，原因写在 `crisis.js` 开头：
+ * 词表回答「要不要拦」，危机模块回答「该给什么帮助」。
+ *
+ * 从 index 统一导出，是为了让三端只需要记一个入口 `packages/safety/src/index.js`，
+ * 不必知道内部拆了几个文件。
+ */
+export { crisisCheck, crisisMeta, CRISIS_RESOURCES, buildSupportCard } from './crisis.js';

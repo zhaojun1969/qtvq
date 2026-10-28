@@ -26,6 +26,7 @@ import { Router } from 'express';
 import { chat } from '../services/llm.js';
 import { retrievePitfalls, formatPitfalls, publicHits } from '../services/pitfalls.js';
 import { canAsk, recordAsk, getQuota } from '../services/quota-store.js';
+import { quickCheck, crisisCheck, buildSupportCard as buildSupport } from '../services/content-safety.js';
 
 const router = Router();
 
@@ -82,6 +83,15 @@ function checkRate(ip) {
   return true;
 }
 
+/*
+ * 危机卡片的文案与号码**不在这里** —— 现在是 `packages/safety/src/crisis.js`
+ * 的 `buildSupportCard`，与 Pages 侧共用同一份。
+ *
+ * 为什么下沉：这段话会同时出现在官网、小程序、以及 Pages 回退路径上。
+ * 各写一份的必然结果是漂移（改一处漏两处），而这里的字段是电话号码 ——
+ * 写错等于把人引到空号。上一版就在本文件里手写过一份，趁接 Pages 侧时收掉了。
+ */
+
 router.post('/', async (req, res) => {
   const ip = req.headers['cf-connecting-ip'] || req.ip || 'local';
   if (!checkRate(ip)) {
@@ -102,6 +112,29 @@ router.post('/', async (req, res) => {
     clientId && typeof clientId === 'string' ? clientId.slice(0, 64) : `ip:${ip}`.slice(0, 64);
 
   try {
+    /*
+     * 内容审核放在**配额检查之前**：被判为不通过的内容不该消耗用户的免费次数。
+     * 这里只跑本地词表（微秒级），不调远端 —— 详见 content-safety.quickCheck 的注释。
+     *
+     * 2026-10-28 补：此前 `/v1/chat` 是**唯一一个没有任何审核**的生成入口。
+     * 资料、报告题目、报告输出都走了 assertSafe，唯独每问必走的问答链路没有。
+     */
+    const safety = await quickCheck(message.trim(), { field: 'chat_question', clientId: cid });
+    if (safety.action === 'block') {
+      return res.status(400).json({
+        error: '这段内容无法处理，请换个说法',
+        code: 'E_CONTENT_BLOCKED',
+      });
+    }
+
+    /*
+     * 危机识别：`level: 'urgent'` 时在响应里附 `support`（求助资源），前端渲染成卡片。
+     * 刻意**不**拒绝这次提问、**不**改写 AI 回答 —— 一个人说「我不想活了」的时候，
+     * 最不该做的就是让系统表现得像被冒犯了。正常回答照给，只是多一张卡片。
+     */
+    const crisis = crisisCheck(message.trim());
+    const supportCard = buildSupport(crisis);
+
     const quotaCheck = await canAsk(cid, !!followUp);
     if (!quotaCheck.ok) {
       if (quotaCheck.code === 'QUOTA_EXCEEDED') {
@@ -161,9 +194,16 @@ router.post('/', async (req, res) => {
         errors: ai.error ? [ai.error] : [],
       },
       ...(fallback ? { fallback: true, fallbackReason, aiError: ai.error || null } : {}),
+      ...(supportCard ? { support: supportCard } : {}),
     });
   } catch (err) {
     console.error('[chat] 生成失败：', err?.message || err);
+    /*
+     * 生成失败时也带危机资源：求助资源的存在与否**不该取决于模型是否可用**。
+     * 这正是「AI 挂了」最不该连带的损失 —— 一个人来求助，模型超时了，
+     * 卡片也没有了，那这条链路在关键时刻是空的。
+     */
+    const supportOnError = buildSupport(crisisCheck(message.trim()));
     return res.json({
       reply: MOCK_REPLIES[0],
       qCoins: 5,
@@ -171,6 +211,7 @@ router.post('/', async (req, res) => {
       fallback: true,
       fallbackReason: 'EXCEPTION',
       aiError: err?.message || String(err),
+      ...(supportOnError ? { support: supportOnError } : {}),
     });
   }
 });

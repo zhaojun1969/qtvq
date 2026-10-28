@@ -6,6 +6,15 @@ import { canAsk, recordAsk, getQuota } from '../lib/quota-store.js';
 import { corsPreflight, jsonResponse } from '../lib/http.js';
 import { retrievePitfalls, isRagReady } from '../lib/rag.js';
 import { runChatChain, isLlmReady } from '../lib/llm-chain.js';
+/*
+ * 与 Node 版（server/src/routes/chat.js）共用同一份词表与危机句式。
+ *
+ * 一条刻意的不对称：**这里不写审核台账**。Pages Functions 跑在边缘，
+ * functions/lib 下没有任何 Mongo 客户端（后台数据在境内），跨境回写既慢又不可靠；
+ * 台账由 Node 的 `/v1/chat` 承担。本文件只在流量回退到 Pages 时生效，
+ * 那种情况下"少一条台账"远好于"为了台账把对话拖慢几百毫秒"。
+ */
+import { localCheck, crisisCheck, buildSupportCard } from '../../packages/safety/src/index.js';
 
 const SYSTEM_PROMPT = `你是「我心永恒-Q问」的情感智慧顾问。你的风格是「避坑+直线解决」：
 - 不说鸡汤，不给模糊安慰
@@ -95,6 +104,21 @@ export async function onRequestPost(context) {
     clientId && typeof clientId === 'string'
       ? clientId.slice(0, 64)
       : `ip:${ip}`.slice(0, 64);
+
+  /*
+   * 内容审核放在配额检查之前：不通过的内容不该消耗用户的免费次数。
+   * 只跑本地词表（微秒级），不调远端 —— 理由与 Node 版一致，见 content-safety.quickCheck。
+   */
+  const safety = localCheck(message.trim(), { field: 'chat_question' });
+  if (safety.action === 'block') {
+    return jsonResponse(
+      request,
+      { error: '这段内容无法处理，请换个说法', code: 'E_CONTENT_BLOCKED' },
+      400,
+    );
+  }
+  const support = buildSupportCard(crisisCheck(message.trim()));
+
   const quotaCheck = await canAsk(env, cid, !!followUp);
   if (!quotaCheck.ok) {
     if (quotaCheck.code === 'QUOTA_EXCEEDED') {
@@ -178,6 +202,7 @@ export async function onRequestPost(context) {
         errors: attempts.map((e) => `${e.provider}:${e.model} → ${e.error}`),
       },
       ...(fallback ? { fallback: true, fallbackReason, aiError: attempts[0]?.error || null } : {}),
+      ...(support ? { support } : {}),
     });
   } catch (err) {
     console.error('AI error:', err);
@@ -188,6 +213,8 @@ export async function onRequestPost(context) {
       fallback: true,
       fallbackReason: 'EXCEPTION',
       aiError: err?.message || String(err),
+      /* 生成失败时也带求助资源：卡片的存在与否不该取决于模型是否可用 */
+      ...(support ? { support } : {}),
     });
   }
 }
