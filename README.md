@@ -25,9 +25,12 @@ npm run dev
 ```
 
 完整部署步骤见 **[DEPLOY.md](DEPLOY.md)**。  
+**计划书整改（路线B · AI 配对报告）见 [docs/计划书对齐与整改实施方案.md](docs/计划书对齐与整改实施方案.md)**，新服务在 **[server/](server/README.md)**（Node + Express + MongoDB，与现有账号体系桥接、不迁移数据）。  
 多端 App / 小程序方案见 **[docs/MULTI-PLATFORM.md](docs/MULTI-PLATFORM.md)**。  
 PC 微信扫码登录见 **[docs/WECHAT-OPEN-LOGIN.md](docs/WECHAT-OPEN-LOGIN.md)**。  
 微信支付见 **[docs/PAYMENT-WECHAT-API.md](docs/PAYMENT-WECHAT-API.md)**。  
+会员开通/到期（30/90/365 天）见 **[docs/MEMBERSHIP-RULES.md](docs/MEMBERSHIP-RULES.md)**。  
+小程序 v1.0.6 见 **[apps/qtvq-uni/docs/MULTI-MINI-PROGRAM.md](apps/qtvq-uni/docs/MULTI-MINI-PROGRAM.md)**（微信 / 支付宝 / 抖音 / 小红书同 UI）。  
 发布到 GitHub / Gitee 见 **[docs/GIT-PRIVATE.md](docs/GIT-PRIVATE.md)**、Gitee 首次 **[docs/GITEE-SETUP.md](docs/GITEE-SETUP.md)**（**务必私有**）。双推：`npm run git:push-all`  
 上下文备份 OBS 见 **[docs/OBS.md](docs/OBS.md)**（`npm run context:upload` / `pnpm sync:obs`）。  
 Cloudflare 动态数据 OSS 备份与降级见 **[docs/OSS-BACKUP.md](docs/OSS-BACKUP.md)**。

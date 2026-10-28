@@ -1,0 +1,515 @@
+{
+  "dumpedAt": "2026-10-28T01:33:38.355Z",
+  "total": 50,
+  "used": 50,
+  "sample": {
+    "keys": [
+      "_id",
+      "category",
+      "title"
+    ],
+    "doc": "{\"_id\":\"6aa63b11ca75537997444cb5\",\"category\":\"网恋\",\"title\":\"红包陷阱：转账备注写借款\"}"
+  },
+  "items": [
+    {
+      "id": "6aa63b11ca75537997444cb5",
+      "title": "红包陷阱：转账备注写借款",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cb6",
+      "title": "备胎陷阱：只聊天不确认关系",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cb7",
+      "title": "冷暴力：已读不回超过72小时",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cb8",
+      "title": "面子陷阱：为讨好对方家庭过度消费",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cb9",
+      "title": "彩礼陷阱：先付后反悔",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cba",
+      "title": "原谅陷阱：无底线二次信任",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cbb",
+      "title": "条件陷阱：只谈物质不谈相处",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cbc",
+      "title": "朋友圈陷阱：仅对你可见的暧昧",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cbd",
+      "title": "照骗陷阱：见面即幻灭",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cbe",
+      "title": "沉默陷阱：用消失惩罚你",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cbf",
+      "title": "情绪忽视：你的感受永远排最后",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc0",
+      "title": "投资陷阱：带你「稳赚」理财",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc1",
+      "title": "承诺陷阱：只说见面从不订票",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc2",
+      "title": "攀比陷阱：彩礼年年加价",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc3",
+      "title": "暧昧边界：与异性「兄弟/闺蜜」无界限",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc4",
+      "title": "急婚陷阱：认识两周催领证",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc5",
+      "title": "站队陷阱：父母与你对立时TA不表态",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc6",
+      "title": "礼物陷阱：只收礼不确认关系",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc7",
+      "title": "分手威胁：一吵架就说分手",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc8",
+      "title": "人设陷阱：完美人设从不露馅",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cc9",
+      "title": "深夜陷阱：只在深夜找你",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cca",
+      "title": "桃花陷阱：异地却从不让你去TA城市",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ccb",
+      "title": "考察陷阱：把你当试用期员工",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ccc",
+      "title": "中介陷阱：彩礼经手「亲戚」账户",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ccd",
+      "title": "精神出轨：「没上床就不算」",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cce",
+      "title": "隐瞒陷阱：婚前隐瞒债务/婚史",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ccf",
+      "title": "甩锅陷阱：所有问题都是你的错",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd0",
+      "title": "代购陷阱：让你帮忙收货/代付",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd1",
+      "title": "前任陷阱：与前任边界不清",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd2",
+      "title": "监督陷阱：要求24小时报备行踪",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd3",
+      "title": "比较陷阱：家长当众比较别人家女婿",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd4",
+      "title": "嫁妆陷阱：彩礼全要嫁妆翻倍",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd5",
+      "title": "坦白陷阱：坦白细节逼你原谅",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd6",
+      "title": "托陷阱：相亲对象是「婚托」",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd7",
+      "title": "间歇强化：忽冷忽热让你上瘾",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd8",
+      "title": "游戏陷阱：带你打游戏充钱",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cd9",
+      "title": "办公室陷阱：地下恋不让公开",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cda",
+      "title": "暧昧异地：异地却和本地人暧昧",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cdb",
+      "title": "催生陷阱：见面就催怀孕",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cdc",
+      "title": "定金陷阱：彩礼定金反悔不退",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cdd",
+      "title": "原谅陷阱：让你「原谅」后继续联系第三者",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cde",
+      "title": "学历陷阱：伪造学历家境",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444cdf",
+      "title": "贬低陷阱：当众贬低你开玩笑",
+      "category": "冷暴力",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce0",
+      "title": "签证陷阱：以结婚为由骗签证钱",
+      "category": "网恋",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce1",
+      "title": "节日陷阱：只在情人节出现",
+      "category": "暧昧",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce2",
+      "title": "时区陷阱：永远「不方便」视频",
+      "category": "异地",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce3",
+      "title": "礼金陷阱：反复要礼金不给名分",
+      "category": "见家长",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce4",
+      "title": "房产陷阱：彩礼要求加名但不共同还贷",
+      "category": "彩礼",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce5",
+      "title": "社交陷阱：关注大量异性暧昧点赞",
+      "category": "出轨",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    },
+    {
+      "id": "6aa63b11ca75537997444ce6",
+      "title": "合约陷阱：婚前协议极度不公平",
+      "category": "相亲",
+      "summary": "",
+      "advice": [],
+      "tags": [],
+      "signals": [],
+      "severity": null
+    }
+  ]
+}

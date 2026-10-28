@@ -135,15 +135,14 @@ node tools/scripts/test-wechat-sign.mjs
 # 期望 HTTP 200 且返回 code_url；若仍 SIGN_ERROR，说明私钥与序列号不是同一套证书
 ```
 
-## 现状 vs 目标
+## 现状 vs 目标（2026-06-13 更新）
 
-| 能力 | 第 1 期（现状） | 第 2 期（目标） |
-|------|----------------|----------------|
-| H5 / PC | 展示静态收款码，用户手填金额与备注 | Native 支付：服务端下单，PC 展示**动态**二维码 |
-| 微信小程序 | 静态收款码 + 提交核实（`subscribe.vue`） | JSAPI 支付：调起微信支付，回调自动开通 |
-| 支付宝小程序 | 同上 | 支付宝交易组件 / 小程序支付 |
-| 到账确认 | 人工核对 + `POST /api/payment` | 支付平台异步通知 + 可选人工兜底 |
-| 所需资质 | 个人/经营收款码即可 | **企业微信/支付宝商户号** |
+| 能力 | 现状 | 待办 |
+|------|------|------|
+| H5 / PC | Native 动态二维码 + 静态码兜底 + 人工核实 | — |
+| 微信小程序 | **JSAPI 直接扣款** + Native 扫码 + 静态码 + 提交核实（`subscribe.vue`） | 支付宝小程序支付 |
+| 到账确认 | 微信 notify 自动开通 + 人工核实并存 | 支付宝 notify |
+| 会员时长 | 月 30 / 季 90 / 年 365 天，见 [MEMBERSHIP-RULES.md](./MEMBERSHIP-RULES.md) | 到期提醒推送 |
 
 **不需要「付款码」**（顾客出示、商户扫描）。线上场景用的是 **收款码** 或 **Native/JSAPI 动态订单**。
 
@@ -176,15 +175,15 @@ node tools/scripts/test-wechat-sign.mjs
 
 ---
 
-## 建议新增后端路由
+## 建议新增后端路由（已实现 ✓）
 
-| 路由 | 方法 | 说明 |
+| 路由 | 方法 | 状态 |
 |------|------|------|
-| `/api/payment/wechat/create` | POST | 创建订单，返回 Native `code_url` 或 JSAPI 参数 |
-| `/api/payment/wechat/notify` | POST | 微信支付结果通知（验签、幂等） |
-| `/api/payment/wechat/query` | GET | 轮询订单状态（PC 扫码后前端可选） |
-| `/api/payment/alipay/create` | POST | 支付宝预下单 |
-| `/api/payment/alipay/notify` | POST | 支付宝异步通知 |
+| `/api/payment/wechat/create` | POST | ✅ |
+| `/api/payment/wechat/notify` | POST | ✅ |
+| `/api/payment/wechat/query` | GET | ✅ |
+| `/api/payment/alipay/create` | POST | 待建 |
+| `/api/payment/alipay/notify` | POST | 待建 |
 
 实现位置建议：`functions/api/payment-wechat.js`、`functions/api/payment-alipay.js`，订单状态扩展 `functions/lib/quota-store.js`。
 
@@ -245,6 +244,25 @@ ALIPAY_PUBLIC_KEY=
 ```
 
 存储：Cloudflare KV（与现有 `quota-store` 同库或独立 `ORDERS` namespace）。
+
+---
+
+## 会员开通与到期（已实现）
+
+逻辑在 `functions/lib/quota-store.js` → `activatePayment` / `buildQuota`。
+
+| 套餐 | 天数 | 价格 |
+|------|------|------|
+| month | 30 | ¥29 |
+| quarter | 90 | ¥79 |
+| year | 365 | ¥299 |
+
+- **开通**：微信 notify 或工作人员 `verify` 调用 `activatePayment`
+- **到期**：每次 API 判断 `subscription.activeUntil > Date.now()`，过期自动恢复 24h/5 次
+- **续费**：未到期时新购叠在原有 `activeUntil` 之后
+- **汇款**：以工作人员核实通过时刻起算，非打款时刻
+
+完整说明见 **[MEMBERSHIP-RULES.md](./MEMBERSHIP-RULES.md)**。
 
 ---
 
