@@ -1,0 +1,64 @@
+#!/bin/bash
+# Q问 · 封禁与误伤观察报告
+#
+# 回答三个问题（这三件事此前都无法回答）：
+#   1. 现在封了谁、封在哪一层；
+#   2. 近 24 小时封了多少、增长趋势；
+#   3. **有多少封禁可能是误伤** —— 判据：该 IP 在 nginx 日志里只出现过 429（限流），
+#      没有任何 444/蜜罐/恶意 UA 迹象。
+set -u
+LOG=/var/log/nginx/access.log
+F2B=/var/log/fail2ban.log
+JAILS="qtvq-honeypot qtvq-nginx sshd"
+
+echo "== 时间：$(date '+%F %T %Z') =="
+echo
+echo "-- 各 jail 现状 --"
+printf '%-16s %8s %8s\n' "jail" "当前封禁" "累计"
+for j in $JAILS; do
+  cur=$(fail2ban-client status "$j" 2>/dev/null | grep -oE 'Currently banned:\s*[0-9]+' | grep -oE '[0-9]+')
+  tot=$(fail2ban-client status "$j" 2>/dev/null | grep -oE 'Total banned:\s*[0-9]+' | grep -oE '[0-9]+')
+  printf '%-16s %8s %8s\n' "$j" "${cur:-0}" "${tot:-0}"
+done
+
+echo
+echo "-- 近 24 小时封禁数（按 jail）--"
+if [ -f "$F2B" ]; then
+  # 日志形如：2026-10-27 07:15:57,426 fail2ban.actions [1316629]: NOTICE  [qtvq-honeypot] Ban 1.2.3.4
+  # 用 grep -o 精确取 "Ban" 前那个方括号（第一个方括号是 PID，不能用 .* 贪婪匹配）
+  SINCE=$(date -d '24 hours ago' '+%Y-%m-%d %H:%M:%S')
+  BANLINES=$(awk -v since="$SINCE" '$1" "$2 >= since' "$F2B" 2>/dev/null | grep -E '\] Ban ' || true)
+  if [ -z "$BANLINES" ]; then
+    echo "  （无）"
+  else
+    echo "$BANLINES" | grep -oE '\[[a-z0-9-]+\] Ban' | sed 's/[][]//g; s/ Ban//' | sort | uniq -c | awk '{printf "  %-16s %d\n", $2, $1}'
+  fi
+else
+  echo "  （无 fail2ban 日志）"
+fi
+
+echo
+echo "-- 疑似误伤：只出现过 429、没有任何攻击迹象的封禁 IP --"
+FOUND=0
+for j in qtvq-honeypot qtvq-nginx; do
+  ips=$(fail2ban-client status "$j" 2>/dev/null | grep -oE 'Banned IP list:.*' | sed 's/Banned IP list:[[:space:]]*//')
+  for ip in $ips; do
+    [ -z "$ip" ] && continue
+    n429=$(grep -cF "$ip" "$LOG" 2>/dev/null | head -1); n429=${n429:-0}
+    n444=$(grep -F "$ip" "$LOG" 2>/dev/null | grep -cE '" (444|403) ' || true)
+    if [ "$n429" -gt 0 ] && [ "$n444" -eq 0 ]; then
+      echo "  $ip  429=$n429  444/403=0   [$j]"
+      FOUND=$((FOUND+1))
+    fi
+  done
+done
+[ "$FOUND" -eq 0 ] && echo "  （无）"
+
+echo
+echo "-- 触发限流最多的路径（近 200 条 429）--"
+grep -hE '" 429 ' "$LOG" 2>/dev/null | awk '{print $7}' | sort | uniq -c | sort -rn | head -8 | sed 's/^/  /'
+[ -z "$(grep -hE '" 429 ' "$LOG" 2>/dev/null | head -1)" ] && echo "  （近 200 条里没有 429）"
+
+echo
+echo "-- 蜜罐命中 Top 路径 --"
+grep -hE '" 444 ' "$LOG" 2>/dev/null | awk '{print $7}' | sort | uniq -c | sort -rn | head -8 | sed 's/^/  /'

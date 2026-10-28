@@ -1,0 +1,102 @@
+# 持续集成：每次推送都跑"本地静态检查 + 各端构建"
+#
+# 为什么现在才加、以及为什么值得加：
+#   本项目的教训几乎都是"本地没跑、线上才发现"——重复导出导致 Pages 部署连失败 3 次、
+#   .vue 漏 import 导致用户点了才报错、uvue 用了不支持的 CSS 写法到编译才暴露。
+#   这些**全都能在 CI 里提前拦住**，成本只有一条命令：`npm run check:local`。
+#
+# 设计取舍：
+#   · 只跑"不需要密钥/不需要网络"的部分（check:local）。在线检查（真实支付、模型探测、
+#     线上指纹）依赖生产环境与凭据，不适合放进 CI —— 那会让 CI 因为别人的服务抖动而变红。
+#   · 小程序矩阵只构建 4 个端（微信/支付宝/抖音/京东）作为抽样：8 个端全构建会让 CI 很慢，
+#     而它们共用同一套源码，抽样能覆盖绝大部分编译错误。
+#   · 鸿蒙工程需要 HBuilderX + DevEco Studio，CI 上没有 → 只跑静态检查（check:uniappx）。
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: 静态检查（本地 10 项）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装依赖（仓库根）
+        run: npm install --no-audit --no-fund
+
+      - name: 全量本地静态检查
+        # 包含：小程序接线/静态、平台矩阵、鸿蒙工程、下载页链路、
+        #       Pages Functions 打包预检、各端专用端口契约、死胡同审计、二维码、脚本编码
+        run: npm run check:local
+
+  build-pages:
+    name: Pages Functions 可打包
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      # 与 Cloudflare 部署同一套 esbuild 规则预打包所有入口。
+      # 这一步单独列出来，是因为它拦住过真实事故：重复导出 → 部署连失败 3 次。
+      - run: npm run check:functions
+
+  build-miniprograms:
+    name: 小程序构建（抽样 4 端）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 安装 uni-app 工程依赖
+        working-directory: apps/qtvq-uni
+        run: npm install --no-audit --no-fund
+
+      - name: 构建 微信 / 支付宝 / 抖音 / 京东
+        working-directory: apps/qtvq-uni
+        run: |
+          npm run build:mp-weixin
+          npm run build:mp-alipay
+          npm run build:mp-toutiao
+          npm run build:mp-jd
+
+      - name: 构建 H5（桌面壳与本页共用）
+        working-directory: apps/qtvq-uni
+        run: npm run build:h5
+
+  build-desktop:
+    name: Windows 桌面壳可打包
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装依赖
+        run: |
+          npm install --no-audit --no-fund
+          cd desktop && npm install --no-audit --no-fund
+
+      - name: 同步 H5 到桌面壳并试打包
+        # 只做 --dir（不生成安装包）：验证壳能打出来即可，
+        # 生成 NSIS 安装包在 CI 上要下载额外二进制、耗时且无必要。
+        run: |
+          cd apps/qtvq-uni && npm run build:h5
+          cd ../.. && npm run desktop:web
+          cd desktop && npm run pack
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/

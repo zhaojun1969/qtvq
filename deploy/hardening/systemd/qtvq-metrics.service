@@ -1,0 +1,17 @@
+[Unit]
+Description=Aggregate QTVQ growth metrics into metrics_daily
+# 别写非 ASCII 路径：systemd 会报 "Invalid URL, ignoring"
+Documentation=file:///opt/qtvq/server/scripts/aggregate-metrics.mjs
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qtvq/server
+# 重算最近 3 天：埋点走 sendBeacon，跨零点补传很常见，只算"昨天"会漏
+ExecStart=/usr/local/bin/qtvq-metrics-aggregate --days=3
+# 聚合失败不该让机器看起来"正常"：留给 journalctl -u qtvq-metrics 看原因
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
+Nice=10

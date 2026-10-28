@@ -1,0 +1,56 @@
+# fail2ban jail：Q问站点防护（放到 /etc/fail2ban/jail.d/qtvq.local）
+#
+# 策略：反复触发**真攻击信号**的 IP 自动封禁，但**不把限流当攻击**。
+#
+# 两个 jail 用**两个不同的 filter**（2026-10-26 修正）：
+#   · [qtvq-honeypot] → filter.d/qtvq-honeypot.conf：只匹配 444 / honeypot=1 /
+#     ua_bad=1 / fake_crawler=1。这些是"确定恶意"：那些路径/UA 正常用户不可能产生。
+#   · [qtvq-nginx]    → filter.d/qtvq-nginx.conf：额外把 429 计入，但**阈值放得很高**（60 次/10 分钟）。
+#
+# ⚠️ 为什么必须拆开（2026-10-26 的真实事故）：
+#   两个 jail 原本共用含 `(?:429|444)` 的同一个 filter，于是 **429 限流被当成攻击信号**。
+#   而 429 恰恰是"网络慢 → 客户端重试"时最容易产生的响应 —— 形成自我强化的误封：
+#       链路慢 → 重试 → 429 → 封 24h → 客户端看到"连接超时" → 重试更猛 → ……
+#   当天测试 IP 就因此被两个 jail 同时封禁，整站表现为"打不开"，
+#   排查时极易误判为网络故障。
+#   教训：**限流是保护措施的结果，不是攻击的证据**，两者的处置强度必须不同。
+#
+# 为什么 bantime 从 24h 收到 6h/1h：
+#   24h 长封对真爬虫有意义，但对"被误判的真人"是不可接受的代价；
+#   而 `bantime.increment` 会让反复触发的 IP 指数加长，真恶意者依然会被越封越久。
+
+[DEFAULT]
+# 忽略本机与内网：监控、健康检查、我自己的部署/体检脚本都从这些来源来
+ignoreip = 127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+backend = auto
+usedns = warn
+# 封禁动作：只封 80/443，避免把 SSH 也封了（本项目用 SSH 部署，封了就把自己锁在门外）
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+# bantime.increment：反复被封的 IP 自动指数加长
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 1w
+
+[qtvq-nginx]
+enabled  = true
+filter   = qtvq-nginx
+# 两个日志都读：abuse 日志记"被我们主动拒绝的"，access 日志记 429/444 状态码
+logpath  = /var/log/nginx/qtvq-abuse.log
+           /var/log/nginx/access.log
+port     = http,https
+findtime = 10m
+# 60 次/10 分钟才封：这里包含 429，阈值必须远高于正常人（甚至高于"手快刷新"）
+maxretry = 60
+bantime  = 1h
+
+[qtvq-honeypot]
+enabled  = true
+# 只匹配真攻击信号，**不含 429**（见文件头说明）
+filter   = qtvq-honeypot
+logpath  = /var/log/nginx/qtvq-abuse.log
+port     = http,https
+findtime = 1h
+# 蜜罐路径（/.git、/.env、/wp-admin、/actuator…）正常用户绝不可能访问 → 5 次即封
+maxretry = 5
+bantime  = 6h

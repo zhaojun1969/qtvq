@@ -1,0 +1,38 @@
+#!/bin/bash
+# 把 fail2ban 当前的封禁名单同步进 nginx 的 map 文件，使被封 IP 收到 429 而非 DROP。
+#
+# 为什么不直接用 fail2ban 的 action：
+#   实测该版本下 `action` 已挂到 jail、`fail2ban-client -t` 通过、Ban 日志也打了，
+#   但 actionban 里的命令并未执行（名单文件始终为空），排查成本高。
+#   改成"定时从 fail2ban 读状态 → 写 map"，每一步都能单独验证：
+#     · fail2ban-client status <jail> 的输出可直接看
+#     · map 文件内容可直接看
+#     · nginx -t 通过才 reload
+set -u
+MAP=/etc/nginx/blacklisted-sessions.map
+JAILS="qtvq-honeypot qtvq-nginx"
+
+TMP=$(mktemp)
+for j in $JAILS; do
+  fail2ban-client status "$j" 2>/dev/null \
+    | grep -oE 'Banned IP list:.*' \
+    | sed 's/Banned IP list:[[:space:]]*//' \
+    | tr ' ' '\n' \
+    | grep -E '^[0-9a-fA-F:.]+$' \
+    | sed 's/$/ 1;/' >> "$TMP"
+done
+sort -u "$TMP" -o "$TMP"
+
+if ! cmp -s "$TMP" "$MAP"; then
+  mv "$TMP" "$MAP"
+  chmod 644 "$MAP"
+  if nginx -t >/dev/null 2>&1; then
+    nginx -s reload
+    logger -t qtvq-blocklist "synced $(grep -c . "$MAP" 2>/dev/null || echo 0) IPs, nginx reloaded"
+  else
+    logger -t qtvq-blocklist "nginx -t failed, kept old map"
+    exit 1
+  fi
+else
+  rm -f "$TMP"
+fi

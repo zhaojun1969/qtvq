@@ -1,0 +1,7 @@
+[Unit]
+Description=Sync fail2ban banned IPs into nginx block map
+After=fail2ban.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/qtvq-blocklist-sync

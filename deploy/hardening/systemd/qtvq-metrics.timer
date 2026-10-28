@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily QTVQ metrics aggregation
+
+[Timer]
+# 00:20：给"跨零点补传的埋点"和 Mongo 的夜间维护留出余量
+OnCalendar=*-*-* 00:20:00
+RandomizedDelaySec=300
+# 机器重启 / 关机错过的那次，开机后补跑一次（指标断了要能自愈）
+Persistent=true
+Unit=qtvq-metrics.service
+
+[Install]
+WantedBy=timers.target

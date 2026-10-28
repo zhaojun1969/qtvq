@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# 指标聚合包装器（供 systemd timer 调用）
+#
+# 为什么需要这层包装而不是在 unit 里写 `cd ... && node ...`：
+#   1. systemd 的 ExecStart 不经过 shell，`cd`、`&&` 都不生效，写进去只会报错；
+#   2. node 需要 `--env-file=.env`，而 `.env` 是相对路径，必须先进目录；
+#   3. 手动补算时可以直接跑这个脚本 `qtvq-metrics-aggregate --days=30`，与定时任务走同一条路径 ——
+#      定时任务和人工操作行为不一致是最难查的一类问题。
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/qtvq/server}"
+NODE_BIN="${NODE_BIN:-$(command -v node || echo /usr/bin/node)}"
+
+cd "$APP_DIR"
+exec "$NODE_BIN" --env-file=.env scripts/aggregate-metrics.mjs "$@"
