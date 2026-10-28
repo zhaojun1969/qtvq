@@ -59,6 +59,22 @@ foreach ($item in $items) {
 
 & (Join-Path $PSScriptRoot "copy-verify-root.ps1") -Stage $stage -Root $Root
 
+# uni-app 的 H5 构建产物 → `/h5/`（"与 App 同界面"的网页版）。
+#
+# 2026-10-28 之前没有任何部署脚本管这一段：源码改了、产物重建了，但**没人传**，
+# `/h5/` 会永远停在首次手工上传的那一版（线上实测就是 9 月的产物）。
+# 表现是"手机上打开的网页版看起来跟小程序不一样"，而小程序明明更新过了。
+# 现在只要产物存在就一起发；不存在则明确告警，而不是静默跳过。
+$h5Src = Join-Path $Root "apps\qtvq-uni\dist\build\h5"
+$h5Present = Test-Path (Join-Path $h5Src "index.html")
+if ($h5Present) {
+    $h5Files = @(Get-ChildItem $h5Src -Recurse -File)
+    Copy-Item $h5Src (Join-Path $stage "h5") -Recurse -Force
+    Write-Host ">> H5 产物已纳入：h5/（$($h5Files.Count) 个文件，$([math]::Round((($h5Files | Measure-Object Length -Sum).Sum)/1MB,2)) MB）" -ForegroundColor DarkGray
+} else {
+    Write-Host ">> ⚠️ 没有 apps/qtvq-uni/dist/build/h5 —— /h5/ 将保持线上旧版（先跑 npm run build:h5）" -ForegroundColor Yellow
+}
+
 # 静态资源指纹：这条通道（scp 到阿里云源站）是**线上真正在用的**，缺了它就没有 `?v=`。
 # 2026-10-28 之前确实缺 —— 指纹只写进了 package-static.ps1（打 ZIP 用），
 # check-cache-policy 因此长期判红：线上 CSS/JS 无法长缓存，改了还得让用户 Ctrl+F5。
@@ -102,7 +118,9 @@ if ($LASTEXITCODE -ne 0) {
 $sshArgs = @()
 if (Test-Path $KeyFile) { $sshArgs += @("-i", $KeyFile) }
 $sshArgs += @("-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "StrictHostKeyChecking=accept-new")
-$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; test -f '$Dest/report.html'; test -f '$Dest/js/report.js'; test -f '$Dest/js/report-api.js'; test -f '$Dest/js/report-share.js'; test -f '$Dest/css/report.css'; test -f '$Dest/wheel.html'; test -f '$Dest/js/wheel.js'; test -f '$Dest/css/wheel.css'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q BUILD_SIG '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; grep -q 'js/report.js' '$Dest/report.html'; grep -q 'report.html' '$Dest/index.html'; grep -q 'wheel.html' '$Dest/index.html'; grep -q 'wheel-canvas' '$Dest/wheel.html'; grep -qE 'css/[a-z-]+\.css\?v=[0-9a-f]{6,}' '$Dest/index.html'; echo OK"
+# 只有本地真的有 H5 产物时才在远端断言它存在，否则这次部署会因为"没构建 H5"而失败
+$h5Check = if ($h5Present) { "test -f '$Dest/h5/index.html';" } else { "" }
+$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; test -f '$Dest/report.html'; test -f '$Dest/js/report.js'; test -f '$Dest/js/report-api.js'; test -f '$Dest/js/report-share.js'; test -f '$Dest/css/report.css'; test -f '$Dest/wheel.html'; test -f '$Dest/js/wheel.js'; test -f '$Dest/css/wheel.css'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q BUILD_SIG '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; grep -q 'js/report.js' '$Dest/report.html'; grep -q 'report.html' '$Dest/index.html'; grep -q 'wheel.html' '$Dest/index.html'; grep -q 'wheel-canvas' '$Dest/wheel.html'; grep -qE 'css/[a-z-]+\.css\?v=[0-9a-f]{6,}' '$Dest/index.html'; $h5Check echo OK"
 $sshArgs += @($target, $remoteCmd)
 
 Write-Host ">> Extract on server at $Dest"

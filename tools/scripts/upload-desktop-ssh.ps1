@@ -18,6 +18,10 @@ param(
     [string]$KeyFile = "$env:USERPROFILE\.ssh\id_ed25519_yuan",
     [string]$RemoteDir = "/var/www/qtvq/release/desktop",
     [string]$PublicBase = "https://qtvq.cn/release/desktop",
+    # 只传 latest.yml（不重传 160MB 安装包）。
+    # 用途：清单写错了（例如指向一个不存在的文件名）但只要改清单就能修好时，
+    # 没必要为了 320 字节的 yml 重传两个 80MB 的包。传完仍会做完整核验。
+    [switch]$YmlOnly,
     [switch]$SkipVerify
 )
 
@@ -50,6 +54,13 @@ $hasYml = $files | Where-Object { $_.Name -eq 'latest.yml' }
 if (-not $hasYml) {
     Write-Host "ERROR: 缺少 latest.yml —— 没有它客户端的自动更新无法工作（不是可选项）" -ForegroundColor Red
     exit 1
+}
+
+# 校验必须针对**全部**文件（哪怕只传 yml）：清单引用的包要存在于本地发布目录，
+# 否则 -YmlOnly 会传上去一份指向不存在文件的清单。
+if ($YmlOnly) {
+    Write-Host ">> -YmlOnly：只上传 latest.yml（安装包已在服务器上，不重传）" -ForegroundColor DarkGray
+    $files = @($hasYml | Select-Object -First 1)
 }
 
 Write-Host "=== 上传桌面客户端到 $User@$SshHost : $RemoteDir ===" -ForegroundColor Cyan

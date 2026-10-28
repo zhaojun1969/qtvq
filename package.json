@@ -82,7 +82,9 @@
     "check:app-releases": "node tools/scripts/check-app-releases-coverage.mjs",
     "check:mini-colors": "node tools/scripts/check-mini-colors.mjs",
     "check:channel": "node tools/scripts/check-channel-contract.mjs",
-    "check:desktop-release": "node tools/scripts/check-desktop-release.mjs"
+    "check:desktop-release": "node tools/scripts/check-desktop-release.mjs",
+    "build:h5": "cd apps/qtvq-uni && npm run build:h5",
+    "uni:build:h5": "npm run build:h5"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
