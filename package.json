@@ -73,7 +73,9 @@
     "harmony:compile": "powershell -ExecutionPolicy Bypass -File tools/scripts/compile-harmony.ps1 -CompileOnly",
     "harmony:run": "powershell -ExecutionPolicy Bypass -File tools/scripts/compile-harmony.ps1",
     "diag:green": "cd server && npm run diag:green",
-    "check:content-safety": "node tools/scripts/check-content-safety.mjs"
+    "check:content-safety": "node tools/scripts/check-content-safety.mjs",
+    "check:review": "node tools/scripts/check-review-compliance.mjs",
+    "check:review-mutation": "node tools/scripts/test-review-compliance-mutation.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

@@ -47,6 +47,7 @@ const LOCAL = [
   ['增长内容矩阵（20 条 × 2 平台 + 40 渠道码 + 落地页接线）', 'tools/scripts/check-growth-content.mjs'],
   ['激活事件接线（两端上报点/埋点登录态/年龄门顺序）', 'tools/scripts/check-activation-wiring.mjs'],
   ['问答链路安全（内容审核/危机转介/号码单一来源/能力声明）', 'tools/scripts/check-safety-wiring.mjs'],
+  ['小程序审核合规（iOS 虚拟支付/协议入口/隐私授权/境内模型）', 'tools/scripts/check-review-compliance.mjs'],
   ['埋点 SDK 运行时（报文契约/鉴权头/批量/失败回队）', 'tools/scripts/test-track-sdk.mjs'],
 ];
 
