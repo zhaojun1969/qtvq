@@ -38,3 +38,7 @@ tmp-live-*.js
 
 # WorkBuddy 的项目内数据（工作日志/记忆），属于本机工具状态，不是产品源码
 .workbuddy/
+
+# Python 编译缓存（tools/scripts 下有几个 .py 部署脚本）
+__pycache__/
+*.pyc
