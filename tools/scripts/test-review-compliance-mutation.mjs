@@ -40,7 +40,7 @@ const MUTATIONS = [
     name: '钱包页充值入口去掉防御性早退',
     file: 'apps/qtvq-uni/src/pages/wallet/wallet.vue',
     from: `  if (payBlocked) {
-    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    uni.showModal({ title: payBlockScope + '暂不支持', content: payBlockedTip, showCancel: false });
     return;
   }`,
     to: '  // mutated',
@@ -80,6 +80,127 @@ const MUTATIONS = [
     file: 'apps/qtvq-uni/src/api/config.js',
     from: "export const API_BASE = 'https://qtvq.cn';",
     to: "export const API_BASE = 'https://qtvq-api.pages.dev';",
+  },
+
+  /* ── E.46：多端（快手）支付与登录屏蔽 ─────────────────────────────── */
+  {
+    name: '付费禁用退回"只挡 iOS"，其它小程序端放行（本轮原始 bug）',
+    file: 'apps/qtvq-uni/src/utils/platform.js',
+    from: '  return isOtherMiniProgram() || isIosMiniProgram();',
+    to: '  return isIosMiniProgram();',
+  },
+  {
+    name: '非微信判定改成逐个列平台（漏加平台即漏挡）',
+    file: 'apps/qtvq-uni/src/utils/platform.js',
+    from: '  return !isWechatMiniProgram();',
+    to: "  return platformLabel() === '支付宝小程序';",
+  },
+  {
+    name: '其它小程序端也发"去网页版购买"的出口',
+    file: 'apps/qtvq-uni/src/utils/platform.js',
+    from: `  // #ifndef MP-WEIXIN
+  return false;
+  // #endif
+}
+
+/**
+ * 付费区被禁用时的统一文案。`,
+    to: `  // #ifndef MP-WEIXIN
+  return true;
+  // #endif
+}
+
+/**
+ * 付费区被禁用时的统一文案。`,
+  },
+  {
+    name: '屏蔽文案改成微信口径（快手端显示"受微信平台规则限制"）',
+    file: 'apps/qtvq-uni/src/utils/platform.js',
+    from: `// #ifndef MP-WEIXIN
+export const VIRTUAL_PAY_BLOCKED_TIP =
+  '本小程序不提供在线购买与充值，站内不涉及任何支付。免费功能与已购权益不受影响。';
+// #endif`,
+    to: `// #ifndef MP-WEIXIN
+export const VIRTUAL_PAY_BLOCKED_TIP =
+  '受微信平台规则限制，iOS 端小程序内不支持购买会员或充值缘值。请访问 qtvq.cn 完成购买。';
+// #endif`,
+  },
+  {
+    name: '微信一键登录不再只给微信端（快手端也渲染）',
+    file: 'apps/qtvq-uni/src/pages/account/account.vue',
+    from: `      <!-- #ifdef MP-WEIXIN -->
+      <button class="btn-wechat btn-block" @click="wechatLogin">微信一键登录（推荐）</button>`,
+    to: `      <button class="btn-wechat btn-block" @click="wechatLogin">微信一键登录（推荐）</button>`,
+  },
+  {
+    name: '「我的」充值入口不再按平台裁剪（快手端出现微信支付字样）',
+    file: 'apps/qtvq-uni/src/pages/profile/profile.vue',
+    from: `        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
+        <button v-if="canTopup" class="btn-secondary" @tap="goRecharge">缘值充值（微信在线支付，自动到账）</button>
+        <!-- #endif -->`,
+    to: `        <button v-if="canTopup" class="btn-secondary" @tap="goRecharge">缘值充值（微信在线支付，自动到账）</button>`,
+  },
+  {
+    name: '额度不足提示不再看平台（快手端仍指路微信充值）',
+    file: 'apps/qtvq-uni/src/utils/platform.js',
+    from: `  if (isVirtualPayBlocked()) return '。会员每日有免费次数，可在「办理会员」页查看。';`,
+    to: '',
+  },
+  {
+    name: '快手 appid 被清空',
+    file: 'apps/qtvq-uni/src/manifest.json',
+    from: '"appid": "ks651051624357102489",',
+    to: '"appid": "",',
+  },
+
+  /* ── E.46：引流（官网/网址/下载入口/客服邮箱）─────────────────────── */
+  {
+    name: '导航栏副标题不再按平台裁剪（快手端显示 qtvq.cn）',
+    file: 'apps/qtvq-uni/src/components/BrandNavBar.vue',
+    from: `        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="brand-sub">我心永恒 · qtvq.cn</text>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="brand-sub">我心永恒</text>
+        <!-- #endif -->`,
+    to: `        <text class="brand-sub">我心永恒 · qtvq.cn</text>`,
+  },
+  {
+    name: '「客户端下载」入口不再按平台裁剪（引导站外下载）',
+    file: 'apps/qtvq-uni/src/pages/profile/profile.vue',
+    from: `        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
+        <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('download')">
+          <text>客户端下载</text>
+          <text class="arrow">›</text>
+        </view>
+        <!-- #endif -->`,
+    to: `        <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('download')">
+          <text>客户端下载</text>
+          <text class="arrow">›</text>
+        </view>`,
+  },
+  {
+    name: '「关于」卡片不再按平台裁剪（快手端显示域名与 API 地址）',
+    file: 'apps/qtvq-uni/src/pages/profile/profile.vue',
+    from: `        <!-- #ifdef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="about">qtvq.cn · 京ICP备19045082号\\n版本 {{ appVersion }} · 会员 ¥29/79/299\\nAPI: qtvq.cn</text>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
+        <text class="about">京ICP备19045082号\\n版本 {{ appVersion }} · 会员 ¥29/79/299</text>
+        <!-- #endif -->`,
+    to: `        <text class="about">qtvq.cn · 京ICP备19045082号\\n版本 {{ appVersion }} · 会员 ¥29/79/299\\nAPI: qtvq.cn</text>`,
+  },
+  {
+    name: '客服入口改回邮箱（快手端出现站外联系方式）',
+    file: 'apps/qtvq-uni/src/pages/profile/profile.vue',
+    from: `          <text>联系客服</text>`,
+    to: `          <text>联系客服 qtvq@qtvq.cn</text>`,
+  },
+  {
+    name: '找回密码说明改回"不需要绑定微信"',
+    file: 'apps/qtvq-uni/src/pages/account/account.vue',
+    from: '① 短信验证码找回（推荐，不需要额外授权）：',
+    to: '① 短信验证码找回（推荐，不需要绑定微信）：',
   },
 ];
 
