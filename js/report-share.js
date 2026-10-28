@@ -38,11 +38,21 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** 中文按字断行；同时尊重已有的 \n */
+/**
+ * 中文按字断行；同时尊重已有的 \n。
+ *
+ * 被 `maxLines` 截断时**必须在末行补省略号**：不补的话，句子会停在半句上
+ * （实测避坑卡的长结论停在“把他的失约解释成”，看起来像渲染坏了，
+ * 用户会以为报告本身写崩了，而不是“这里还有更多”）。
+ */
 function wrapText(ctx, text, maxWidth, maxLines = Infinity) {
   const out = [];
+  let truncated = false;
   for (const paragraph of String(text || '').split('\n')) {
-    if (out.length >= maxLines) break;
+    if (out.length >= maxLines) {
+      truncated = true;
+      break;
+    }
     if (!paragraph) {
       out.push('');
       continue;
@@ -53,12 +63,29 @@ function wrapText(ctx, text, maxWidth, maxLines = Infinity) {
       if (ctx.measureText(test).width > maxWidth && line) {
         out.push(line);
         line = ch;
-        if (out.length >= maxLines) break;
+        if (out.length >= maxLines) {
+          truncated = true;
+          break;
+        }
       } else {
         line = test;
       }
     }
-    if (line && out.length < maxLines) out.push(line);
+    if (line) {
+      if (out.length < maxLines) out.push(line);
+      else truncated = true;
+    }
+  }
+
+  if (truncated && out.length) {
+    let last = out.length - 1;
+    while (last >= 0 && !out[last]) last -= 1; // 跳过段落之间的空行
+    if (last >= 0) {
+      let s = out[last];
+      // 逐字回退，保证加上省略号后仍不超宽（宁可再少一个字，也不能出界）
+      while (s && ctx.measureText(`${s}…`).width > maxWidth) s = s.slice(0, -1);
+      out[last] = `${s}…`;
+    }
   }
   return out;
 }
@@ -282,6 +309,8 @@ export async function renderReportCard(report, opts = {}) {
   const qrSize = 132;
   const qrX = W - PAD - qrSize;
   const qrY = H - FOOTER_H + 38;
+  // 静区同样要 ≥ 4 个模块：132px 画 29×29 模块时单模块 ≈ 4.55px，19px ≈ 4.2 个模块
+  const qrPad = 19;
 
   let qrDrawn = false;
   if (/^https?:\/\//.test(shareUrl)) {
@@ -289,7 +318,7 @@ export async function renderReportCard(report, opts = {}) {
     if (qrImg) {
       try {
         ctx.fillStyle = '#ffffff';
-        roundRect(ctx, qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 10);
+        roundRect(ctx, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 10);
         ctx.fill();
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
         qrDrawn = true;
@@ -481,6 +510,12 @@ export async function renderAdviceCard(report, opts = {}) {
     const qrSize = 150;
     const qrX = CW - PAD - qrSize;
     const qrY = CH - FOOT + 44;
+    /*
+     * 白边 21px：二维码规范要求**静区 ≥ 4 个模块**，而 150px 画 29×29 模块时
+     * 单模块 ≈ 5.17px，原来只留 9px ≈ 1.74 个模块（实测 jsQR 仍能解出，但
+     * 微信/系统相机这类容错更差的扫码器容易失败）。21 ≈ 4.06 个模块，刚好达标。
+     */
+    const qrPad = 21;
     const shareUrl = String(opts.shareUrl || '');
     let qrDrawn = false;
     if (/^https?:\/\//.test(shareUrl)) {
@@ -488,7 +523,7 @@ export async function renderAdviceCard(report, opts = {}) {
       if (img) {
         try {
           ctx.fillStyle = '#ffffff';
-          roundRect(ctx, qrX - 9, qrY - 9, qrSize + 18, qrSize + 18, 12);
+          roundRect(ctx, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 12);
           ctx.fill();
           ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
           qrDrawn = true;

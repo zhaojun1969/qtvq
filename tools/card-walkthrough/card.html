@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>share-card fixture</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #14121a; }
+  #stage { width: 750px; }
+  canvas { display: block; }
+  #dims { position: absolute; left: -9999px; top: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+/*
+ * 分享卡像素走查的夹具页（由 run.mjs 用 headless Chrome 打开）
+ *
+ * 为什么要夹具：真实卡片要登录 + 真付费才能拿到报告，而版式问题（截断没省略号、
+ * 二维码白边不够、长文本压到页脚）恰恰只有极端输入才暴露。这里用三份刻意
+ * "超长/超短"的假数据把版式逼到边界，再用像素与解码双重断言。
+ */
+const SHARE_URL = 'https://qtvq.cn/r/CARDWALKTHROUGH8x2f';
+
+const FIXTURES = {
+  diag: {
+    kind: 'diagnose',
+    sections: {
+      summary: '你已经连续三周在等一个不会主动的人。这不是"他忙"，是你把他的沉默解读成了希望。先把自己从这段关系里抽出来看一眼，再决定要不要继续等。',
+      risks: [
+        '冷暴力：已读不回超过 72 小时，且事后没有任何解释',
+        '金钱不对等：你承担了全部约会开销，对方视作理所当然',
+        '边界模糊：关系没有定义，但要求你承担伴侣的义务',
+      ],
+      actions: [
+        '今天起停止主动发起对话，把主动权交回去，观察 7 天内的变化',
+        '把最近三个月的转账记录列出来，写下你自己能接受的上限',
+        '找一个不在这段关系里的朋友，把你的处境完整说一遍',
+      ],
+      cases: [
+        '冷暴力案例（冷暴力）：已读不回超过 72 小时，女生持续追问两个月后彻底断联',
+        '金钱案例（金钱往来）：一方承担全部开销一年半，分手时对方拒绝任何返还',
+      ],
+    },
+  },
+  long: {
+    kind: 'diagnose',
+    sections: {
+      // 超长结论：验证 4 行截断 + 省略号
+      summary:
+        '这段关系里你已经把自己放在了很靠后的位置。你记得对方每一个重要的日子、每一次情绪的起伏，却很少有人问你今天过得怎么样。你开始习惯性地为对方找理由，把他的一次冷淡解释成工作压力，把他的失约解释成临时有事，把自己的委屈解释成矫情。这个过程中你失去的不只是时间，还有对自己的判断力。先停下来，不是为了对抗他，而是为了把自己找回来，重新确认你值得被怎样对待。',
+      risks: [
+        '这是一个非常长的风险点描述，用来验证两行截断之后是否会与下一条重叠或者压到行动清单的标题上，长度继续延伸到第三行也应该被截断掉',
+        '第二个风险点，长度中等，用来对照行距是否一致',
+        '第三个风险点，故意写得非常短',
+        '第四个风险点应该被切片丢掉，因为上限是 3 条',
+      ],
+      actions: [
+        '这是一个特别长的行动项，用来验证编号与文字的对齐关系，同时验证两行截断后下一项的起始位置是否仍然是稳定的行距，不会因为上一项占了两行而错位',
+        '第二件事：短句',
+        '第三件事：中等长度的一句话，验证最后一项与页脚之间的距离',
+        '第四件事应该被丢掉',
+      ],
+      cases: ['超长案例文本，一行截断，用来验证省略号与出界', '第二条案例同样一行', '第三条应被丢掉'],
+    },
+  },
+  retro: {
+    kind: 'retro',
+    sections: {
+      summary: '你们的冲突不是"谁对谁错"，而是每次都在同一个位置掉进同一个坑：你想被看见，他想被放过。',
+      risks: ['重复循环：同一个议题每月至少爆发一次，且从未收尾', '回避修复：争执后 48 小时内无人提出修复动作'],
+      actions: ['写一段 200 字的"我当时的感受"，只描述自己，不评价对方', '约定一个 20 分钟的对话窗口，只谈一件事'],
+      cases: ['复盘案例（异地）：两年异地，靠每日视频维持，最终因"见不到"分手'],
+    },
+  },
+  pair: {
+    kind: 'pair',
+    tierZh: '深度合盘',
+    overall: 0.78,
+    scores: { value: 0.82, talk: 0.74, pace: 0.66 },
+    labels: { value: '价值观', talk: '沟通方式', pace: '生活节奏' },
+    content:
+      '你们在价值观上高度同频：对金钱、对家人、对"什么算浪费时间"的看法几乎一致，这让日常摩擦很少。差异集中在沟通方式上——你习惯把情绪说出来再处理问题，他习惯先解决问题再回头看情绪，于是你的"我想聊聊"会被他读成"又要吵了"。生活节奏的差异更具体：你早睡，他夜猫，一天里真正重叠的时间只有晚上九点到十一点。',
+    pitfalls: [
+      { title: '冷暴力风险', category: '沟通' },
+      { title: '金钱边界模糊', category: '金钱' },
+      { title: '节奏差异', category: '生活' },
+    ],
+    me: { nickname: '小七', avatar: '' },
+    target: { nickname: '阿岚', avatar: '' },
+  },
+};
+
+const name = new URLSearchParams(location.search).get('name') || 'diag';
+const report = FIXTURES[name] || FIXTURES.diag;
+
+const mod = await import(`../../js/report-share.js?v=${Date.now()}`);
+const canvas = name === 'pair' ? await mod.renderReportCard(report, { shareUrl: SHARE_URL }) : await mod.renderAdviceCard(report, { shareUrl: SHARE_URL });
+
+document.getElementById('stage').appendChild(canvas);
+const meta = document.createElement('div');
+meta.id = 'dims';
+meta.textContent = `${canvas.width}x${canvas.height}`;
+document.body.appendChild(meta);
+document.body.dataset.ready = '1';
+document.title = `ready-${name}-${canvas.width}x${canvas.height}`;
+</script>
+</body>
+</html>

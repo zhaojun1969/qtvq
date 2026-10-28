@@ -49,6 +49,9 @@ __pycache__/
 desktop/release/
 desktop/web/
 
+# 分享卡走查的截图产物（每次 run.mjs 重新生成，只用于人眼复核）
+tools/card-walkthrough/out/
+
 # 微信小程序上传私钥（miniprogram-ci 用）。
 # 微信后台生成时只显示一次，等同于"能发版"的凭据 —— 一旦进了 Git 历史，
 # 即使后来删除也仍能从历史里捞出来，必须从一开始就挡住。

@@ -41,6 +41,7 @@ const LOCAL = [
   ['共享层纯度（L0–L3 禁平台 API）', 'tools/scripts/check-shared-purity.mjs'],
   ['ESM 导入导出交叉校验（单文件合法但组合即错）', 'tools/scripts/check-esm-exports.mjs'],
   ['HTML 内联脚本语法（无构建步骤会拦的那类错）', 'tools/scripts/check-inline-js.mjs'],
+  ['分享卡像素走查（750×1334 + 二维码可解 + 静区 ≥ 4 模块，需本机 Chrome）', 'tools/card-walkthrough/run.mjs'],
   ['三端派生自 shared（举报原因/收款渠道单一来源）', 'tools/scripts/check-shared-derivation.mjs'],
   ['图片格式守卫（picture 兜底/WebP 更小/无死文件）', 'tools/scripts/check-image-formats.mjs'],
   ['WebP 变体（存在/更小/像素一致）', 'tools/scripts/gen-image-webp.mjs', ['--check']],
@@ -78,6 +79,12 @@ const run = (label, script, extra = []) => {
   process.stdout.write(`▶️  ${label} ... `);
   const r = spawnSync('node', [full, ...extra], { cwd: ROOT, encoding: 'utf8' });
   const ms = Date.now() - t0;
+  // 约定：退出码 2 = "环境缺依赖，跳过"（例如本机没装 Chrome 时的分享卡走查）。
+  // 既不算通过也不算失败 —— 否则要么逼所有人装浏览器，要么把真失败一起吞掉。
+  if (r.status === 2) {
+    console.log(`⏭️ ${(ms / 1000).toFixed(1)}s（缺依赖，跳过）`);
+    return { ok: null, label, script };
+  }
   const ok = r.status === 0;
   console.log(`${ok ? '✅' : '❌'} ${(ms / 1000).toFixed(1)}s`);
   if (!ok) {
