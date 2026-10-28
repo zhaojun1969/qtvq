@@ -387,7 +387,8 @@ async function doDelete() {
       title: '确认注销账号',
       content: '资料与记录将立即删除且不可恢复，订单脱敏保留。确定继续？',
       confirmText: '确定注销',
-      confirmColor: '#e74c3c',
+      // script 里拿不到 SCSS 变量，这里是 packages/tokens 的 dangerSoft 字面量
+      confirmColor: '#ff8a8a',
       success: (res) => resolve(!!res.confirm),
       fail: () => resolve(false),
     });
@@ -468,7 +469,7 @@ onUnmounted(() => {
 }
 
 .btn-wechat {
-  background: #07c160;
+  background: $color-brand-wechat;
   color: #fff;
   font-size: 30rpx;
   margin-bottom: 16rpx;
@@ -551,13 +552,18 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* —— 注销账号：危险区域用红色边框和红色标题，避免误触 —— */
+/* —— 注销账号：危险区域用红色边框和红色标题，避免误触 ——
+ *
+ * 2026-10-28 配色对齐主站（原先是小程序自己发明的一套红：rgba(231,76,60) / #ff7675 / #c0392b）。
+ * 官网"注销账号"区域用的是 rgba(255,92,92,α) + var(--danger-text)，这里逐字对齐；
+ * 主色不变、只是把三档各不相同的红收敛成同一档，跨端看起来才是同一个产品。 */
 .card.danger {
-  border: 1rpx solid rgba(231, 76, 60, 0.55);
+  border: 1rpx solid rgba(255, 92, 92, 0.45);
+  background: rgba(255, 92, 92, 0.06);
 }
 
 .card.danger .section-title {
-  color: #ff7675;
+  color: $color-danger-text;
 }
 
 .strong {
@@ -567,13 +573,16 @@ onUnmounted(() => {
 
 /* 可点击的次要说明（如"改用输入注销账号确认"） */
 .hint.link {
-  color: #9b8cff;
+  color: $color-purple-light;
   text-decoration: underline;
 }
 
+/* 主站 .btn.btn-danger 是"描边 + 红字"而不是实心深红；
+   实心 #c0392b 在深底上显得脏，且与主站按钮体系不一致。 */
 .btn-danger {
-  background: #c0392b;
-  color: #fff;
+  background: rgba(255, 92, 92, 0.12);
+  color: $color-danger-text;
+  border: 1rpx solid rgba(255, 92, 92, 0.6);
   font-size: 28rpx;
 }
 

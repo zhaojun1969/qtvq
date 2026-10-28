@@ -355,39 +355,68 @@ export function startWebUpdateWatch({ intervalMs = 10 * 60 * 1000, currentBuild 
   };
 }
 
-/** 当前端类型标识，写进埋点/日志便于区分（与 utils/platform.js 的标题互补） */
+/**
+ * 当前端类型标识 —— **必须返回服务端 `APP_CHANNELS` 里的名字**
+ * （`server/src/lib/app-release-core.js` / `functions/lib/app-release-core.js`）
+ *
+ * ── 2026-10-28 修的一个真 BUG：名字对不上 ────────────────────────────────
+ * 这里原来返回的是**构建平台名**：`mp-weixin` / `mp-alipay` / `h5` / `app` …
+ * 而服务端只认 `wechat` / `alipay` / `web` / `android`|`ios`。实测线上：
+ *   `GET /api/app/bootstrap?channel=mp-weixin` → **400 E_UNKNOWN_CHANNEL**
+ *   `GET /api/app/bootstrap?channel=h5`       → **400**
+ *   `GET /api/app/bootstrap?channel=app`      → **400**
+ * 于是 `fetchBootstrap()` 判 `ok === false` 后返回 null —— **所有端的能力清单与更新结论
+ * 从来没有生效过**，一直在安静地退回静态 `release/version.json`（只有 web 一项）。
+ *
+ * 为什么长期没被发现：接口是通的、HTTP 也能连（只是 400），而且客户端设计成
+ * "拿不到结论就退回兜底"，所以**任何一端都不报错**，功能看起来也正常。
+ * 这类"协议两端各说各的名字"只能靠断言对齐，靠人工点不出来。
+ * 断言见 `tools/scripts/check-channel-contract.mjs`。
+ *
+ * App 端要再分一层：服务端的 android / ios 是两条独立发布记录（审核周期完全不同），
+ * 而 uni-app 的 `APP-PLUS` 是一个宏 —— 只能运行时读 `plus.os.name`。
+ */
 export function runtimeTag() {
   // #ifdef MP-WEIXIN
-  return 'mp-weixin';
+  return 'wechat';
   // #endif
   // #ifdef MP-ALIPAY
-  return 'mp-alipay';
+  return 'alipay';
   // #endif
   // #ifdef MP-TOUTIAO
-  return 'mp-toutiao';
+  return 'douyin';
   // #endif
   // #ifdef MP-XHS
-  return 'mp-xhs';
+  return 'xhs';
   // #endif
   // #ifdef MP-QQ
-  return 'mp-qq';
+  return 'qq';
   // #endif
   // #ifdef MP-BAIDU
-  return 'mp-baidu';
+  return 'baidu';
   // #endif
   // #ifdef MP-KUAISHOU
-  return 'mp-kuaishou';
+  return 'kuaishou';
   // #endif
   // #ifdef MP-JD
-  return 'mp-jd';
+  return 'jd';
+  // #endif
+  // #ifdef MP-360
+  return 'mp360';
   // #endif
   // #ifdef H5
-  return 'h5';
+  return 'web';
   // #endif
   // #ifdef APP-PLUS
-  return 'app';
+  try {
+    const os = String((typeof plus !== 'undefined' && plus.os && plus.os.name) || '').toLowerCase();
+    return os === 'ios' ? 'ios' : 'android';
+  } catch {
+    return 'android';
+  }
   // #endif
-  return 'unknown';
+  // 兜底：未知端按 web 处理（服务端有 web 记录，不会 400）
+  return 'web';
 }
 
 /**

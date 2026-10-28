@@ -59,6 +59,16 @@ foreach ($item in $items) {
 
 & (Join-Path $PSScriptRoot "copy-verify-root.ps1") -Stage $stage -Root $Root
 
+# 静态资源指纹：这条通道（scp 到阿里云源站）是**线上真正在用的**，缺了它就没有 `?v=`。
+# 2026-10-28 之前确实缺 —— 指纹只写进了 package-static.ps1（打 ZIP 用），
+# check-cache-policy 因此长期判红：线上 CSS/JS 无法长缓存，改了还得让用户 Ctrl+F5。
+$assetVer = & (Join-Path $PSScriptRoot "inject-asset-version.ps1") -Stage $stage
+if (-not $assetVer) {
+    Write-Host "ERROR: 静态资源指纹注入失败（inject-asset-version.ps1 没有返回版本号）" -ForegroundColor Red
+    exit 1
+}
+Write-Host ">> 静态资源版本号: $assetVer" -ForegroundColor DarkGray
+
 $tar = Join-Path $env:TEMP "qtvq-static.tgz"
 if (Test-Path $tar) { Remove-Item $tar -Force }
 & tar -czf $tar -C $stage . 2>$null
@@ -92,7 +102,7 @@ if ($LASTEXITCODE -ne 0) {
 $sshArgs = @()
 if (Test-Path $KeyFile) { $sshArgs += @("-i", $KeyFile) }
 $sshArgs += @("-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "StrictHostKeyChecking=accept-new")
-$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; test -f '$Dest/report.html'; test -f '$Dest/js/report.js'; test -f '$Dest/js/report-api.js'; test -f '$Dest/js/report-share.js'; test -f '$Dest/css/report.css'; test -f '$Dest/wheel.html'; test -f '$Dest/js/wheel.js'; test -f '$Dest/css/wheel.css'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q BUILD_SIG '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; grep -q 'js/report.js' '$Dest/report.html'; grep -q 'report.html' '$Dest/index.html'; grep -q 'wheel.html' '$Dest/index.html'; grep -q 'wheel-canvas' '$Dest/wheel.html'; echo OK"
+$remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz -C '$Dest'; sudo chown -R www-data:www-data '$Dest'; rm -f /tmp/qtvq-static.tgz; test -f '$Dest/js/config.js'; test -f '$Dest/js/contact.js'; test -f '$Dest/js/toast.js'; test -f '$Dest/js/voice-asr.js'; test -f '$Dest/js/version.js'; test -f '$Dest/report.html'; test -f '$Dest/js/report.js'; test -f '$Dest/js/report-api.js'; test -f '$Dest/js/report-share.js'; test -f '$Dest/css/report.css'; test -f '$Dest/wheel.html'; test -f '$Dest/js/wheel.js'; test -f '$Dest/css/wheel.css'; grep -q BUILD_SHA '$Dest/js/version.js'; grep -q BUILD_SIG '$Dest/js/version.js'; grep -q feature-card-link '$Dest/index.html'; grep -q story-card-clickable '$Dest/js/home.js'; grep -q voice-asr '$Dest/js/home.js'; grep -q initContactModal '$Dest/js/layout.js'; grep -q 'js/report.js' '$Dest/report.html'; grep -q 'report.html' '$Dest/index.html'; grep -q 'wheel.html' '$Dest/index.html'; grep -q 'wheel-canvas' '$Dest/wheel.html'; grep -qE 'css/[a-z-]+\.css\?v=[0-9a-f]{6,}' '$Dest/index.html'; echo OK"
 $sshArgs += @($target, $remoteCmd)
 
 Write-Host ">> Extract on server at $Dest"

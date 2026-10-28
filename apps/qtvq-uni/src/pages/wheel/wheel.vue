@@ -104,7 +104,10 @@ function draw(rot = 0, highlight = -1) {
     ctx.beginPath();
     ctx.moveTo(r, r);
     ctx.arc(r, r, r - 6, start, start + arc);
-    ctx.setFillStyle(highlight === i ? '#ff6b81' : i % 2 ? '#2a2a3d' : '#232333');
+    // canvas 里拿不到 SCSS 变量，这三个值必须与 packages/tokens 逐字一致：
+    // #ff6b81 = pink / #2a2940 = bgRaised / #1c1c28 = bgSunken
+    // （原来是 #2a2a3d 与 #232333 —— 主站没有这两个值，属于小程序独有的"野色"）
+    ctx.setFillStyle(highlight === i ? '#ff6b81' : i % 2 ? '#2a2940' : '#1c1c28');
     ctx.fill();
     // 昵称（取前 3 个字，避免扇形里挤满字）
     const mid = start + arc / 2;

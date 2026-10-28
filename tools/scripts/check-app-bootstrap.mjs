@@ -60,7 +60,15 @@ const srcFile = path.join(ROOT, 'app-releases.json');
 let src = {};
 try {
   src = JSON.parse(fs.readFileSync(srcFile, 'utf8'));
-  delete src._说明;
+  /*
+   * 所有 `_` 开头的键都是说明块（`_说明` / `_未发布渠道`），不是渠道。
+   * 原来只删 `_说明`：2026-10-28 加了第二个说明数组后，它会被当成"渠道"
+   * 参与下面的逐字段比对 → 明明生成正确也报"副本与唯一源不一致"。
+   * 这类"检查器自己被脏数据骗了"的问题，比被测代码错更难查，所以按前缀统一剔除。
+   */
+  for (const key of Object.keys(src)) {
+    if (key.startsWith('_')) delete src[key];
+  }
   good(`唯一源 app-releases.json 合法（已发布渠道：${Object.keys(src).join(', ') || '无'}）`);
 } catch (err) {
   bad(`app-releases.json 非法：${err.message}`);

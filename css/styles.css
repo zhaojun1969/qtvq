@@ -22,6 +22,9 @@
   --success-bright: #7bed9f;
   --warning: #ffd479;
   --danger-soft: #ff8a8a;
+  --danger: #ff5c5c;
+  --danger-text: #ff8080;
+  --brand-wechat: #07c160;
   --bg-sunken: #1c1c28;
   --bg-raised: #2a2940;
   --bg-card-alt: #1a1925;
@@ -414,16 +417,19 @@ a:hover {
 }
 
 /* 注销账号：破坏性操作区，与普通账户卡片在视觉上拉开距离 */
+/* 这里的 rgba(255,92,92,α) 就是 `--danger`（#ff5c5c）加透明度 ——
+   CSS 无法给 hex 变量加 alpha（color-mix 在部分小程序里不支持），所以保留字面量，
+   但**不透明部分一律用变量**，避免小程序端只能自己发明一个"近似红"。 */
 .account-panel.danger-zone {
   border-color: rgba(255, 92, 92, 0.45);
   background: rgba(255, 92, 92, 0.06);
 }
 .account-panel.danger-zone h3 {
-  color: #ff7b7b;
+  color: var(--danger-text);
 }
 .btn.btn-danger {
   border-color: rgba(255, 92, 92, 0.7) !important;
-  color: #ff8080 !important;
+  color: var(--danger-text) !important;
 }
 .btn.btn-danger:hover,
 .btn.btn-danger:focus-visible {

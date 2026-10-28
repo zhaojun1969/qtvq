@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  只收「公开、可独立访问、有检索价值」的页面。
+  刻意不收的：
+    index.html —— 与 `/` 是同一份内容，两个 URL 会让权重分散（规范地址用 `/`）
+    account.html / wechat-callback.html —— 登录态与回调页，索引了也没有意义
+    404.html —— 错误页
+    land.html / r.html —— 投放落地页与分享页，带参数、内容随请求变化
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://qtvq.cn/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://qtvq.cn/index.html</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://qtvq.cn/pitfalls.html</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://qtvq.cn/advice.html</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://qtvq.cn/report.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://qtvq.cn/wheel.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://qtvq.cn/profile.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://qtvq.cn/help.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://qtvq.cn/privacy.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://qtvq.cn/terms.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://qtvq.cn/download.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
 </urlset>

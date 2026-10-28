@@ -34,6 +34,17 @@ try {
 
 const notes = parsed._说明 || [];
 delete parsed._说明;
+/*
+ * 所有 `_` 开头的键都是**给人看的说明块**（`_说明` / `_未发布渠道`），不是渠道。
+ * 原来的写法只删 `_说明`，加第二个说明数组时它会直接变成一个"渠道"，
+ * 被写进 APP_RELEASES_GENERATED 与 release/version.json —— 那种脏数据在端侧
+ * 表现为"多了一个不存在的渠道"，很难查。所以按前缀一律剔除。
+ */
+for (const key of Object.keys(parsed)) {
+  if (key.startsWith('_')) {
+    delete parsed[key];
+  }
+}
 
 const generatedAt = new Date().toISOString();
 

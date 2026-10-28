@@ -701,7 +701,7 @@ onMounted(async () => {
     display: block;
     font-size: 22rpx;
     line-height: 1.4;
-    color: #8b8aa0;
+    color: $color-text-dim;
     margin-bottom: 10rpx;
     letter-spacing: 0.02em;
   }

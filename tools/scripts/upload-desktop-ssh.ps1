@@ -107,6 +107,44 @@ foreach ($f in $files) {
     }
 }
 
+# ── latest.yml 的"内部一致性"必须单独核（2026-10-28 加）────────────────────
+# 上面那段只证明"每个文件都能下载、大小对得上"，**证明不了 latest.yml 能用**。
+# 线上真实状况（本次审计发现）：latest.yml 里写的是 `Q问-Setup-1.0.6.exe`（公网 404），
+# 真正传上去的却是 `qtvq-desktop-Setup-1.0.6.exe`（200）。也就是：
+#   客户端读清单 → 拿到 404 的下载地址 → 自动更新**每次都失败**；
+#   而下载页手动下载是好的（页面用的是另一份配置）。
+# 于是"手动能下、自动更新不行"，用户只会说"它不提示更新"，很难联想到清单里是旧文件名。
+# 这个坑的成因是：打包产物里 latest.yml 与 exe 是**同一批**，但某次只覆盖了 exe、
+# 没覆盖 latest.yml（或者反过来）。所以只有"清单里引用的文件真能下"才算数。
+$ymlFile = $files | Where-Object { $_.Name -eq 'latest.yml' } | Select-Object -First 1
+if ($ymlFile) {
+    Write-Host "  · 校验 latest.yml 引用的安装包是否真的存在…" -ForegroundColor DarkGray
+    $ymlText = Get-Content $ymlFile.FullName -Raw -Encoding UTF8
+    $refMatch = [regex]::Match($ymlText, 'url:\s*(\S+)')
+    $sizeMatch = [regex]::Match($ymlText, 'size:\s*(\d+)')
+    if (-not $refMatch.Success) {
+        Write-Host "  ❌ latest.yml 里没有 url 字段（electron-updater 无法定位安装包）" -ForegroundColor Red
+        $bad++
+    } else {
+        $refName = $refMatch.Groups[1].Value.Trim()
+        $refUrl = "$PublicBase/$refName"
+        try {
+            $refResp = Invoke-WebRequest -Uri $refUrl -Method Head -TimeoutSec 30 -UseBasicParsing
+            $refLen = $refResp.Headers['Content-Length']
+            if ($sizeMatch.Success -and $refLen -and [int64]$refLen -ne [int64]$sizeMatch.Groups[1].Value) {
+                Write-Host "  ❌ latest.yml 指向 $refName 可下载，但长度 $refLen ≠ 清单写的 $($sizeMatch.Groups[1].Value)（客户端 sha512 校验会失败）" -ForegroundColor Red
+                $bad++
+            } else {
+                Write-Host "  ✅ latest.yml 指向的 $refName 可公网下载（$refLen 字节）" -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "  ❌ latest.yml 指向 $refName —— 公网取不到（$($_.Exception.Message)）" -ForegroundColor Red
+            Write-Host "     客户端自动更新会一直失败，而下载页却是好的：这类「手动能下、自动更新不行」最难排查。" -ForegroundColor DarkYellow
+            $bad++
+        }
+    }
+}
+
 Write-Host ""
 if ($bad -eq 0) {
     Write-Host "✅ 全部 $ok 个文件可公网下载（客户端自动更新的前提已满足）" -ForegroundColor Green

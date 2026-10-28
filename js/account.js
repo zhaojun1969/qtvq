@@ -818,8 +818,26 @@ handleWechatOpenCallback()
   })
   .catch((e) => showToast(e.message || '微信回调失败'));
 
-setInterval(() => {
-  if (isLoggedIn()) fetchAccountMe().then(renderDashboard).catch(() => {});
+/*
+ * 账户页轮询（30s）：刷新余额与明细。
+ *
+ * 2026-10-28 加了"页面不可见就跳过"：原来无论标签页在不在前台都每 30 秒打两个请求
+ * （/me + wallet），用户开着 10 个标签放一整天就是纯浪费 —— 服务端也要为它付数据库开销。
+ * 切回来的那一刻补一次即可（visibilitychange），用户感知与轮询完全一致。
+ */
+const refreshAccountPanels = () => {
+  if (!isLoggedIn()) return;
+  fetchAccountMe().then(renderDashboard).catch(() => {});
   // 缘值余额与明细：登录后立即渲染（网页端以前完全没有这块显示）
-  if (isLoggedIn()) refreshWallet().catch(() => {});
+  refreshWallet().catch(() => {});
+};
+
+setInterval(() => {
+  if (document.hidden) return;
+  refreshAccountPanels();
 }, 30000);
+
+document.addEventListener('visibilitychange', () => {
+  // 从后台切回来：数据可能已经变了（例如在手机小程序里付了款），立刻补一次
+  if (!document.hidden) refreshAccountPanels();
+});

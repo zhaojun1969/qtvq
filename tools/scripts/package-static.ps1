@@ -84,18 +84,13 @@ Write-Host ">> 已纳入自动更新清单: release/version.json（web.build=$($
 # 版本号必须覆盖**所有** css 与 js —— 只哈希 styles.css 会导致"只改了 JS 时 URL 不变"，
 # 浏览器继续用缓存里的旧 JS，修复看起来像没生效（2026-10-11 实际踩到：改完 wallet 逻辑
 # 版本号仍是 0be2e415，与上一版相同）。这里把所有 css/js 的哈希拼起来再取一次哈希。
-$assetFiles = @(Get-ChildItem (Join-Path $stage 'css') -Recurse -File -Include *.css) + @(Get-ChildItem (Join-Path $stage 'js') -Recurse -File -Include *.js)
-$joined = ($assetFiles | Sort-Object FullName | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash }) -join ''
-$sha = [System.Security.Cryptography.SHA256]::Create()
-$assetVer = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($joined)))).Replace('-', '').Substring(0, 8).ToLower()
-$sha.Dispose()
-Get-ChildItem $stage -File -Filter '*.html' | ForEach-Object {
-    $p = $_.FullName
-    $h = [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)
-    $orig = $h
-    $h = $h -replace '(href="css/([^"?]+)\.css)(\?v=[0-9a-f]+)?"', ('$1?v=' + $assetVer + '"')
-    $h = $h -replace '(src="(?:\./)?js/([^"?]+)\.js)(\?v=[0-9a-f]+)?"', ('$1?v=' + $assetVer + '"')
-    if ($h -ne $orig) { [IO.File]::WriteAllText($p, $h, (New-Object System.Text.UTF8Encoding($false))) }
+# 实现已抽到 `inject-asset-version.ps1`：**打包与直接同步源站两条通道共用同一份**。
+# 2026-10-28 抽出的原因：这段原来只在这里，而线上真正在跑的是 `sync-static-from-windows.ps1`
+# （scp 到阿里云源站）—— 那条通道完全没走这段，于是线上首页从来没有 `?v=`，
+# `check-cache-policy.mjs` 判红。同一件事有两份实现，就一定会有一份漏掉。
+$assetVer = & (Join-Path $PSScriptRoot "inject-asset-version.ps1") -Stage $stage
+if (-not $assetVer) {
+    throw "静态资源指纹注入失败（inject-asset-version.ps1 没有返回版本号）"
 }
 Write-Host ">> 静态资源版本号: $assetVer" -ForegroundColor DarkGray
 $missingPages = @($htmlPages | Where-Object { -not (Test-Path (Join-Path $stage $_)) })

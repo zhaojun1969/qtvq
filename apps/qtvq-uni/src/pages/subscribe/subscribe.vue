@@ -669,7 +669,7 @@ onUnmounted(() => {
 
 .legal-lg {
   font-size: 26rpx;
-  color: #9090a8;
+  color: $color-text-dim;
   line-height: 1.6;
 }
 
