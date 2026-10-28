@@ -38,7 +38,10 @@ EXCLUDE_FILES = {".env", "boot-out.txt", "boot-err.txt"}
 # 除了 server/，还要带上静态同步依赖的文件：
 # sync-static.sh 会调用同目录的 write-version.sh 与 copy-verify-root.sh，
 # 只给 server/ 的话服务器上拿到的仍是那份有泄露缺陷的旧脚本。
-EXTRA_PATHS = ["tools", "packages", ".assetsignore"]
+# `js/` 也打进去：服务器脚本要复用浏览器端的纯 JS 实现（例如 buy-real-report.mjs
+# 用 js/qr-render.js 的 qrMatrix 画二维码）。不打包的话 /opt/qtvq/js 会停在几个月前
+# 的旧副本上 —— 实测是一份 322 字节的 stub，import 进来 `qrMatrix is not a function`。
+EXTRA_PATHS = ["tools", "packages", "js", ".assetsignore"]
 
 # 文本类文件打进 Linux 包时必须转成 LF。
 # 本仓库 core.autocrlf=true，工作区的 .sh 可能是 CRLF —— 原样打包的话，
