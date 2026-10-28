@@ -13,16 +13,14 @@
     <div class="header-inner">
       <a href="index.html" class="logo">
         <span data-logo></span>
-        <div class="logo-text">
-          我心永恒
-          <span>Q问 · qtvq.cn</span>
-        </div>
+        <div class="logo-text"><span class="logo-title">Q问</span><span class="logo-sub">问出爱情真谛</span></div>
       </a>
       <nav class="nav-main">
           <a href="index.html">Q问</a>
           <a href="wheel.html">转盘配对</a>
           <a href="pitfalls.html">避坑大全</a>
           <a href="report.html">配对报告</a>
+          <a href="advice.html">避坑诊断</a>
           <a href="profile.html">我的缘值</a>
         </nav>
       <div class="user-stats">
@@ -115,44 +113,53 @@
     <div class="modal-backdrop" data-close-subscribe></div>
     <div class="modal-box modal-box-wide subscribe-modal-box">
       <h3>办理 Q问 会员 · 不限次数提问</h3>
-      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问；超出后可<strong>扫码支付</strong>或银行汇款。建议先 <a href="account.html">注册登录</a>，付款后可在「我的账户」查看核实进度。</p>
+      <p class="modal-hint">免费用户每 24 小时最多 5 次新提问。<strong>推荐用下方「微信在线支付」</strong>：选好套餐点一下即生成专属订单二维码，<strong>金额自动带上</strong>，付款成功后<strong>立即开通会员</strong>，无需人工核实。建议先 <a href="account.html">注册登录</a>，开通记录可在「我的账户」查看。</p>
       <div class="plan-grid" id="plan-grid"></div>
-      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥29</span> · 扫码时请按此金额支付</p>
+      <p class="plan-price-hint">当前选择：<span id="selected-plan-price">¥29</span> · 在线支付会自动按此金额生成订单</p>
 
       <div class="pay-online-section">
-        <button type="button" id="btn-wechat-online-pay" class="btn btn-primary btn-wechat-online">微信在线支付（自动到账）</button>
+        <button type="button" id="btn-wechat-online-pay" class="btn btn-primary btn-wechat-online">微信在线支付（自动开通）</button>
         <p class="modal-hint pay-online-hint">PC 推荐：生成专属订单二维码，支付成功后自动开通会员，无需人工核实。</p>
       </div>
 
-      <div class="pay-section">
-        <h4 class="pay-section-title">静态收款码 · 点击放大</h4>
-        <p class="modal-hint pay-section-hint">或使用下方收款码手动扫码；需手填金额与设备编号，并提交核实。</p>
-        <div class="pay-qr-grid" id="pay-qr-grid">
-          <button type="button" class="pay-qr-card" data-pay-channel="wechat" aria-label="微信支付">
-            <img src="assets/payment/qr-wechat.png" alt="微信支付收款码" width="160" height="220" loading="lazy">
-            <span class="pay-qr-label">微信支付</span>
-          </button>
-          <button type="button" class="pay-qr-card fit-contain" data-pay-channel="aggregate" aria-label="聚合码">
-            <img src="assets/payment/qr-aggregate.png" alt="聚合收款码（微信/支付宝/云闪付）" width="160" height="220" loading="lazy">
-            <span class="pay-qr-label">聚合码</span>
-          </button>
+      <details class="pay-section-details">
+        <summary class="pay-bank-summary">没有微信？用静态收款码 / 对公汇款（需人工核实）</summary>
+        <div class="pay-section">
+          <h4 class="pay-section-title">静态收款码 · 点击放大</h4>
+          <p class="modal-hint pay-section-hint">手动扫码：需自己填金额与设备编号，付款后必须点「我已付款 · 提交核实」，客服核对到账后才开通。</p>
+          <div class="pay-qr-grid" id="pay-qr-grid">
+            <button type="button" class="pay-qr-card" data-pay-channel="wechat" aria-label="微信支付">
+              <picture>
+                <source srcset="https://static.qtvq.cn/assets/payment/qr-wechat.webp" type="image/webp">
+                <img src="https://static.qtvq.cn/assets/payment/qr-wechat.png" alt="微信支付收款码" width="160" height="220" loading="lazy">
+              </picture>
+              <span class="pay-qr-label">微信支付</span>
+            </button>
+            <button type="button" class="pay-qr-card fit-contain" data-pay-channel="aggregate" aria-label="聚合码">
+              <picture>
+                <source srcset="https://static.qtvq.cn/assets/payment/qr-aggregate.webp" type="image/webp">
+                <img src="https://static.qtvq.cn/assets/payment/qr-aggregate.png" alt="聚合收款码（微信/支付宝/云闪付）" width="160" height="220" loading="lazy">
+              </picture>
+              <span class="pay-qr-label">聚合码</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <details class="pay-bank-details">
-        <summary class="pay-bank-summary">或 对公银行汇款</summary>
-      <div id="bank-info"></div>
-      <p class="modal-hint payment-legal">收款方：我心永恒（北京）网络科技有限公司。汇款后请提交信息，我司核对工商银行到账记录无误后开通会员，不开通自动退款请联系客服。</p>
-      <form id="payment-form">
-        <label>汇款人姓名（对公户名或您的姓名）<input name="payerName" required maxlength="40"></label>
-        <label>汇款时间<input name="paidAt" type="datetime-local" required></label>
-        <label>汇款金额（元）<input name="amount" type="number" required placeholder="与所选套餐一致"></label>
-        <label>汇款备注 / 后四位<input name="remark" maxlength="80" placeholder="建议填写设备编号"></label>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" data-close-subscribe>稍后</button>
-          <button type="submit" class="btn btn-primary">我已汇款，提交核实</button>
-        </div>
-      </form>
+        <details class="pay-bank-details">
+          <summary class="pay-bank-summary">或 对公银行汇款</summary>
+        <div id="bank-info"></div>
+        <p class="modal-hint payment-legal">收款方：我心永恒（北京）网络科技有限公司。汇款后请提交信息，我司核对工商银行到账记录无误后开通会员，不开通自动退款请联系客服。</p>
+        <form id="payment-form">
+          <label>汇款人姓名（对公户名或您的姓名）<input name="payerName" required maxlength="40"></label>
+          <label>汇款时间<input name="paidAt" type="datetime-local" required></label>
+          <label>汇款金额（元）<input name="amount" type="number" required placeholder="与所选套餐一致"></label>
+          <label>汇款备注 / 后四位<input name="remark" maxlength="80" placeholder="建议填写设备编号"></label>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-close-subscribe>稍后</button>
+            <button type="submit" class="btn btn-primary">我已汇款，提交核实</button>
+          </div>
+        </form>
+        </details>
       </details>
     </div>
   </div>
@@ -181,7 +188,7 @@
 
   <footer class="site-footer">
     <p class="footer-line">
-      <span>域名 qtvq.cn · Q Thought, Voice, Question · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>qtvq@qtvq.cn</a></span>
+      <span>域名 qtvq.cn · 我心永恒（北京）网络科技有限公司版权所有 · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></span>
       <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
     </p>
     <p class="footer-support">

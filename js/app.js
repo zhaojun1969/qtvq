@@ -206,15 +206,21 @@ export async function submitPaymentRequest(payload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, ...payload }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '提交失败');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // 以前这里把**服务端的拒绝**吞掉并伪造成功（"已本地登记（演示）"）——
+      // 用户以为提交成功、运营根本没收到，是最容易漏单的一类写法。
+      // 现在如实抛出，并在控制台留全量信息。
+      console.error('[payment] 提交被拒', res.status, data);
+      const empty = !data || Object.keys(data).length === 0;
+      throw new Error(
+        `提交失败（HTTP ${res.status}）：${data?.error || data?.message || (empty ? '服务端未返回 JSON 原因' : '未知原因')}`,
+      );
+    }
     return data;
   } catch (e) {
-    return {
-      ok: true,
-      message: '已本地登记（演示）。部署后由工作人员核对银行到账记录后解禁。',
-      fallback: true,
-    };
+    // 网络层失败（不是服务端拒绝）才走本地登记提示，且必须说明"未送达"
+    throw new Error(`提交未送达：${e.message || '网络异常'}，请稍后重试或邮件 qtvq@qtvq.cn`);
   }
 }
 

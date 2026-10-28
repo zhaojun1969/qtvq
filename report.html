@@ -16,16 +16,14 @@
     <div class="header-inner">
       <a href="index.html" class="logo">
         <span data-logo></span>
-        <div class="logo-text">
-          我心永恒
-          <span>Q问 · qtvq.cn</span>
-        </div>
+        <div class="logo-text"><span class="logo-title">Q问</span><span class="logo-sub">问出爱情真谛</span></div>
       </a>
       <nav class="nav-main">
           <a href="index.html">Q问</a>
           <a href="wheel.html">转盘配对</a>
           <a href="pitfalls.html">避坑大全</a>
           <a href="report.html">配对报告</a>
+          <a href="advice.html">避坑诊断</a>
           <a href="profile.html">我的缘值</a>
         </nav>
       <div class="user-stats">
@@ -153,6 +151,13 @@
     <!-- 3. 报告 -->
     <section class="panel hidden" id="panel-report">
       <h2>配对报告</h2>
+      <!-- 《人工智能生成合成内容标识办法》要求对 AI 生成内容作显式标识。
+           这里是文字内容的"起点位置提示"，与后端零宽溯源水印（隐式标识）互为补充，
+           两者用途不同，不可互相替代。 -->
+      <p class="ai-generated-notice" id="report-ai-notice">
+        <span class="ai-generated-tag">AI 生成</span>
+        本报告由 AI 生成，仅供关系决策参考，不构成心理诊断或医疗建议。
+      </p>
       <div id="report-body"></div>
     </section>
 
@@ -168,10 +173,11 @@
 
   <footer class="site-footer">
     <p class="footer-line">
-      <span>域名 qtvq.cn · Q Thought, Voice, Question · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>qtvq@qtvq.cn</a></span>
+      <span>域名 qtvq.cn · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></span>
       <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
     </p>
-    <p class="footer-support">
+        <p class="footer-copyright">我心永恒（北京）网络科技有限公司版权所有</p>
+<p class="footer-support">
       <a href="help.html">使用帮助</a>
       · <a href="privacy.html">隐私说明</a>
       · <a href="pitfalls.html">避坑大全</a>

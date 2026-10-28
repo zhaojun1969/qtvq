@@ -1,0 +1,157 @@
+/* 落地页（land.html）：投放专用的单页，风格沿用深色 + 粉紫渐变，
+   比主站更"窄、更长、更竖"，因为它 95% 的流量来自手机。 */
+
+.land-body {
+  background: var(--bg, #0f0e17);
+}
+
+.land-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.5rem 1.1rem 3rem;
+}
+
+.land-hero {
+  text-align: left;
+  padding: 1rem 0 0.5rem;
+}
+
+.land-eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: #ff6b81;
+  margin: 0 0 0.55rem;
+}
+
+.land-title {
+  font-size: 1.62rem;
+  line-height: 1.34;
+  margin: 0 0 0.7rem;
+  color: #f5f5f7;
+  font-weight: 700;
+}
+
+.land-sub {
+  font-size: 0.95rem;
+  line-height: 1.66;
+  color: #a0a0b0;
+  margin: 0 0 0.9rem;
+}
+
+.land-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1.2rem;
+}
+
+.land-badge {
+  font-size: 0.74rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b81, #6c5ce7);
+  color: #fff;
+}
+
+.land-badge-quiet {
+  background: #1a1928;
+  border: 1px solid #2c2b3e;
+  color: #a0a0b0;
+}
+
+.land-card {
+  background: #1a1928;
+  border: 1px solid #242338;
+  border-radius: 14px;
+  padding: 1.05rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.land-card-title {
+  font-size: 1rem;
+  margin: 0 0 0.7rem;
+  color: #f5f5f7;
+}
+
+.land-signals,
+.land-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #d7d7e0;
+  font-size: 0.92rem;
+  line-height: 1.72;
+}
+
+.land-signals li,
+.land-steps li {
+  margin-bottom: 0.45rem;
+}
+
+.land-card-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: #a0a0b0;
+}
+
+.land-cta-block {
+  margin: 1.3rem 0 1.4rem;
+}
+
+.land-cta {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+  margin-bottom: 0.7rem;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.land-cta:active {
+  transform: scale(0.985);
+}
+
+.land-cta-primary {
+  background: linear-gradient(135deg, #ff6b81, #6c5ce7);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(108, 92, 231, 0.28);
+}
+
+.land-cta-sub {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  opacity: 0.9;
+  margin-top: 0.28rem;
+}
+
+.land-cta-ghost {
+  background: #1a1928;
+  border: 1px solid #2c2b3e;
+  color: #d7d7e0;
+  font-weight: 500;
+}
+
+.land-cta-note {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #8a8a99;
+  text-align: center;
+  margin: 0;
+}
+
+.land-how {
+  margin-top: 0.2rem;
+}
+
+@media (min-width: 720px) {
+  .land-title {
+    font-size: 1.9rem;
+  }
+  .land-wrap {
+    padding-top: 2.2rem;
+  }
+}

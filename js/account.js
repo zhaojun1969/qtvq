@@ -1,5 +1,9 @@
 import { getClientId, formatQuotaStatusText } from './quota.js';
 import { getUser, showToast, refreshStatUI } from './app.js';
+import { PAY_CHANNELS } from './pay-qr.js';
+import { qrCodeImageUrl } from './qr-render.js';
+import { apiFetch } from './api-fetch.js';
+import { imgUrl } from './config.js';
 import {
   registerAccount,
   loginAccount,
@@ -12,7 +16,11 @@ import {
   deleteAccount,
   clearAuthSession,
   startWechatOpenLogin,
+  closeWechatLoginModal,
   handleWechatOpenCallback,
+  sendSmsCode,
+  resetPasswordBySms,
+  fetchSmsStatus,
 } from './auth.js';
 
 const guestPanel = document.getElementById('guest-panel');
@@ -84,6 +92,109 @@ function renderPayStatus(quota) {
   payStatusArea.appendChild(card);
 }
 
+/* ── 缘值钱包：余额 + 最近明细 ────────────────────────────────────────────
+ * 2026-10-11：网页端**以前完全没有这块显示** —— 用户充了钱，页面上只有"充值"按钮与
+ * "会员开通记录"（那是会员数据，与缘值无关），于是反复投诉"看不到余额 +1"。
+ * 数据源：Node `GET /v1/wallet`（余额）与 `GET /v1/wallet/ledger?limit=N`（流水，含 balanceAfter）。
+ * 小程序早就在用这两个接口，是网页端一直没接。
+ */
+const LEDGER_REASON_ZH = {
+  topup: '缘值充值',
+  admin_credit: '人工入账',
+  welcome: '欢迎缘值',
+  wheel_spin: '转盘',
+  member_daily_spin: '转盘（会员每日免费）',
+  report_charge: '配对报告',
+  member_daily_free: '报告（会员每日免费）',
+  free_tier: '报告（体验档免费）',
+  refund: '退款回冲',
+  billing_disabled: '计费未开启',
+};
+
+function ledgerReasonText(reason, ref) {
+  // 与小程序同一套兜底：历史数据里在线充值曾被写成 admin_credit，但 ref 是订单号（ord_ 开头）
+  if (reason === 'admin_credit' && typeof ref === 'string' && ref.startsWith('ord_')) return '缘值充值（在线支付）';
+  return LEDGER_REASON_ZH[reason] || reason || '—';
+}
+
+/** 取钱包流水（供"是否真的入账"判定与渲染共用） */
+async function fetchWalletLedger(limit = 5) {
+  /* 返回数组=成功（空数组表示确实没有记录）；返回 null=没取到（必须显式告诉用户）。
+   * 2026-10-11 两个真实坑：
+   *  ① `r.ok` 对 304 Not Modified 是 false（ok 仅 200-299）→ 原来据此返回 []，
+   *     把"有数据但没取到"伪装成"确实没有记录"（线上日志里大量 /v1/wallet/ledger 304）。
+   *  ② 页面刚加载时 token 未就绪 → 服务端 401（日志 21:22:27 / 21:23:11 均为 401，
+   *     1-3 秒后重试才 200）→ 需要一次重试。
+   * 统一加 cache:'no-store' + _t 时间戳，不给浏览器/中间层用 304 糊弄我们的机会。
+   */
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const r = await apiFetch(`/v1/wallet/ledger?limit=${limit}&_t=${Date.now()}`, { cache: 'no-store' });
+      if (r.status === 401 && attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+      if (r.status === 401) return null;
+      const j = await r.json().catch(() => null);
+      const items = j?.data?.items || j?.items;
+      if (Array.isArray(items)) return items;
+      if (attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+      return null;
+    } catch {
+      if (attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+      return null;
+    }
+  }
+  return null;
+}
+
+/** 渲染余额与明细；返回余额（拿不到返回 null） */
+async function refreshWallet() {
+  const balEl = document.getElementById('wallet-balance');
+  const listEl = document.getElementById('wallet-ledger');
+  const emptyEl = document.getElementById('wallet-ledger-empty');
+  if (!balEl && !listEl) return null;
+
+  let balance = null;
+  let failReason = '';
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const r = await apiFetch(`/v1/wallet?_t=${Date.now()}`, { cache: 'no-store' });
+      if (r.status === 401 && attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+      if (r.status === 401) { failReason = '登录状态已失效，请重新登录'; break; }
+      const j = await r.json().catch(() => null);
+      const b = j?.data?.wallet?.balance ?? j?.wallet?.balance;
+      if (typeof b === 'number') { balance = b; break; }
+      failReason = '服务端未返回余额';
+      if (attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+    } catch {
+      failReason = '网络错误';
+      if (attempt === 0) { await new Promise((res) => setTimeout(res, 1200)); continue; }
+    }
+  }
+  if (balEl) {
+    /* 读不到就**如实显示原因**，不再让 "¥—" 沉默地骗人
+       （今天已因"静默兜底掩盖失败"吃过两次亏，这次轮到我自己的代码） */
+    balEl.textContent = balance !== null ? `¥${balance.toFixed(2)}` : `读取失败（${failReason || '未知原因'}）`;
+  }
+
+  const items = await fetchWalletLedger(5);
+  if (items === null) {
+    if (listEl) listEl.innerHTML = '<li>明细加载失败，请刷新重试（上面的余额可能仍然是准的）</li>';
+    if (emptyEl) emptyEl.hidden = true;
+    return balance;
+  }
+  if (listEl) {
+    listEl.innerHTML = items
+      .map((x) => `<li>${x.direction === 'out' ? '−' : '+'}¥${Number(x.amount).toFixed(2)} · ${escapeText(ledgerReasonText(x.reason, x.ref))} · ${fmtTime(x.createdAt)}</li>`)
+      .join('');
+  }
+  if (emptyEl) emptyEl.hidden = items.length > 0;
+  return balance;
+}
+
+/** 极简转义：流水里的 reason/ref 也可能来自服务端，不直接拼进 innerHTML */
+function escapeText(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function renderPayHistory(quota) {
   const list = quota?.paymentHistory || [];
   if (!payHistoryEl || !payHistoryEmpty) return;
@@ -133,6 +244,7 @@ function renderDashboard(data) {
 
   renderPayStatus(quota);
   renderPayHistory(quota);
+  initTopup(quota);
   renderDeleteZone(user);
   refreshAuthNav();
   refreshStatUI();
@@ -207,12 +319,327 @@ document.getElementById('change-pwd-form')?.addEventListener('submit', async (e)
   }
 });
 
+/* ── 短信找回密码 ── */
+let smsTimer = null;
+
+// 短信服务没配置时不要展示短信入口：点了只得到"未配置"是最差的体验
+fetchSmsStatus().then((ok) => {
+  if (ok) return;
+  document.getElementById('forgot-form')?.setAttribute('hidden', '');
+  const hint = document.getElementById('sms-hint');
+  if (hint) hint.textContent = '短信找回暂未开通，请使用下方微信扫码验证，或邮件联系客服。';
+});
+
+function setSendBtnText(text, disabled) {
+  const btn = document.getElementById('btn-send-sms');
+  if (!btn) return;
+  btn.textContent = text;
+  btn.disabled = !!disabled;
+}
+
+document.getElementById('btn-send-sms')?.addEventListener('click', async () => {
+  const form = document.getElementById('forgot-form');
+  const phone = (new FormData(form).get('phone') || '').toString().trim();
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    showToast('请先填写正确的 11 位手机号');
+    return;
+  }
+  setSendBtnText('发送中…', true);
+  try {
+    await sendSmsCode(phone);
+    showToast('验证码已发送（若该手机号已注册）');
+    // 60 秒倒计时与后端节流一致
+    let left = 60;
+    setSendBtnText(`${left} 秒后可重发`, true);
+    clearInterval(smsTimer);
+    smsTimer = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(smsTimer);
+        setSendBtnText('重新获取', false);
+      } else {
+        setSendBtnText(`${left} 秒后可重发`, true);
+      }
+    }, 1000);
+  } catch (e) {
+    setSendBtnText('获取验证码', false);
+    showToast(e.message || '验证码发送失败');
+  }
+});
+
+document.getElementById('forgot-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const phone = (fd.get('phone') || '').toString().trim();
+  const code = (fd.get('code') || '').toString().trim();
+  const newPassword = (fd.get('newPassword') || '').toString();
+  if (newPassword !== fd.get('newPassword2')) {
+    showToast('两次新密码不一致');
+    return;
+  }
+  try {
+    await resetPasswordBySms({ phone, code, newPassword });
+    clearInterval(smsTimer);
+    showToast('密码已重置，请用新密码登录');
+    document.getElementById('forgot-panel').hidden = true;
+    document.getElementById('login-panel').hidden = false;
+    document.getElementById('login-form')?.querySelector('input[name="phone"]')?.focus?.();
+  } catch (err) {
+    showToast(err.message || '重置失败');
+  }
+});
+
+/* ── 缘值充值·在线支付（方案 A：金额由订单决定，付完自动到账） ── */
+let topupPollTimer = null;
+
+function stopTopupPoll() {
+  if (topupPollTimer) {
+    clearTimeout(topupPollTimer);
+    topupPollTimer = null;
+  }
+}
+
+/**
+ * 充值登录闸门：**未登录时把静态收款码整块收起来**。
+ *
+ * 为什么要做成"看不见"而不是"提示一下"（2026-10-11 两位用户实测踩坑）：
+ *   · 在线支付必须登录（要往 `uid` 的钱包入账，没账号无处可记）→ `js/account.js` 里只弹一句"请先登录"；
+ *   · 而折叠在 `<details>` 里的静态码**不需要登录**，展开就能扫；
+ *   · 于是"点在线支付 → 被登录提示挡住 → 顺手展开下面那块去扫静态码"成了最自然的路径，
+ *     而那笔钱**永远无法自动入账**（静态图没有订单号、没有回调），只能人工核实补账。
+ * 所以这里把「未登录」与「静态码」两件事从结构上互斥：没登录就看不到静态码。
+ * 靠文案提醒是不够的 —— 已经发生两次了。
+ */
+function applyTopupLoginGate() {
+  const logged = Boolean(getAuthUser()?.id);
+  const manual = document.getElementById('topup-manual');
+  const gate = document.getElementById('topup-login-gate');
+  const onlineBox = document.getElementById('topup-online-box');
+  if (manual) manual.hidden = !logged;
+  if (gate) gate.hidden = logged;
+  // 未登录时把已生成的订单二维码也收起来（避免"上一个会话的码"被误扫）
+  if (!logged && onlineBox) onlineBox.hidden = true;
+}
+
+applyTopupLoginGate();
+
+document.getElementById('btn-topup-online')?.addEventListener('click', async () => {
+  stopTopupPoll();
+  const amount = currentTopupAmount();
+  if (amount < 1 || amount > 2000) return showToast('充值金额需在 ¥1 – ¥2000 之间');
+
+  const user = getAuthUser();
+  if (!user?.id) {
+    // 关键：被登录挡住时，顺手把静态码也收起来 —— 否则用户会退到那条无法自动入账的路上
+    applyTopupLoginGate();
+    return showToast('请先登录后再充值（需要账号才能入账）');
+  }
+
+  const btn = document.getElementById('btn-topup-online');
+  btn.disabled = true;
+  btn.textContent = '正在创建订单…';
+  try {
+    const res = await apiFetch('/api/payment/wechat/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: getClientId(),
+        plan: 'topup',
+        amount,
+        uid: user.id, // Node 侧钱包的 _id 就是这个值，无需映射
+        channel: 'native',
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.codeUrl) {
+      throw new Error(data.error || `下单失败（HTTP ${res.status}）`);
+    }
+
+    const box = document.getElementById('topup-online-box');
+    const img = document.getElementById('topup-online-img');
+    const statusEl = document.getElementById('topup-online-status');
+    if (box) box.hidden = false;
+    if (img) img.src = qrCodeImageUrl(data.codeUrl, 260);
+    if (statusEl) statusEl.textContent = `订单 ${data.orderId} · 应付 ¥${amount} · 等待支付中…`;
+
+    const { pollWechatPayOrder } = await import('./payment-wechat.js');
+    const stop = pollWechatPayOrder(data.orderId, {
+      /*
+       * ⚠️ 付款成功 ≠ 已入账 —— 这里以前直接写「✓ 支付成功，¥X 已自动加到你的缘值」，
+       * 而它唯一的依据是**订单状态变成 paid**；而订单是被 `payment-activate.js` 的
+       * `markOrderPaid()` **先**标成 paid 的，与"钱有没有进钱包"无关。
+       * 2026-10-11 事故里入账失败、界面却宣布成功，用户以为钱到了（连续几笔都这样）。
+       * 现在只陈述"支付成功"，入账结果以**余额/明细**为准，并给出订单号便于核对。
+       */
+      onPaid: async () => {
+        /*
+         * 付款成功 ≠ 已入账。以前这里只看订单状态就宣布"已加到你的缘值"，
+         * 而订单是被 markOrderPaid() **先**标的 paid（与钱是否进钱包无关）→ 假提示。
+         * 现在以**流水里出现本订单号**为准确认（ref = orderId：自动入账与人工补账都用这个键）。
+         */
+        if (statusEl) statusEl.textContent = `支付成功，正在确认入账…（订单号 ${data.orderId}）`;
+        let credited = false;
+        for (let i = 0; i < 5 && !credited; i += 1) {
+          const items = await fetchWalletLedger(10);
+          credited = items.some((x) => x.ref === data.orderId);
+          if (!credited) await new Promise((r) => setTimeout(r, 2000));
+        }
+        await refreshWallet();
+        if (statusEl) {
+          statusEl.textContent = credited
+            ? `✓ 已到账：缘值 +¥${amount}（订单号 ${data.orderId}）`
+            : `支付成功，但入账尚未确认（订单号 ${data.orderId}）。请点「刷新」；若 1 分钟后仍未到账，请把这个订单号发给客服。`;
+        }
+        showToast(credited ? `充值到账：+¥${amount}` : '支付成功，入账待确认');
+        fetchAccountMe().then((d) => d && renderDashboard(d)).catch(() => {});
+      },
+      onError: () => {},
+    });
+    topupPollTimer = setTimeout(stop, 10 * 60 * 1000); // 最多轮询 10 分钟
+  } catch (err) {
+    showToast(err.message || '创建充值订单失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '微信在线支付 · 自动到账';
+  }
+});
+
+/* ── 缘值充值（静态收款码 + 提交核实；后端 /api/payment 的 plan=topup 分支） ── */
+let topupChannel = 'wechat';
+
+function currentTopupAmount() {
+  const el = document.getElementById('topup-amount');
+  const v = Number(el?.value || 0);
+  return Number.isFinite(v) ? v : 0;
+}
+
+/** 三行提示：把"必须自己填金额 + 必须提交核实"讲明白（静态码不会自动到账） */
+function refreshTopupTip() {
+  const amount = currentTopupAmount();
+  const ch = PAY_CHANNELS[topupChannel];
+  const tipEl = document.getElementById('topup-tip');
+  const imgEl = document.getElementById('topup-qr-img');
+  if (ch && imgEl) {
+    imgEl.src = imgUrl(ch.image);
+    imgEl.alt = `${ch.label}收款码`;
+  }
+  if (tipEl) {
+    tipEl.textContent = amount > 0
+      ? `① 用${ch?.label || '微信'}扫上面这张码，付款金额请填 ¥${amount}（可点「复制金额」）\n② 备注填设备编号或账单后四位\n③ 付完点下方「我已付款 · 提交核实」（静态码不会自动到账）`
+      : '请先填写充值金额';
+  }
+  document.querySelectorAll('#topup-channels [data-channel]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.channel === topupChannel);
+  });
+}
+
+function renderTopupChannels() {
+  const wrap = document.getElementById('topup-channels');
+  if (!wrap || wrap.dataset.ready === '1') return;
+  wrap.innerHTML = Object.values(PAY_CHANNELS)
+    .map((ch) => `<button type="button" class="btn btn-secondary" data-channel="${ch.id}">${ch.label}</button>`)
+    .join('');
+  wrap.dataset.ready = '1';
+  wrap.querySelectorAll('[data-channel]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      topupChannel = btn.dataset.channel;
+      refreshTopupTip();
+    });
+  });
+}
+
+document.querySelectorAll('[data-topup]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const el = document.getElementById('topup-amount');
+    if (el) el.value = btn.dataset.topup;
+    refreshTopupTip();
+  });
+});
+
+document.getElementById('topup-amount')?.addEventListener('input', refreshTopupTip);
+
+document.getElementById('btn-topup-copy')?.addEventListener('click', async () => {
+  const amount = currentTopupAmount();
+  if (amount <= 0) return showToast('请先填写充值金额');
+  try {
+    await navigator.clipboard.writeText(String(amount));
+    showToast(`已复制金额 ¥${amount}`);
+  } catch {
+    showToast(`请手动输入金额：¥${amount}`);
+  }
+});
+
+document.getElementById('topup-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const amount = currentTopupAmount();
+  if (amount < 1 || amount > 2000) return showToast('充值金额需在 ¥1 – ¥2000 之间');
+  const fd = new FormData(e.target);
+  try {
+    const res = await apiFetch('/api/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: getClientId(),
+        plan: 'topup',
+        amount,
+        payerName: (fd.get('payerName') || '').toString().trim(),
+        paidAt: (fd.get('paidAt') || '').toString().trim(),
+        remark: (fd.get('remark') || '').toString().trim(),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // 这里以前是 `data.error || '提交失败'` —— 当响应体不是 JSON（例如 403/404/405 的 HTML 页）
+      // 时，就会退化成笼统的「提交失败」，用户和排查的人都看不到真实原因。
+      // 现在把状态码与服务端返回内容一并抛出，并在控制台留全量信息。
+      const empty = !data || Object.keys(data).length === 0;
+      console.error('[topup] 提交失败', res.status, data);
+      throw new Error(
+        `提交失败（HTTP ${res.status}）：${data?.error || data?.message || (empty ? '服务端未返回 JSON 原因' : '未知原因')}`,
+      );
+    }
+    showToast(data.message || '已登记，核对到账后为你加缘值');
+    const pendingEl = document.getElementById('topup-pending');
+    if (pendingEl) {
+      pendingEl.hidden = false;
+      pendingEl.textContent = `已提交待核实：¥${amount}（${fd.get('payerName') || ''} · ${fd.get('paidAt') || ''}）。客服核对到账后加缘值。`;
+    }
+  } catch (err) {
+    showToast(err.message || '提交失败');
+  }
+});
+
+function initTopup(quota) {
+  renderTopupChannels();
+  // 付款时间预填为现在，减少一处必填负担
+  const paidAt = document.querySelector('#topup-form input[name="paidAt"]');
+  if (paidAt && !paidAt.value) {
+    const p = (n) => String(n).padStart(2, '0');
+    const d = new Date();
+    paidAt.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  const pendingEl = document.getElementById('topup-pending');
+  if (pendingEl && quota?.topupPending?.status === 'pending') {
+    pendingEl.hidden = false;
+    pendingEl.textContent = `已提交待核实：¥${quota.topupPending.amount}（${quota.topupPending.payerName} · ${quota.topupPending.paidAt}）`;
+  }
+  refreshTopupTip();
+}
+
 document.getElementById('btn-wechat-open-login')?.addEventListener('click', async () => {
   try {
     await startWechatOpenLogin();
   } catch (e) {
     showToast(e.message || '微信登录未配置');
   }
+});
+
+// 关闭微信扫码弹窗（点遮罩或「关闭」按钮）
+document.querySelectorAll('[data-close-wx-login]').forEach((el) => {
+  el.addEventListener('click', () => closeWechatLoginModal());
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeWechatLoginModal();
 });
 
 document.getElementById('btn-wechat-open-reset')?.addEventListener('click', async () => {
@@ -326,4 +753,6 @@ handleWechatOpenCallback()
 
 setInterval(() => {
   if (isLoggedIn()) fetchAccountMe().then(renderDashboard).catch(() => {});
+  // 缘值余额与明细：登录后立即渲染（网页端以前完全没有这块显示）
+  if (isLoggedIn()) refreshWallet().catch(() => {});
 }, 30000);

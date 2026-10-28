@@ -15,9 +15,10 @@ import {
   syncQuotaFromServer,
 } from './app.js';
 import { canAskNewQuestion } from './quota.js';
+import { track } from './track.js';
 import { openSubscribeModal, initSubscribeModal } from './subscribe.js';
 import { showLoading, hideLoading } from './loading.js';
-import { createVoiceRecorder, transcribeBlob, probeSpeechApi } from './voice-asr.js';
+import { createVoiceRecorder, transcribeBlob, probeSpeechApiDetailed } from './voice-asr.js';
 
 let lastQuestion = '';
 
@@ -98,13 +99,26 @@ function initVoiceInput() {
   let webRec = null;
   let webListening = false;
 
-  probeSpeechApi().then((ok) => {
-    useServerAsr = ok;
-    if (ok) btn.title = '语音输入（阿里云识别，点击开始/停止）';
-    else if (!SR) {
-      btn.disabled = true;
-      btn.title = '当前浏览器不支持语音输入';
-    } else btn.title = '语音输入（浏览器识别，国内可能不可用）';
+  // 就绪探测：只有"真的能换到识别 token"才启用服务端识别路径。
+  // 原来只看 /api/health 的 speechConfigured（=环境变量存在），于是按钮一直亮着、
+  // 点下去才失败 —— 属于"配置存在 ≠ 服务可用"的典型误判。
+  probeSpeechApiDetailed().then((probe) => {
+    useServerAsr = probe.ready;
+    if (probe.ready) {
+      btn.title = '语音输入（阿里云识别，点击开始/停止）';
+      return;
+    }
+    console.warn('[voice] 服务端识别不可用：', probe.nlsCode, probe.reason);
+    if (SR) {
+      btn.title = '语音识别服务暂不可用，将尝试浏览器识别';
+      return;
+    }
+    btn.disabled = true;
+    btn.title = probe.configured
+      ? `语音识别不可用：${probe.reason || '服务异常'}`
+      : '语音识别未配置';
+    // 对用户只说一句能行动的；详细原因留在控制台，避免把 RAM 权限说明糊到用户脸上
+    btn.textContent = '🎤 语音（暂不可用）';
   });
 
   const ERROR_MSG = {
@@ -223,6 +237,18 @@ function appendMessage(text, type, withAdopt = false) {
 
   const msg = document.createElement('div');
   msg.className = `msg msg-${type}`;
+  /*
+   * 《人工智能生成合成内容标识办法》要求对 AI 生成内容作**显式标识**。
+   * 这是文字内容"起点位置"的提示标识；后端另有零宽字符溯源水印（隐式标识）。
+   * 两者用途不同：显式标识用于告知用户，隐式标识用于事后溯源，不可互相替代。
+   */
+  if (type === 'ai') {
+    const label = document.createElement('div');
+    label.className = 'msg-ai-label';
+    label.setAttribute('role', 'note');
+    label.textContent = '本回答由 AI 生成';
+    msg.appendChild(label);
+  }
   if (type === 'ai' && withAdopt) {
     const pre = document.createElement('pre');
     pre.className = 'msg-pre';
@@ -244,7 +270,8 @@ function appendMessage(text, type, withAdopt = false) {
     row.appendChild(btn);
     msg.appendChild(row);
   } else {
-    msg.textContent = text;
+    /* 用文本节点而非 textContent：textContent 会清空上面刚加的 AI 标识 */
+    msg.appendChild(document.createTextNode(text));
   }
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
@@ -306,6 +333,14 @@ async function handleAsk(followUp = false) {
     typing.remove();
     hideLoading();
     appendMessage(data.reply, 'ai', true);
+    /*
+     * 激活口径（`server/src/services/metrics.js::ACTIVATION_EVENTS`）：
+     * 「完成资料」或「首问」。这里只报首问，且**只在真的拿到回答之后**报 ——
+     * 报在点击时会把限流/配额拦截也算成激活，90 天验收门就失去意义。
+     */
+    if (!followUp) {
+      track('question_asked', { mode: data?.fallback ? 'fallback' : 'ai' });
+    }
     if (!followUp) {
       if (data.quota) applyServerQuota(data.quota);
       else commitNewQuestionAsk();

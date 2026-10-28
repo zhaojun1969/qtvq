@@ -13,13 +13,14 @@
     <div class="header-inner">
       <a href="index.html" class="logo">
         <span data-logo></span>
-        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+        <div class="logo-text"><span class="logo-title">Q问</span><span class="logo-sub">问出爱情真谛</span></div>
       </a>
       <nav class="nav-main">
           <a href="index.html">Q问</a>
           <a href="wheel.html">转盘配对</a>
           <a href="pitfalls.html">避坑大全</a>
           <a href="report.html">配对报告</a>
+          <a href="advice.html">避坑诊断</a>
           <a href="profile.html">我的缘值</a>
         </nav>
       <div class="user-stats">
@@ -48,13 +49,14 @@
           <li><a href="#qask">Q问 · 首页</a></li>
           <li><a href="#pitfalls">避坑大全</a></li>
           <li><a href="#profile">我的缘值</a></li>
-          <li><a href="#member">会员与汇款</a></li>
+          <li><a href="#member">会员与支付</a></li>
+          <li><a href="#account">账号与安全</a></li>
           <li><a href="#contact">联系客服</a></li>
           <li><a href="#privacy">隐私说明</a></li>
           <li><a href="#download">客户端下载</a></li>
           <li><a href="#404">找不到页面</a></li>
         </ul>
-        <p class="help-toc-foot"><a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>客户邮箱 qtvq@qtvq.cn</a></p>
+        <p class="help-toc-foot"><a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></p>
       </aside>
 
       <div class="help-content">
@@ -65,8 +67,11 @@
               <thead><tr><th>页面</th><th>入口</th><th>主要功能</th><th>离开方式</th></tr></thead>
               <tbody>
                 <tr><td><a href="index.html">Q问</a></td><td>顶栏 / 首页</td><td>AI 直线问答、语音、热点</td><td>→ 避坑 / 缘值 / 帮助</td></tr>
+                <tr><td><a href="wheel.html">转盘配对</a></td><td>顶栏</td><td>转一圈抽配对（每次 ¥1，从缘值扣）</td><td>→ 报告 / 账户 / 帮助</td></tr>
+                <tr><td><a href="report.html">配对报告</a></td><td>顶栏</td><td>生成/查看配对报告、填写资料</td><td>→ 转盘 / 账户 / 帮助</td></tr>
                 <tr><td><a href="pitfalls.html">避坑大全</a></td><td>顶栏</td><td>50 坑、测验、行动卡</td><td>→ Q问 / 缘值 / 帮助</td></tr>
                 <tr><td><a href="profile.html">我的缘值</a></td><td>顶栏</td><td>Q币、直线卡、会员</td><td>→ Q问 / 避坑 / 帮助</td></tr>
+                <tr><td><a href="account.html">我的账户</a></td><td>顶栏（登录后）</td><td>登录注册、找回密码、缘值充值、会员状态、注销</td><td>→ Q问 / 帮助</td></tr>
                 <tr><td><a href="help.html">使用帮助</a></td><td>页脚</td><td>本说明</td><td>→ 任意顶栏链接</td></tr>
                 <tr><td><a href="privacy.html">隐私说明</a></td><td>页脚</td><td>隐私政策全文</td><td>→ 首页 / 下载</td></tr>
                 <tr><td><a href="download.html">客户端下载</a></td><td>页脚</td><td>安卓 / iOS / 鸿蒙 / 小程序</td><td>→ 首页 / 隐私</td></tr>
@@ -94,9 +99,9 @@
               <li>单次录音最长约 30 秒；环境尽量安静、语速清晰。</li>
             </ul>
             <h3>③ 提问额度</h3>
-            <p>免费用户每 <strong>24 小时 5 次</strong>新提问；「再问一步」不占用。额度用尽后点 <strong>办理会员不限次</strong> 或前往 <a href="profile.html#subscription">我的缘值 · 会员</a>。</p>
+            <p>免费用户每 <strong>24 小时 5 次</strong>新提问；「再问一步」不占用。额度用尽后点 <strong>办理会员不限次</strong> 或前往 <a href="profile.html#subscription-card">我的缘值 · 会员</a>。</p>
             <h3>④ 先锋次数</h3>
-            <p>新用户有独立先锋问答次数；在 <a href="profile.html#pioneer">缘值页</a> 可邀请好友 +5 次。</p>
+            <p>新用户有独立先锋问答次数；在 <a href="profile.html">缘值页</a> 可邀请好友 +5 次。</p>
           </div>
           <p class="help-nav-row">
             <a href="#map" class="btn btn-secondary btn-sm">上一节</a>
@@ -162,17 +167,18 @@
         <section id="member" class="help-section">
           <h2>会员与支付</h2>
           <div class="help-card">
-            <h3>① 微信在线支付（推荐，自动到账）</h3>
+            <h3>① 微信在线支付（推荐，自动开通）</h3>
             <ol>
-              <li>打开 <strong>办理会员</strong>，选择套餐后点 <strong>微信在线支付</strong>。</li>
-              <li>扫描生成的订单二维码完成付款（PC 用手机扫屏幕）。</li>
-              <li>支付成功后自动开通，无需提交核实。</li>
+              <li>打开 <strong>办理会员</strong>，选择月卡 / 季卡 / 年卡。</li>
+              <li>点 <strong>微信在线支付（自动开通）</strong> → 生成专属订单二维码（<strong>金额自动带上</strong>，扫码后不用再输金额）。</li>
+              <li>支付成功后<strong>立即自动开通</strong>，无需提交核实；记录见「我的账户 → 历史开通记录」。</li>
+              <li>若付完页面没反应：关掉再打开一次「我的账户」，系统会主动向微信查账并自动开通。</li>
             </ol>
-            <h3>② 静态收款码</h3>
+            <h3>② 静态收款码（没有微信时用）</h3>
             <ol>
-              <li>在会员弹窗点击四种收款码之一放大。</li>
-              <li>按所选套餐金额付款，备注填写设备编号。</li>
-              <li>点 <strong>我已完成支付</strong> 并提交核实。</li>
+              <li>在会员弹窗展开 <strong>没有微信？用静态收款码 / 对公汇款</strong>，点收款码放大（现为两种：微信支付、聚合码）。</li>
+              <li>付款金额请<strong>自己填</strong>成所选套餐金额，备注建议填设备编号。</li>
+              <li>回到页面点 <strong>我已付款 · 提交核实</strong>。静态码<strong>无法自动识别到账</strong>，必须做这一步。</li>
             </ol>
             <h3>③ 对公银行汇款</h3>
             <ol>
@@ -180,11 +186,59 @@
               <li>填写汇款人、时间、金额后点 <strong>我已汇款，提交核实</strong>。</li>
               <li>工作人员核对到账后开通不限次提问。</li>
             </ol>
+            <h3>④ 缘值充值（转盘与配对报告用）</h3>
+            <ol>
+              <li>进入 <a href="account.html">我的账户</a> → <strong>缘值充值</strong>，填金额（¥1–¥2000）。</li>
+              <li>点 <strong>微信在线支付 · 自动到账</strong> → 扫码付款（<strong>不用再填一次金额</strong>）→ 支付成功后<strong>自动加到缘值</strong>。</li>
+              <li>没有微信时，展开下方的静态收款码走人工核实那条路（需点提交核实）。</li>
+            </ol>
+            <h3>⑤ 请分清两笔钱（互不通用）</h3>
+            <ul>
+              <li><strong>会员费</strong>（月卡 ¥29 / 季卡 ¥79 / 年卡 ¥299）：买的是会员权益（不限次提问、每日免一次转盘/报告），<strong>不会增加缘值</strong>。</li>
+              <li><strong>缘值充值</strong>：只加余额，用于 <strong>转盘每次 ¥1</strong> 与 <strong>配对报告按次扣费</strong>，<strong>不能当会员费用</strong>。</li>
+              <li>两笔钱分别记账、分别到账，谁也不顶替谁。</li>
+            </ul>
             <p>汇款疑问可 <a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>联系客服 qtvq@qtvq.cn</a>。</p>
           </div>
           <p class="help-nav-row">
             <a href="#profile" class="btn btn-secondary btn-sm">上一节</a>
             <a href="index.html" class="btn btn-secondary btn-sm">去办会员</a>
+            <a href="#account" class="btn btn-primary btn-sm">下一节：账号与安全</a>
+          </p>
+        </section>
+
+        <section id="account" class="help-section">
+          <h2>账号与安全</h2>
+          <div class="help-card">
+            <h3>① 登录方式</h3>
+            <ul>
+              <li><strong>手机号 + 密码</strong>：注册后即可用。</li>
+              <li><strong>微信扫码登录</strong>：在 <a href="account.html">我的账户</a> 点按钮会<strong>弹出小窗显示二维码</strong>，扫码成功后本页自动进入你的账户；未注册的微信号会自动创建账号。</li>
+              <li>登录后设备编号会与账号绑定，换浏览器也能看到会员与额度。</li>
+            </ul>
+            <h3>② 忘记密码</h3>
+            <ul>
+              <li><strong>短信验证码找回（推荐）</strong>：账户页 →「忘记密码」→ 填注册手机号 → 获取验证码（5 分钟内有效，同一号码 60 秒只能获取一次、每天最多 10 条）→ 填验证码与新密码。</li>
+              <li><strong>微信扫码找回</strong>：适合已绑定微信的账号，扫码验证后重置。</li>
+              <li>两者都不行：邮件 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a> 联系客服。</li>
+            </ul>
+            <h3>③ 语音输入</h3>
+            <ul>
+              <li>首页输入框旁点 <strong>🎤 语音</strong>，对着麦克风说一句中文，识别结果会自动填入输入框。</li>
+              <li>首次使用浏览器会请求麦克风权限，请选择允许。</li>
+              <li>若按钮显示「暂不可用」，说明识别服务当时不可用，可直接手打；服务恢复后按钮会自动变回可用。</li>
+            </ul>
+            <h3>④ 注销账号</h3>
+            <ul>
+              <li>在 <a href="account.html">我的账户</a> 最后一栏「注销账号」操作；有密码的账号需输密码，纯微信账号需打出「注销账号」四个字。</li>
+              <li>注销后<strong>个人资料、登录凭证、提问记录、微信绑定立即删除且不可恢复</strong>。</li>
+              <li>为保护双方权益：<strong>会员未到期</strong>或<strong>有付款待核实</strong>时暂不能自助注销，请先联系客服协商处理。</li>
+              <li>订单记录会以<strong>脱敏方式</strong>保留（金额、时间保留，身份信息隐去），用于财务与合规留痕。</li>
+            </ul>
+          </div>
+          <p class="help-nav-row">
+            <a href="#member" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="account.html" class="btn btn-primary btn-sm">去我的账户</a>
             <a href="#contact" class="btn btn-primary btn-sm">下一节：客服</a>
           </p>
         </section>
@@ -194,14 +248,14 @@
           <div class="help-card">
             <p>邮箱：<strong>qtvq@qtvq.cn</strong></p>
             <ul>
-              <li>任意页脚点 <strong>客户邮箱</strong>，可写文字并上传最多 4 张截图。</li>
+              <li>任意页脚点 <strong>客户留言：</strong>，可写文字并上传最多 4 张截图。</li>
               <li>也可直接发邮件至 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，邮件客户端可附图片。</li>
               <li>建议留下回复邮箱；勿发送银行卡密码、验证码等敏感信息。</li>
             </ul>
             <button type="button" class="btn btn-primary" data-open-contact>打开留言窗口</button>
           </div>
           <p class="help-nav-row">
-            <a href="#member" class="btn btn-secondary btn-sm">上一节</a>
+            <a href="#account" class="btn btn-secondary btn-sm">上一节</a>
             <a href="#privacy" class="btn btn-primary btn-sm">下一节：隐私</a>
           </p>
         </section>
@@ -261,8 +315,9 @@
       <span>使用帮助 · <a href="index.html">返回 Q问</a></span>
       <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
     </p>
-    <p class="footer-support">
-      <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户邮箱 qtvq@qtvq.cn</a>
+        <p class="footer-copyright">我心永恒（北京）网络科技有限公司版权所有</p>
+<p class="footer-support">
+      <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a>
       · <a href="help.html">使用帮助</a>
       · <a href="privacy.html">隐私说明</a>
       · <a href="download.html">客户端下载</a>

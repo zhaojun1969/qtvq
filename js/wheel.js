@@ -12,8 +12,11 @@
  * **转盘转、顶部指针固定**（老虎机形态）——落点唯一、可核对、可复现。
  */
 import { showToast } from './app.js';
+import { ensureAdult } from './adult-gate.js';
+import { track } from './track.js';
 import { isLoggedIn } from './auth.js';
 import * as api from './report-api.js';
+import { pickReportReason } from './report-reason.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -325,6 +328,8 @@ async function onMakeReport() {
   const btn = $('btn-make-report');
   const target = state.current?.target;
   if (!target) return;
+  // 18+ 年龄门（P0-T0.2）：报告是付费商品
+  if (!(await ensureAdult({ action: '生成配对报告' }))) return;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>生成中…';
   try {
@@ -346,10 +351,17 @@ async function onMakeReport() {
 async function onComplain() {
   const target = state.current?.target;
   if (!target) return;
-  const reason = prompt(`举报 ${target.nickname || 'TA'} 的原因，请输入：涉黄 / 广告 / 诈骗 / 辱骂 / 头像违规 / 虚假资料 / 其他`);
-  if (!reason) return;
+  // 原因必须从白名单里选：服务端 REPORT_REASONS 是白名单，自由文本会 400 E_BAD_REASON。
+  // 之前这里用 prompt() 让用户手打，打错一个字就提交失败——改成弹层选择 + 补充说明。
+  const picked = await pickReportReason({ targetName: target.nickname || '' });
+  if (!picked) return;
   try {
-    const r = await api.submitReport({ targetType: 'user', targetId: target.uid, reason: reason.trim() });
+    const r = await api.submitReport({
+      targetType: 'user',
+      targetId: target.uid,
+      reason: picked.reason,
+      detail: picked.detail,
+    });
     showToast(r?.duplicate ? '今天已经举报过这个对象了' : '举报已提交，运营会尽快核实');
   } catch (err) {
     showToast(err?.message || '举报失败');
@@ -393,7 +405,8 @@ async function loadQuoteAndCandidates() {
       $('btn-spin').disabled = true;
     } else if (data.empty) {
       notice(
-        `${escapeHtml(data.hint || '还没有可配对的用户')}<br>可以到 <a href="report.html">配对报告</a> 生成邀请链接发给朋友。`,
+        `${escapeHtml(data.hint || '还没有可配对的用户')}<br>可以到 <a href="report.html">配对报告</a> 生成邀请链接发给朋友。`
+          + '<br><strong>本次不会真正转动，因此不计入免费次数、也不会产生转动记录。</strong>',
         'warn',
       );
       $('btn-spin').disabled = true;
@@ -415,7 +428,9 @@ async function loadHistory() {
     const data = await api.fetchSpinHistory(10);
     const items = data.items || [];
     if (!items.length) {
-      $('history-list').innerHTML = '<div class="wheel-hint">还没有转动记录。</div>';
+      $('history-list').innerHTML =
+        '<div class="wheel-hint">还没有产生过转动记录 —— 转盘只有在有<strong>可配对用户</strong>时才会真正转动并留下记录'
+        + '（没有任何人可配对时，转动不会发生，也不会记录）。</div>';
       return;
     }
     $('history-list').innerHTML = items
@@ -447,6 +462,11 @@ async function onSpin() {
     location.href = 'report.html';
     return;
   }
+  /*
+   * 18+ 年龄门（P0-T0.2）：转盘是付费入口，未过门时先弹窗收集出生年份。
+   * 取消 = 中止本次抽奖，不扣费、不调接口。
+   */
+  if (!(await ensureAdult({ action: '转盘抽奖' }))) return;
   state.spinning = true;
   const btn = $('btn-spin');
   btn.disabled = true;
@@ -470,6 +490,17 @@ async function onSpin() {
 
     await animateTo(res.targetIndex);
     renderCard(res);
+    /*
+     * 埋点（P0-T0.3）：免费转与付费转分开记 —— 书里 §7 的事件字典就是这么定义的，
+     * 因为"免费钩子带来多少人"和"多少人真掏钱"是两条完全不同的曲线。
+     * `res.billing` 存在且 charged>0 才算付费转。
+     */
+    try {
+      const paid = Number(res?.billing?.charged || 0) > 0;
+      track(paid ? 'wheel_spin_paid' : 'wheel_spin_free', { tier: state.tier, charged: res?.billing?.charged ?? 0 });
+    } catch {
+      /* 埋点永不打断主流程 */
+    }
     loadWallet();
     loadHistory();
   } catch (err) {

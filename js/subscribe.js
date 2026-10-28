@@ -1,12 +1,35 @@
 import { PLANS, COMPANY, getClientId } from './quota.js';
 import { submitPaymentRequest, showToast, syncQuotaFromServer, applyServerSubscription } from './app.js';
 import { getAuthUser } from './auth.js';
-import { PAY_CHANNELS, detectPayEnv } from './pay-qr.js';
+import { PAY_CHANNELS, detectPayEnv, channelTip } from './pay-qr.js';
+import { imgUrl } from './config.js';
 import { createWechatPayOrder, pollWechatPayOrder } from './payment-wechat.js';
 import { qrCodeImageUrl } from './qr-render.js';
+import { track } from './track.js';
 
 let selectedPlan = 'month';
 let stopOrderPoll = null;
+
+/**
+ * 会员开通成功的埋点出口。
+ *
+ * 口径：会员单同样落在服务端 `orders` 集合，营收/付费用户**只认 `orders`**；
+ * `membership_purchase` 只是「客户端看到一次开通成功」的行为流，与看板不叠加，
+ * 所以不会同一笔钱算两遍。
+ *
+ * 按订单号去重：用户重开二维码查看器会重新起一次轮询，同一单不能被记两次。
+ */
+const membershipPaidTracked = new Set();
+function trackMembershipPaid(orderId) {
+  const key = orderId || 'no-order';
+  if (membershipPaidTracked.has(key)) return;
+  membershipPaidTracked.add(key);
+  try {
+    track('membership_purchase', { plan: selectedPlan, price: getSelectedPrice(), orderId });
+  } catch {
+    /* 埋点永不打断主流程 */
+  }
+}
 
 function getSelectedPrice() {
   return PLANS[selectedPlan]?.price ?? 29;
@@ -107,11 +130,11 @@ function openPayQrViewer(channelId) {
     title: `${ch.label} · 扫码付款`,
     price,
     clientId,
-    tip: ch.tip,
+    tip: channelTip(channelId, price),
   });
 
   const img = document.getElementById('pay-qr-viewer-img');
-  img.src = ch.image;
+  img.src = imgUrl(ch.image);
   img.alt = `${ch.label}收款码`;
   img.hidden = false;
 
@@ -139,6 +162,9 @@ function stopOnlinePoll() {
 
 function openDynamicPayViewer({ codeUrl, orderId, jsapi, stub, message }) {
   stopOnlinePoll();
+  // 先收起「办理会员」弹窗：否则二维码会与会员弹窗同屏叠在一起，
+  // 即使 z-index 修好了，视觉上也乱（业务方明确期望"点了就直接看到二维码"）。
+  closeSubscribeModal();
   const viewer = document.getElementById('pay-qr-viewer');
   const price = getSelectedPrice();
   const clientId = getClientId();
@@ -205,6 +231,7 @@ function openDynamicPayViewer({ codeUrl, orderId, jsapi, stub, message }) {
         statusPaid: true,
       });
       showToast('会员已开通');
+      trackMembershipPaid(orderId);
       syncQuotaFromServer();
     },
     onError: () => {

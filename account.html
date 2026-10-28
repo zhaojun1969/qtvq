@@ -28,13 +28,14 @@
     <div class="header-inner">
       <a href="index.html" class="logo">
         <span data-logo></span>
-        <div class="logo-text">我心永恒<span>Q问 · qtvq.cn</span></div>
+        <div class="logo-text"><span class="logo-title">Q问</span><span class="logo-sub">问出爱情真谛</span></div>
       </a>
       <nav class="nav-main">
           <a href="index.html">Q问</a>
           <a href="wheel.html">转盘配对</a>
           <a href="pitfalls.html">避坑大全</a>
           <a href="report.html">配对报告</a>
+          <a href="advice.html">避坑诊断</a>
           <a href="profile.html">我的缘值</a>
         </nav>
       <div class="user-stats">
@@ -80,19 +81,26 @@
 
       <div class="account-panel" id="forgot-panel" hidden>
         <h3 style="margin-top:0">找回密码</h3>
-        <ol class="help-list modal-hint" style="padding-left:1.1rem;line-height:1.7">
-          <li><strong>已绑定微信</strong>：填写手机号与新密码，点「微信扫码验证并重置」。</li>
-          <li><strong>小程序用户</strong>：也可在小程序「我的账户 → 忘记密码」操作。</li>
-          <li><strong>未绑定微信</strong>：邮件联系 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，或请客服在核实页重置。</li>
-        </ol>
         <form id="forgot-form">
-          <label>注册手机号<input name="phone" type="tel" maxlength="11" required></label>
+          <label>注册手机号<input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" required></label>
+          <label>短信验证码
+            <span class="code-row">
+              <input name="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字" required>
+              <button type="button" id="btn-send-sms" class="btn btn-secondary">获取验证码</button>
+            </span>
+          </label>
           <label>新密码<input name="newPassword" type="password" minlength="6" required></label>
           <label>确认新密码<input name="newPassword2" type="password" minlength="6" required></label>
           <div class="modal-actions">
-            <button type="button" id="btn-wechat-open-reset" class="btn btn-primary" style="background:#07c160;border-color:#07c160">微信扫码验证并重置</button>
+            <button type="submit" class="btn btn-primary">短信验证并重置密码</button>
           </div>
+          <p class="modal-hint" id="sms-hint">验证码 5 分钟内有效；同一号码 60 秒内只能获取一次，每天最多 10 条。</p>
         </form>
+        <div id="forgot-alt">
+          <p class="modal-hint" style="margin-top:1rem"><strong>已绑定微信</strong>的账号也可改用扫码验证：</p>
+          <button type="button" id="btn-wechat-open-reset" class="btn btn-secondary" style="background:#07c160;border-color:#07c160;color:#fff">微信扫码验证并重置</button>
+          <p class="modal-hint">两者都不行？邮件联系 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，或请客服在核实页重置。</p>
+        </div>
       </div>
 
       <div class="account-panel" id="register-panel" hidden>
@@ -139,8 +147,70 @@
         <div id="pay-status-area"></div>
       </div>
 
+      <!-- 缘值充值：转盘(每次¥1)与配对报告用余额扣费，此前没有自助充值入口 -->
+      <div class="account-panel" id="topup-panel">
+        <h3>缘值充值</h3>
+        <p class="modal-hint">
+          余额用于「转盘 · 每次 ¥1」与「配对报告」。
+          <strong>推荐用下面的「微信在线支付」</strong>：金额由订单决定（扫码即带金额，不用再填一次），
+          付款成功后<strong>自动加到缘值</strong>，无需人工核实。
+        </p>
+        <!-- 缘值余额与最近明细。
+             2026-10-11：网页端**以前完全没有这块显示** —— 用户充了钱，页面上只有"充值"按钮和
+             "会员开通记录"，**没有任何地方能看到余额或充值记录**，于是反复投诉"看不到余额 +1"。
+             数据来自 Node 的 `GET /v1/wallet`（余额）与 `GET /v1/wallet/ledger?limit=5`（流水，含 balanceAfter），
+             小程序早就在用这两个接口，是网页端一直没接。 -->
+        <div class="wallet-panel">
+          <p class="wallet-balance-line">当前缘值：<strong id="wallet-balance">¥—</strong></p>
+          <ul id="wallet-ledger" class="pay-history"></ul>
+          <p id="wallet-ledger-empty" class="modal-hint">还没有充值或消费记录</p>
+        </div>
+
+        <div class="topup-presets">
+          <button type="button" class="btn btn-secondary" data-topup="10">¥10</button>
+          <button type="button" class="btn btn-secondary" data-topup="20">¥20</button>
+          <button type="button" class="btn btn-secondary" data-topup="50">¥50</button>
+        </div>
+        <label>充值金额（元）<input id="topup-amount" type="number" min="1" max="2000" step="1" value="10"></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="btn-topup-online">微信在线支付 · 自动到账</button>
+        </div>
+        <div id="topup-online-box" hidden>
+          <div class="topup-qr"><img id="topup-online-img" alt="微信支付订单二维码"></div>
+          <p class="modal-hint" id="topup-online-status">等待支付中…</p>
+          <p class="modal-hint">支付成功后本页会自动更新余额；若已关闭页面，下次打开账户页也会自动补账。</p>
+        </div>
+
+        <p class="modal-hint" id="topup-login-gate" hidden>
+          充值需要<strong>先登录</strong>（没有账号钱无处可记）。
+          <strong>静态收款码无法自动到账</strong> —— 我们收不到任何订单信息，只能人工核实后补账；
+          登录后用上面的「微信在线支付」可<strong>即时到账</strong>。
+        </p>
+        <details class="topup-manual" id="topup-manual" hidden>
+          <summary>没有微信？用静态收款码（需人工核实）</summary>
+          <div class="topup-channels" id="topup-channels"></div>
+          <div class="topup-qr">
+            <img id="topup-qr-img" alt="收款码">
+          </div>
+          <p class="modal-hint" id="topup-tip"></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="btn-topup-copy">复制金额</button>
+          </div>
+          <div id="topup-pending" hidden class="modal-hint" style="color:#ffd479"></div>
+          <form id="topup-form">
+            <label>付款人姓名<input name="payerName" maxlength="40" placeholder="转账时显示的姓名" required></label>
+            <label>付款时间<input name="paidAt" maxlength="40" required></label>
+            <label>备注 / 账单后四位<input name="remark" maxlength="80" placeholder="选填，便于快速核对"></label>
+            <div class="modal-actions">
+              <button type="submit" class="btn btn-primary">我已付款 · 提交核实</button>
+            </div>
+          </form>
+        </details>
+      </div>
+
       <div class="account-panel">
-        <h3>历史开通记录</h3>
+        <h3>会员开通记录</h3>
+        <p class="modal-hint">这一栏只记录<strong>会员开通</strong>（月卡/季卡/年卡）。缘值充值的余额与明细请看上方「当前缘值」。</p>
         <ul id="pay-history" class="pay-history"></ul>
         <p id="pay-history-empty" class="modal-hint">暂无记录</p>
       </div>
@@ -165,13 +235,28 @@
         </div>
       </div>
     </section>
+
+    <!-- 微信扫码登录：小弹窗内嵌二维码（扫完顶层页面自动进入我的账户） -->
+    <div class="modal" id="wx-login-modal" aria-hidden="true" role="dialog" aria-label="微信扫码登录">
+      <div class="modal-backdrop" data-close-wx-login></div>
+      <div class="modal-box wx-login-box">
+        <h3 style="margin-top:0">微信扫码登录</h3>
+        <p class="modal-hint">用微信扫一扫下方二维码；扫码成功后本页会自动进入你的账户。</p>
+        <div id="wx-login-box" class="wx-login-frame"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close-wx-login>关闭</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <footer class="site-footer">
-    <p class="footer-line">
+        <p class="footer-copyright">我心永恒（北京）网络科技有限公司版权所有</p>
+<p class="footer-line">
       <span><a href="index.html">返回 Q问</a> · <a href="profile.html">我的缘值</a></span>
       <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
     </p>
+    <p class="footer-support"><a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></p>
   </footer>
 
   <script type="module" src="js/layout.js"></script>

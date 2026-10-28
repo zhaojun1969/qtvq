@@ -1,18 +1,45 @@
+/* @tokens:start —— 由 tools/scripts/gen-tokens.mjs 生成，勿手改 */
+/* 由 tools/scripts/gen-tokens.mjs 从 packages/tokens 生成，请勿手改 */
 :root {
   --pink: #ff6b81;
-  --purple: #6c5ce7;
   --pink-light: #ff8fa3;
+  --pink-soft: #ff9db0;
+  --purple: #6c5ce7;
   --purple-dark: #5a4bd1;
+  --purple-light: #8b7cf0;
   --bg: #0f0e17;
+  --bg-deep: #14141c;
   --bg-card: #1a1928;
   --bg-elevated: #242338;
   --text: #f5f5f7;
+  --text-bright: #e8e8f0;
+  --text-soft: #c8c8d8;
+  --text-softer: #d8d8e2;
   --text-muted: #a0a0b0;
-  --gradient: linear-gradient(135deg, var(--pink) 0%, var(--purple) 100%);
-  --shadow: 0 8px 32px rgba(108, 92, 231, 0.25);
+  --text-dim: #9a9ab0;
+  --text-faint: #707080;
+  --success-soft: #5ad07a;
+  --success-bright: #7bed9f;
+  --warning: #ffd479;
+  --danger-soft: #ff8a8a;
+  --bg-sunken: #1c1c28;
+  --bg-raised: #2a2940;
+  --bg-card-alt: #1a1925;
   --radius: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+  --gradient: linear-gradient(135deg, #ff6b81 0%, #6c5ce7 100%);
+  --shadow: 0 8px 32px rgba(108, 92, 231, 0.25);
   --font: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
+/* @tokens:end */
 
 *,
 *::before,
@@ -156,7 +183,46 @@ a:hover {
   color: var(--pink-light);
 }
 
-.logo-text span {
+/*
+ * logo 文案：两行必须上下对齐（左对齐、竖排）。
+ * 原来只给子元素写了 display:block，靠"块级自动换行"来实现换行 —— 在不同宽度/父级 flex 上下文里
+ * 容易表现不一致（业务方反馈"要上下并排对齐"）。这里显式声明为竖排 flex，
+ * 不再依赖隐式行为。**不动任何字号**（主标题沿用原样式，副标题仍是 .logo-text span 的 1.24rem）。
+ */
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  /*
+   * 业务方要求：两行上下排列，且**短的那行（Q问）居中在长的那行（问出爱情真谛）上方**。
+   * 即两行的水平中线对齐（不是左对齐）。
+   * 之前是 flex-start（左对齐），所以短行贴在左边 —— 与要求不符，已改为中心对齐。
+   */
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  line-height: 1.15;
+}
+
+/*
+ * 「Q问」两字之间留一个字宽。
+ *
+ * 关键：负 margin 必须加在**标题这一个元素自己身上**，用来抵消 letter-spacing 在末字之后
+ * 多补的那一份间距 —— 这样在 align-items:center 之下，两字才是相对副标题真正居中。
+ * v1 曾把它加在外层 .logo-text 上，结果是标题与副标题整块被推偏 1em（业务方一眼看出没居中）。
+ */
+.logo-title {
+  /*
+   * 业务方最终确认的间距：Q 与 问 **各从两边向中间缩进半个字符**，两字之间**一个字符之隔**。
+   * 即 letter-spacing: 1em；末字之后多出的那 1em 用 margin-right 抵消，
+   * 这样在 align-items:center 之下才是相对副标题真正居中。
+   * 这里**不设 color / font-size** —— 标题沿用页头原本的颜色与字号。
+   */
+  letter-spacing: 1em;
+  margin-right: -1em;
+}
+
+/* 副标题：小字号、灰色，保持不受标题字间距影响 */
+.logo-sub {
   display: block;
   font-size: 1.24rem;
   font-weight: 400;
@@ -164,22 +230,67 @@ a:hover {
   letter-spacing: 0.05em;
 }
 
+/*
+ * 已删除旧规则 `.logo-text span { color: var(--text-muted); font-size: 1.24rem }`。
+ * 它原本只面向副标题，但标题改成 `<span class="logo-title">` 后**同被命中** ——
+ * 表现为"Q问 颜色变了、字号也变小了"（2026-09-18 业务方反馈）。
+ * 现在改为按 class 精确指定：.logo-title（继承原样式）/ .logo-sub（副标题样式）。
+ */
+
 .nav-main {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  align-items: center;
 }
 
+/* ── 统一导航样式：所有栏目**同宽、同形、同一种控件** ─────────────────────
+ * 2026-10-11 业务方反馈：「Q问 / 转盘配对 / 避坑大全 / 配对报告 / 我的缘值 / 我的账户
+ * 在页面里的宽度都不一致」。根因三处，全在这里修掉：
+ *   ① 宽度随文字长度变化（「Q问」两字 vs 「转盘配对」四字）→ 用 min-width 统一；
+ *   ② 账户入口自己加了 1px 边框，比其余项各多 2px → 所有项都留**透明边框位**，
+ *      账户入口只把边框**染色**，几何完全不变；
+ *   ③ 静态时无底色、只有 hover/active 才有，视觉上像"两种控件" → 统一底色，
+ *      当前页与账户入口**只改配色，绝不改几何**。
+ * 结果：宽度天然一致，且不随字体/文案长度变化。
+ */
 .nav-main a {
-  padding: 0.5rem 1rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 固定宽度：**不依赖文字长度、不依赖 em 换算**，六项一律同宽。
+     2026-10-11：先用 min-width: 5.8em（em 相对自身 font-size），业务方反馈"还是不一致"，
+     改为 rem 固定宽度 —— 无论字体设置、浏览器缩放、文案长短，宽度都完全一致。 */
+  /* 宽度三重锁定 + flex 基准锁定：不伸缩、不被内容撑开、不被容器压缩。
+     即 flex 布局里 `flex: 0 0 6.2rem` = 不放大、不缩小、基准固定 6.2rem，
+     这是 CSS 层面能做到的最强保证（比只写 width/min-width 更硬）。 */
+  /* 三重锁定 + flex 基准锁定 + `!important`。
+     `!important` 是刻意的：这条规则只在"六项等宽"这一件事上生效，不影响任何其它样式，
+     而此前已有多轮"改了但界面没变"的情况（外部样式表与浏览器缓存打架）。
+     加上 !important 后，即使浏览器手里是旧的 JS（内联样式没施加），宽度也照样一致。 */
+  flex: 0 0 6.2rem !important;
+  width: 6.2rem !important;
+  min-width: 6.2rem !important;
+  max-width: 6.2rem !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid transparent;
   border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text-muted);
   font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-align: center;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .nav-main a:hover,
 .nav-main a.active {
   color: var(--text);
   background: rgba(108, 92, 231, 0.2);
+  border-color: rgba(108, 92, 231, 0.45);
 }
 
 /* 账户入口（出）与功能导航（进）视觉分离：
@@ -187,7 +298,7 @@ a:hover {
    混在一起会让人以为「微信用户」是第六个功能栏目（2026-09-16 业务方反馈）。 */
 .nav-main a.nav-account {
   margin-left: 0.45rem;
-  border: 1px solid rgba(108, 92, 231, 0.45);
+  border-color: rgba(108, 92, 231, 0.45);   /* 只染色，不改几何（尺寸与其它栏目一致） */
   color: var(--text);
   font-weight: 600;
 }
@@ -224,6 +335,82 @@ a:hover {
 .account-status.is-warn {
   border-color: rgba(255, 176, 32, 0.55);
   background: rgba(255, 176, 32, 0.14);
+}
+
+/* 诊断信息块（微信回调用它显示失败的完整上下文，方便用户直接复制发客服） */
+.code-block {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  margin: 0.6rem 0;
+  color: #d8d8e2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 微信扫码登录弹窗：把官方二维码内嵌进来，避免跳到整页二维码 */
+.wx-login-box {
+  max-width: 360px;
+  text-align: center;
+}
+.wx-login-frame {
+  min-height: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  margin: 0.6rem 0;
+  overflow: hidden;
+}
+.wx-login-frame iframe {
+  border: 0;
+}
+
+/* 缘值充值：金额快捷档 + 渠道切换 + 收款码 */
+.topup-presets,
+.topup-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.topup-presets .btn,
+.topup-channels .btn {
+  flex: 0 1 auto;
+  min-width: 4.5rem;
+}
+.topup-channels .btn.active {
+  border-color: var(--pink, #ff6b81);
+  color: var(--pink-light, #ff9db0);
+}
+.topup-qr {
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.5rem;
+  margin: 0.6rem 0;
+  max-width: 260px;
+}
+.topup-qr img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 找回密码：验证码输入框 + 获取验证码按钮同一行 */
+.code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.code-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.code-row .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 /* 注销账号：破坏性操作区，与普通账户卡片在视觉上拉开距离 */
@@ -1444,6 +1631,18 @@ a.feature-card-link:focus-visible {
   object-fit: cover;
   object-position: top center;
 }
+/*
+ * `<picture>` 只是 WebP/PNG 的容器（2026-10-26 图片优化引入）。
+ *
+ * 必须在 flex 容器里显式给它 block + 100% 宽：`<picture>` 默认 `display: inline`，
+ * 作为 flex item 会被 blockify，宽度依赖内容；而里面的 `img` 又是 `width: 100%` ——
+ * 不显式收敛就会出现"图片宽度取决于自身"的循环，实测容易退化成 0 宽。
+ * 这段只影响布局稳定性，不改变任何视觉参数。
+ */
+.pay-qr-card picture {
+  display: block;
+  width: 100%;
+}
 
 /* 聚合码的原始比例（531×785 ≈ 0.676）比 3/4 更细长，用 cover 会裁掉底部约 10%。
    收款码被裁可能直接扫不出来，所以这一类改用 contain 完整显示、白底留边。 */
@@ -1481,13 +1680,22 @@ a.feature-card-link:focus-visible {
   color: var(--purple);
 }
 
+/*
+ * 收款码查看器必须**盖在普通弹窗之上**。
+ * 原来这里是 120，而 `.modal` 是 300 —— 于是从「办理会员」弹窗里点「微信在线支付」后，
+ * 二维码被会员弹窗整个盖住，用户永远看不到（2026-09-18 业务方反馈"码藏在界面后面"）。
+ * 350 的取值：高于 .modal(300)，低于 .toast(400)，保证提示仍在最上层。
+ */
 .pay-qr-viewer {
-  z-index: 120;
+  z-index: 350;
 }
 
 .pay-qr-viewer-box {
   max-width: 360px;
   text-align: center;
+  /* 内容（订单信息 + 二维码 + 提示 + 按钮）在小屏上会超出视口，允许自身滚动 */
+  max-height: 92vh;
+  overflow-y: auto;
 }
 
 .pay-qr-viewer-amount {
@@ -1519,12 +1727,22 @@ a.feature-card-link:focus-visible {
   text-align: left;
   line-height: 1.55;
   font-size: 0.82rem;
+  /* 提示是按 ①②③ 分行的文本，需要保留换行 */
+  white-space: pre-line;
 }
 
 .pay-qr-viewer-actions {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
+  /* 收款码弹窗在小屏上会高于视口，关闭按钮被挤到屏幕外，业务方会以为"没有关闭按钮"。
+     让操作行吸附在弹窗底部，滚到哪都能看到关闭 / 我已付款（2026-09-16 反馈）。 */
+  position: sticky;
+  bottom: 0;
+  background: rgba(22, 22, 32, 0.96);
+  padding: 0.6rem 0 0.2rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .pay-qr-viewer-actions .btn {
@@ -2105,4 +2323,183 @@ a.feature-card-link:focus-visible {
   .download-grid-4 {
     grid-template-columns: 1fr;
   }
+}
+
+/*
+ * 举报原因弹层（js/report-reason.js）。
+ * z-index 360：在收款码查看器(350)之上、toast(400)之下——
+ * 举报有可能从转盘结果页（本身就能拉起收款码）发起，不能互相盖住。
+ */
+.report-reason-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.report-reason-box {
+  width: 100%;
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid rgba(108, 92, 231, 0.4);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.report-reason-box h3 {
+  margin: 0 0 1rem;
+  color: var(--pink-light);
+  font-size: 1.1rem;
+}
+
+.report-reason-box label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.35rem;
+}
+
+.report-reason-box select,
+.report-reason-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0f0e17;
+  border: 1px solid rgba(108, 92, 231, 0.4);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.report-reason-box textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.report-reason-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0.75rem 0 0;
+}
+
+.report-reason-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.report-reason-actions .btn {
+  flex: 1;
+}
+
+
+/* ============================================================================
+ * 2026-10-11：让「所有页面的头部几何完全一致」——业务方要求"以首页为准"。
+ *
+ * 起因：六个栏目宽度虽已锁死，但不同页面 header 右侧内容不同
+ *      （Q币/智慧/直线的**数字位数**不同，如 25 与 0），
+ *      而 .nav-main 与 .stat-badge 原本都可被压缩 ⇒ 各页导航被挤到的位置/宽度不一致。
+ * 做法：① 导航容器整体不参与伸缩；② 统计徽标固定宽度。
+ *      二者都不改变文字，只固定几何，因此所有页面看起来完全一样。
+ * ========================================================================== */
+.nav-main {
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+}
+
+.user-stats .stat-badge {
+  box-sizing: border-box;
+  min-width: 5.4rem;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ============================================================================
+ * AI 生成内容显式标识（《人工智能生成合成内容标识办法》）
+ * 与后端零宽字符溯源水印（隐式标识）互为补充：前者用于告知用户，后者用于事后溯源，
+ * 两者用途不同，不可互相替代。
+ * ========================================================================== */
+.msg-ai-label {
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.02em;
+}
+
+.ai-generated-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(108, 92, 231, 0.35);
+  border-radius: 10px;
+  background: rgba(108, 92, 231, 0.1);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ai-generated-tag {
+  flex: none;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--purple, #6c5ce7);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+/* ── 年龄门（2026-10-27 · 再改造实施书 P0-T0.2）───────────────────────────
+   弹窗里需要一个年份下拉和一个"勾选承诺"的行。
+   这里只补缺失的类，不新增视觉语言：颜色/圆角都沿用既有 .modal-box 与 .btn。
+   勾选行用 flex 保证在窄屏下文字换行时不挤掉复选框。 */
+.field-label {
+  display: block;
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.modal-box .input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(108, 92, 231, 0.25);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.adult-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0.2rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.adult-agree input[type='checkbox'] {
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+}
+
+.modal-box .btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid rgba(108, 92, 231, 0.25);
 }

@@ -2,7 +2,8 @@ import { mountLogo } from './logo.js';
 import { getClientId } from './quota.js';
 import { getUser, saveUser, refreshStatUI, syncQuotaFromServer } from './app.js';
 import { initContactModal } from './contact.js';
-import { flushOfflineQueue } from './api-fetch.js';
+import { track } from './track.js';
+import { flushOfflineQueue, probeDirectOrigin } from './api-fetch.js';
 import { fetchAccountMe, isLoggedIn, refreshAuthNav } from './auth.js';
 
 const PAGES = { index: 'index.html', pitfalls: 'pitfalls.html', profile: 'profile.html', account: 'account.html', help: 'help.html' };
@@ -27,7 +28,26 @@ const NAV_ITEMS = [
   { href: 'report.html', label: '配对报告' },
   { href: 'profile.html', label: '我的缘值' },
 ];
-
+/*
+ * 六项等宽：**用内联样式写死**，不依赖样式表。
+ * 理由：导航本身就是这里用 JS 重建的，而样式表可能被浏览器缓存旧版本 ——
+ * 业务方多次反馈"六个栏目宽度仍不一致"，而线上 CSS 规则我逐条核过都是对的。
+ * 内联样式优先级高于任何外部样式表（对方除非写 !important），且每次重建都重新施加，
+ * 所以**无论浏览器手里是哪一份 CSS，宽度都一致**。这是能一次性了结此事的做法。
+ */
+function applyNavItemBox(el) {
+  el.style.display = 'inline-flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  el.style.boxSizing = 'border-box';
+  el.style.flex = '0 0 6.2rem';
+  el.style.width = '6.2rem';
+  el.style.minWidth = '6.2rem';
+  el.style.maxWidth = '6.2rem';
+  el.style.padding = '0.45rem 0.4rem';
+  el.style.textAlign = 'center';
+  el.style.whiteSpace = 'nowrap';
+}
 function initNav() {
   const nav = document.querySelector('.nav-main');
   if (!nav) return;
@@ -38,6 +58,7 @@ function initNav() {
     const a = document.createElement('a');
     a.href = item.href;
     a.textContent = item.label;
+    applyNavItemBox(a);   // ← 六项等宽（内联写死，不受缓存样式表影响）
     nav.appendChild(a);
   }
 
@@ -48,6 +69,7 @@ function initNav() {
     acct.setAttribute('data-nav-account', '');
     acct.className = 'nav-account';
     acct.innerHTML = '<span data-auth-label>登录 / 注册</span>';
+    applyNavItemBox(acct);   // ← 账户入口同样等宽
     nav.appendChild(acct);
   }
   refreshAuthNav();
@@ -114,3 +136,31 @@ if (document.querySelector('[data-quota-status]')) {
 }
 
 export { PAGES };
+
+/*
+ * 探测 API 独立域名（api.qtvq.cn）是否可用 —— 结果只在**下次加载**生效。
+ * 放在 layout.js 是因为它被 11 个页面全部引用，一处改动即全站覆盖。
+ * 失败/超时都只是把标记置 0，等同现状（同源），不会影响本次渲染。
+ */
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'complete') probeDirectOrigin();
+  else window.addEventListener('load', () => probeDirectOrigin(), { once: true });
+
+/*
+ * 埋点接线（P0-T0.3）：只有报告页有对应的落地事件（书里 §7 的白名单）。
+ * 其它页面暂不上报 —— 往字典里随手加事件会让三个月后的看板什么都查不出来。
+ */
+window.addEventListener(
+  'load',
+  () => {
+    try {
+      if (location.pathname.endsWith('/report.html') || location.pathname.endsWith('report.html')) {
+        track('report_landing_view', { from: document.referrer ? 'referral' : 'direct' });
+      }
+    } catch {
+      /* 埋点永不打断主流程 */
+    }
+  },
+  { once: true },
+);
+}

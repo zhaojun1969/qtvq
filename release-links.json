@@ -1,0 +1,55 @@
+{
+  "_说明": [
+    "各端下载 / 更新地址 —— 唯一来源，不要手改 js/download-config.js（那是生成文件）。",
+    "改完运行：node tools/scripts/write-download-config.mjs && node tools/scripts/write-release-manifest.mjs",
+    "留空表示该端尚未发布：下载页会显示「即将上线」并说明原因，App 自动更新会安静跳过（不会误报新版本）。",
+    "windows.url 支持填 .exe/.msi 安装包地址；android.url 可以填 APK 直链或应用市场页面。",
+    "qrcode 填小程序码图片路径（放到 assets/download/ 下，例如 assets/download/weixin-mp.png）。"
+  ],
+  "android": {
+    "url": "",
+    "store": "",
+    "note": "",
+    "wgtCompatible": true
+  },
+  "ios": {
+    "url": "",
+    "note": ""
+  },
+  "harmony": {
+    "url": "",
+    "note": "",
+    "wgtCompatible": true
+  },
+  "windows": {
+    "version": "1.0.6",
+    "url": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
+    "note": "Windows 10/11 安装版（另有免安装版，见发布目录）"
+  },
+  "weixin": {
+    "href": "",
+    "qrcode": ""
+  },
+  "alipay": {
+    "href": "",
+    "qrcode": ""
+  },
+  "douyin": {
+    "href": ""
+  },
+  "xhs": {
+    "href": ""
+  },
+  "qq": {
+    "href": ""
+  },
+  "baidu": {
+    "href": ""
+  },
+  "kuaishou": {
+    "href": ""
+  },
+  "jd": {
+    "href": ""
+  }
+}

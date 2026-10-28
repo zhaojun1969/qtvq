@@ -7,6 +7,8 @@
 import { showToast } from './app.js';
 import { isLoggedIn } from './auth.js';
 import * as api from './report-api.js';
+import { ensureAdult } from './adult-gate.js';
+import { track } from './track.js';
 import { downloadReportCard } from './report-share.js';
 
 const $ = (id) => document.getElementById(id);
@@ -59,6 +61,31 @@ function handleGenerateError(err) {
     notice(`<strong>${escapeHtml(err.message)}</strong><br>可以在 <a href="account.html">我的账户</a> 通过扫码或对公汇款充值，
       充值核实到账后回来重新生成即可（已生成的报告不会重复扣费）。`, 'warn');
     showToast('余额不足');
+    return;
+  }
+  /*
+   * 付费拦截（2026-10-27 · 实施书 P1）：计费开启且没有可用订单/会员额度时，
+   * 服务端返回 402 `E_NEED_PAY` 并带价格。这里把价格与"还剩几份额度"讲清楚，
+   * 并记一次 report_pay_intent —— 它与 report_paid 的比值就是"想买但没付成"的漏斗。
+   */
+  if (err?.code === 'E_NEED_PAY') {
+    const info = err?.data || {};
+    const yuan = info.price != null ? Number(info.price).toFixed(2) : null;
+    try {
+      track('report_pay_intent', { sku: info.sku || 'pair', priceFen: info.priceFen ?? null });
+    } catch {
+      /* 埋点永不打断主流程 */
+    }
+    const creditsLine =
+      info?.credits?.total > 0
+        ? `你的会员额度本期已用完（${info.credits.used}/${info.credits.total} 份），下期自动恢复。`
+        : '办理会员可每月获得报告额度，也可以直接单份购买。';
+    notice(
+      `<strong>这是一份付费报告</strong>${yuan ? `（¥${escapeHtml(yuan)}）` : ''}<br>${creditsLine}` +
+        '<br>支付入口开放后可直接在这里完成支付。',
+      'warn',
+    );
+    showToast('需要先完成支付');
     return;
   }
   if (err?.blocked) {
@@ -269,6 +296,14 @@ async function saveProfile(e) {
     const data = await api.saveMyProfile(patch);
     state.profile = data?.user || null;
     renderCompleteness(state.profile);
+    /*
+     * 激活口径的另一半（见 `metrics.js::ACTIVATION_EVENTS`）。
+     * 「完成资料」按**产品自己的定义**算：保存时客户端强制昵称+性别、服务端再校验一次，
+     * 能存成功就是可用资料 —— 不另设"完成度 ≥ X%"的阈值，
+     * 否则「能不能算激活」就变成两套口径（看板一套、产品一套）。
+     * `completeness` 只作为分析字段带上，供以后按资料质量切人群。
+     */
+    track('profile_complete', { completeness: state.profile?.completeness ?? null });
     showToast(data?.vectorUpdated ? '已保存，资料向量已更新' : '已保存');
   } catch (err) {
     if (err?.blocked) {
@@ -541,7 +576,9 @@ function renderReportList(items) {
   box.querySelectorAll('.report-item').forEach((el) => {
     el.addEventListener('click', async () => {
       try {
-        const report = await api.fetchReport(el.dataset.id);
+        let report = await api.fetchReport(el.dataset.id);
+        // 异步生成：刚生成完就点开时会先拿到 pending，这里等它完成
+        if (report?.status === 'pending') report = await api.waitForReport(el.dataset.id);
         state.shareToken = null;
         renderReport(report, { isOwner: true });
       } catch (err) {
@@ -644,6 +681,7 @@ async function onAcceptInvite() {
     state.shareToken = report.shareToken || null;
     $('invite-landing').classList.add('hidden');
     renderReport(report, { isOwner: false });
+    trackReportOutcome(report);
     showToast(billingToast(report));
     await loadWallet();
     loadReportList();
@@ -667,13 +705,28 @@ async function onGenerateByUid() {
     showToast('请先完善自己的资料（至少 5 项）');
     return;
   }
+  // 18+ 年龄门（P0-T0.2）：报告是付费商品，未过门先收集出生年份；取消则中止
+  if (!(await ensureAdult({ action: '生成配对报告' }))) return;
   const btn = $('btn-generate-by-uid');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>生成中…';
   try {
-    const report = await withIdempotency((key) => api.generateReport({ targetUid, tier: state.tier, idempotencyKey: key }));
+    let report = await withIdempotency((key) => api.generateReport({ targetUid, tier: state.tier, idempotencyKey: key }));
+    /*
+     * 异步生成：POST 秒回 `status: 'pending'`，这里轮询到 ready 再渲染。
+     * 生成失败会抛错（服务端已退款），由 handleGenerateError 统一处理。
+     * 轮询期间把已等待秒数显示出来 —— 之前同步等待时用户面对的是一个不动的转圈。
+     */
+    if (report?.status === 'pending') {
+      report = await api.waitForReport(report.reportId, {
+        onTick: (ms) => {
+          btn.innerHTML = `<span class="spinner"></span>生成中… ${Math.round(ms / 1000)}s`;
+        },
+      });
+    }
     state.shareToken = null;
     renderReport(report, { isOwner: true });
+    trackReportOutcome(report);
     showToast(billingToast(report));
     await loadWallet();
     loadReportList();
@@ -686,6 +739,38 @@ async function onGenerateByUid() {
 }
 
 /** 生成成功后的计费提示：扣了多少 / 为什么免费 / 是否重放 */
+/**
+ * 报告「生成成功」的唯一埋点出口。
+ *
+ * 口径（营收唯一真相 = `orders` 集合，见 `server/src/services/metrics.js` 的说明）：
+ *  - `report_generated`：这一次生成成功了（含免费、含幂等重放）
+ *  - `report_paid`     ：这一次真的从缘值里扣了钱（`charged > 0` 且非重放）
+ *
+ * `report_paid` 只回答"客户端看到了一次付费成功"，用于支付/转化漏斗；
+ * 看板的「报告实收」一律取 `orders`，两者**不叠加**，所以不会同一笔钱算两次。
+ *
+ * 必须在**生成成功之后**上报：点击时就报的话，被余额不足/配额拦下的请求
+ * 也会被记成一次付费，漏斗会比账实高。
+ */
+function trackReportOutcome(report) {
+  const billing = report?.billing || {};
+  const base = { sku: report?.sku || 'pair', tier: report?.tier || state.tier };
+  try {
+    track('report_generated', base);
+    const charged = Number(billing.charged) || 0;
+    if (charged > 0 && !billing.replayed) {
+      track('report_paid', {
+        ...base,
+        charged,
+        amount: Number(billing.amount) || charged,
+        plan_label: billing.label || null,
+      });
+    }
+  } catch {
+    /* 埋点永不打断主流程 */
+  }
+}
+
 function billingToast(report) {
   const b = report?.billing;
   if (!b) return '报告已生成';
@@ -722,7 +807,9 @@ async function init() {
   // 3) 直接查看某份报告（分享链接优先，不需要登录）
   if (reportId) {
     try {
-      const report = await api.fetchReport(reportId, { shareToken });
+      let report = await api.fetchReport(reportId, { shareToken });
+      // 异步生成：生成完立刻跳转会先拿到 pending，这里等它完成再渲染
+      if (report?.status === 'pending') report = await api.waitForReport(reportId, { shareToken });
       state.shareToken = shareToken || null;
       renderReport(report, { isOwner: !shareToken });
     } catch (err) {

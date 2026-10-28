@@ -338,3 +338,198 @@ export async function downloadReportCard(report, opts = {}) {
     return { ok: false, error: err?.message || '生成分享图失败' };
   }
 }
+
+// ---------------------------------------------------------------- 避坑/复盘卡
+
+/**
+ * 避坑卡 / 复盘卡（T2.4）
+ *
+ * 为什么是**浏览器端 canvas**、而不是实施书原本写的「服务端 resvg + OSS」：
+ *   · 服务器 `fc-list` 里**一个中文字体都没有**，resvg/sharp 渲染中文会全变方框；
+ *     补字体要么上传几十 MB 字体文件、要么改系统包，代价远大于收益；
+ *   · 二维码本来就由 `js/qr-render.js` 在浏览器端算（纯 JS、零依赖、已有反解校验）；
+ *   · 出图不需要服务端存储：用户点「保存」直接下载到相册，没有 OSS 费用与清理问题。
+ * 代价是「分享卡」只能在浏览器里生成，无法在服务端批量预热 —— 本场景不需要。
+ *
+ * 版式固定 750×1334（9:16，微信/小红书通用），内容按槽位截断，宁可少一行也不出界。
+ */
+const ADVICE_META = {
+  diagnose: { title: '避坑诊断', sub: '你的处境 → 风险点 · 对照案例 · 行动清单' },
+  retro: { title: '关系复盘', sub: '双方视角 → 时间线 · 冲突模式 · 挽救或止损' },
+  pair: { title: '配对报告', sub: '资料语义 + 真实避坑案例' },
+};
+
+export async function renderAdviceCard(report, opts = {}) {
+  if (typeof document === 'undefined') throw new Error('当前环境不支持出图');
+  const CW = 750;
+  const CH = 1334;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW;
+  canvas.height = CH;
+  const ctx = canvas.getContext('2d');
+  const meta = ADVICE_META[report?.kind] || ADVICE_META.diagnose;
+
+  const sec = report?.sections || {};
+  const summary = String(sec.summary || report?.content || '').split('\n')[0].trim() || '先把自己从这段关系里抽出来看一眼。';
+  const risks = (Array.isArray(sec.risks) ? sec.risks : []).slice(0, 3);
+  const actions = (Array.isArray(sec.actions) ? sec.actions : []).slice(0, 3);
+  const cases = (Array.isArray(sec.cases) ? sec.cases : []).slice(0, 2);
+
+  // 背景
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // 顶部品牌渐变
+  const HEAD = 196;
+  {
+    const g = ctx.createLinearGradient(0, 0, CW, HEAD);
+    g.addColorStop(0, COLORS.pink);
+    g.addColorStop(1, COLORS.purple);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, CW, HEAD);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `20px ${FONT}`;
+    ctx.fillText('Q问 · 我心永恒', PAD, 56);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold 46px ${FONT}`;
+    ctx.fillText(meta.title, PAD, 116);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = `18px ${FONT}`;
+    ctx.fillText(meta.sub, PAD, 158);
+  }
+
+  let y = HEAD + 44;
+
+  // 核心结论：最多 4 行、行高 42
+  {
+    ctx.fillStyle = COLORS.card;
+    roundRect(ctx, PAD - 12, y - 34, CW - (PAD - 12) * 2, 232, 20);
+    ctx.fill();
+    ctx.fillStyle = COLORS.pink;
+    ctx.font = `bold 16px ${FONT}`;
+    ctx.fillText('核心结论', PAD, y - 6);
+    ctx.fillStyle = COLORS.text;
+    ctx.font = `bold 27px ${FONT}`;
+    const lines = wrapText(ctx, summary, CW - PAD * 2, 4);
+    let cy = y + 34;
+    for (const line of lines) {
+      ctx.fillText(line, PAD, cy);
+      cy += 42;
+    }
+    y += 232;
+  }
+
+  // 风险点（最多 3 条）
+  y += 30;
+  if (risks.length) {
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `18px ${FONT}`;
+    ctx.fillText('风险点', PAD, y);
+    y += 34;
+    ctx.font = `20px ${FONT}`;
+    for (const r of risks) {
+      const lines = wrapText(ctx, r, CW - PAD * 2 - 28, 2);
+      ctx.fillStyle = COLORS.pink;
+      ctx.fillText('·', PAD, y);
+      ctx.fillStyle = COLORS.text;
+      for (const [i, line] of lines.entries()) {
+        ctx.fillText(line, PAD + 20, y + i * 30);
+      }
+      y += lines.length * 30 + 10;
+    }
+    y += 16;
+  }
+
+  // 行动清单（最多 3 条，编号）
+  if (actions.length) {
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `18px ${FONT}`;
+    ctx.fillText('今天就能做的三件事', PAD, y);
+    y += 36;
+    ctx.font = `20px ${FONT}`;
+    for (const [i, a] of actions.entries()) {
+      const lines = wrapText(ctx, a, CW - PAD * 2 - 44, 2);
+      ctx.fillStyle = COLORS.purple;
+      ctx.font = `bold 20px ${FONT}`;
+      ctx.fillText(`${i + 1}`, PAD + 4, y);
+      ctx.fillStyle = COLORS.text;
+      ctx.font = `20px ${FONT}`;
+      for (const [j, line] of lines.entries()) {
+        ctx.fillText(line, PAD + 32, y + j * 30);
+      }
+      y += lines.length * 30 + 12;
+    }
+    y += 10;
+  }
+
+  // 对照案例（最多 2 条，弱化）
+  if (cases.length) {
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `16px ${FONT}`;
+    for (const c of cases) {
+      const lines = wrapText(ctx, `案例：${c}`, CW - PAD * 2, 1);
+      ctx.fillText(lines[0] || '', PAD, y);
+      y += 26;
+    }
+  }
+
+  // 页脚：二维码 + 免责声明
+  const FOOT = 240;
+  {
+    ctx.fillStyle = COLORS.elevated;
+    ctx.fillRect(0, CH - FOOT, CW, FOOT);
+    const qrSize = 150;
+    const qrX = CW - PAD - qrSize;
+    const qrY = CH - FOOT + 44;
+    const shareUrl = String(opts.shareUrl || '');
+    let qrDrawn = false;
+    if (/^https?:\/\//.test(shareUrl)) {
+      const img = await loadImage(qrCodeImageUrl(shareUrl, 320), 6000);
+      if (img) {
+        try {
+          ctx.fillStyle = '#ffffff';
+          roundRect(ctx, qrX - 9, qrY - 9, qrSize + 18, qrSize + 18, 12);
+          ctx.fill();
+          ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+          qrDrawn = true;
+        } catch {
+          qrDrawn = false;
+        }
+      }
+    }
+    ctx.fillStyle = COLORS.text;
+    ctx.font = `bold 22px ${FONT}`;
+    ctx.fillText('扫码看我的完整报告', PAD, CH - FOOT + 76);
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `16px ${FONT}`;
+    const textW = qrDrawn ? CW - PAD * 2 - qrSize - 28 : CW - PAD * 2;
+    const urlLines = wrapText(ctx, shareUrl.replace(/^https?:\/\//, ''), textW, 2);
+    let uy = CH - FOOT + 110;
+    for (const l of urlLines) {
+      ctx.fillText(l, PAD, uy);
+      uy += 24;
+    }
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `13px ${FONT}`;
+    ctx.fillText('AI 生成内容，仅供关系决策参考，不构成心理诊断或医疗建议。', PAD, CH - 32);
+  }
+
+  return canvas;
+}
+
+/** 保存避坑/复盘卡到本地；埋点由调用方负责（避免把分析逻辑塞进绘图模块） */
+export async function downloadAdviceCard(report, opts = {}) {
+  if (typeof document === 'undefined') return { ok: false, error: '当前环境不支持出图' };
+  try {
+    const canvas = await renderAdviceCard(report, opts);
+    const dataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    const meta = ADVICE_META[report?.kind] || ADVICE_META.diagnose;
+    a.download = `Q问${meta.title}-${new Date().toISOString().slice(0, 10)}.png`;
+    a.href = dataUrl;
+    a.click();
+    return { ok: true, filename: a.download };
+  } catch (err) {
+    return { ok: false, error: err?.message || '生成分享图失败' };
+  }
+}

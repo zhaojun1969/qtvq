@@ -48,6 +48,10 @@ export class ReportApiError extends Error {
     this.status = status;
     this.code = code;
     this.safety = extra.safety || null;
+    // 保留原始响应体：402 E_NEED_PAY 要拿 priceFen 才能显示"还差多少钱"。
+    // `data` 是 report.js 已经在用的字段名，`body` 是更直白的别名，两个都留着。
+    this.body = extra.body || null;
+    this.data = extra.body || null;
   }
   /** 需要用户先登录 */
   get needLogin() {
@@ -93,8 +97,17 @@ async function request(method, path, { body, token, timeoutMs = DEFAULT_TIMEOUT_
       /* 网关返回的非 JSON（例如 Nginx 502 页面） */
     }
     if (!res.ok) {
-      throw new ReportApiError(json?.error || `请求失败（HTTP ${res.status}）`, res.status, json?.errorCode || null, {
+      /*
+       * 错误码有两种写法，两种都要认：
+       *   · 统一错误中间件：`{ code: <非 0 数字>, error, errorCode: 'E_XXX' }`
+       *   · 路由里直接 res.json 的：`{ code: 'E_NEED_PAY', error, priceFen, ... }`（402 就是这种）
+       * 之前只读 `errorCode`，导致 402 的 `err.code` 恒为 null，
+       * 前端「需要支付」的分支永远进不去 —— 表现为点了生成只弹一句"请先完成支付"却没有价格。
+       */
+      const errCode = json?.errorCode || (typeof json?.code === 'string' ? json.code : null);
+      throw new ReportApiError(json?.error || `请求失败（HTTP ${res.status}）`, res.status, errCode, {
         safety: json?.safety || null,
+        body: json || null,
       });
     }
     return json && Object.prototype.hasOwnProperty.call(json, 'data') ? json.data : json;
@@ -138,14 +151,33 @@ export function fetchProfile(uid) {
  * 服务端用唯一索引保证，不依赖前端「按钮禁用」这种不可靠的防重。
  * @param {{targetUid:string, tier:'basic'|'advanced'|'deep'|'soul', question?:string, idempotencyKey?:string}} params
  */
-export function generateReport({ targetUid, tier = 'deep', question = '', idempotencyKey }) {
+export function generateReport({ sku = 'pair', targetUid, tier = 'deep', question = '', payload = null, idempotencyKey }) {
   const key = idempotencyKey || newIdempotencyKey();
-  return request('POST', '/v1/report/generate', {
-    body: { targetUid, tier, question },
-    idempotencyKey: key,
-  });
+  const body = { sku, tier, question };
+  // pair 之外的商品（diagnose/retro）不需要对方账号，改为自带输入；
+  // 服务端 `reportPayload(kind, body)` 会按 kind 从 body 顶层读这些字段。
+  if (targetUid) body.targetUid = targetUid;
+  if (payload && typeof payload === 'object') Object.assign(body, payload);
+  return request('POST', '/v1/report/generate', { body, idempotencyKey: key });
 }
 
+/**
+ * 分享落地页用的公开摘要（无需登录）。
+ *
+ * 与 `fetchReport(id, {shareToken})` 的区别：这里**只有 token**，没有 reportId，
+ * 且服务端不会返回对方资料快照与全文（见 `GET /v1/report/share/:token` 的注释）。
+ */
+export function fetchSharedReport(token) {
+  return request('GET', `/v1/report/share/${encodeURIComponent(token)}`);
+}
+
+/**
+ * 报告价目 + 我的额度（P1-T1.1）。
+ * 返回 `{ skus, credits, introAvailable, billingOn }`，前端据此渲染价格表。
+ */
+export function fetchReportSkus() {
+  return request('GET', '/v1/report/skus');
+}
 /** 生成一个幂等键（优先用 crypto.randomUUID） */
 export function newIdempotencyKey() {
   try {
@@ -162,6 +194,46 @@ export function fetchReport(reportId, { shareToken } = {}) {
   return request('GET', `/v1/report/${encodeURIComponent(reportId)}${qs}`);
 }
 
+/**
+ * 等待异步报告生成完成（轮询 `GET /v1/report/:id`）。
+ *
+ * 背景（2026-10-26）：`POST /v1/report/generate` 已改为**异步**——
+ * 先扣费并落 `pending` 文档、立刻返回 reportId，生成在后台跑。
+ * 原因是模型调用最长 45 秒，同步返回等于让用户盯着转圈 45 秒且毫无反馈。
+ *
+ * 现在：POST 约 50–100ms 返回 `status: 'pending'` → 这里每秒半查一次 →
+ * `ready` 就渲染，`failed` 抛错（服务端已退款）。
+ *
+ * @param {string} reportId
+ * @param {{intervalMs?:number, timeoutMs?:number, shareToken?:string, onTick?:(elapsedMs:number)=>void}} opts
+ */
+export async function waitForReport(reportId, { intervalMs = 1500, timeoutMs = 120000, shareToken, onTick } = {}) {
+  const started = Date.now();
+  for (;;) {
+    let report = null;
+    try {
+      report = await fetchReport(reportId, { shareToken });
+    } catch (err) {
+      // 网络抖动不要立刻失败：继续等，直到超时
+      if (Date.now() - started > timeoutMs) throw err;
+    }
+    if (report && report.status && report.status !== 'pending') {
+      if (report.status === 'failed') {
+        const e = new Error(report.llmError || '报告生成失败（已退款），请稍后重试');
+        e.reportFailed = true;
+        throw e;
+      }
+      return report;
+    }
+    if (Date.now() - started > timeoutMs) {
+      const e = new Error('报告生成时间较长，请稍后到「我的报告」里查看');
+      e.reportTimeout = true;
+      throw e;
+    }
+    if (typeof onTick === 'function') onTick(Date.now() - started);
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
 /** 我的报告列表 */
 export function listMyReports(limit = 20) {
   return request('GET', `/v1/report/mine?limit=${encodeURIComponent(limit)}`);
@@ -213,7 +285,9 @@ export function checkText(text, field = 'profile') {
 }
 
 /** 举报原因（与服务端 services/moderation.js 的 REPORT_REASONS 保持一致） */
-export const REPORT_REASONS = ['涉黄', '广告', '诈骗', '辱骂', '头像违规', '虚假资料', '其他'];
+/* 唯一来源：packages/shared（跨端同一份，见该文件头说明） */
+import { REPORT_REASONS } from '../packages/shared/src/index.js';
+export { REPORT_REASONS };
 
 /** 提交举报 */
 export function submitReport({ targetType, targetId, reason, detail = '' }) {

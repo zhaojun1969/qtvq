@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Q问避坑诊断与关系复盘：把一段关系说清楚，5 分钟拿到风险点、对照真实案例和今天就能做的三件事。">
+  <meta name="robots" content="index, follow">
+  <title>避坑诊断 · 关系复盘 | 我心永恒 - Q问</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/advice.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span data-logo></span>
+        <div class="logo-text"><span class="logo-title">Q问</span><span class="logo-sub">问出爱情真谛</span></div>
+      </a>
+      <nav class="nav-main">
+        <a href="index.html">Q问</a>
+        <a href="wheel.html">转盘配对</a>
+        <a href="pitfalls.html">避坑大全</a>
+        <a href="report.html">配对报告</a>
+        <a href="advice.html" class="active">避坑诊断</a>
+        <a href="profile.html">我的缘值</a>
+      </nav>
+      <div class="user-stats">
+        <span class="stat-badge">Q币 <strong data-q-coins>0</strong></span>
+        <span class="stat-badge">智慧 <strong data-wisdom>0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="report-page">
+    <section class="report-hero">
+      <h1>避坑诊断 · 关系复盘</h1>
+      <p>不填资料、不用对方配合 —— 把情况说清楚，拿到结论、真实案例和今天就能做的三件事</p>
+    </section>
+
+    <div id="notice-slot"></div>
+
+    <div class="wallet-bar" id="wallet-bar" hidden>
+      <span>余额 <span class="wb-balance" id="wallet-balance">—</span></span>
+      <span class="muted" id="wallet-membership"></span>
+      <span class="grow"></span>
+      <a href="account.html">充值 / 办理会员 →</a>
+    </div>
+
+    <section class="panel" id="panel-choose">
+      <h2>1 · 选一项</h2>
+      <p class="panel-hint">
+        <strong>避坑诊断</strong>适合「现在正在纠结」的情况；<strong>关系复盘</strong>适合「已经发生、想理清楚」的情况。
+        两项都由 AI 结合真实避坑案例生成，全程不需要对方参与。
+      </p>
+      <div class="tier-grid" id="sku-grid">
+        <div class="empty-state">加载中…</div>
+      </div>
+      <p class="panel-hint" id="billing-hint" style="margin-bottom:0"></p>
+    </section>
+
+    <section class="panel hidden" id="panel-input">
+      <h2 id="input-title">2 · 说说你的情况</h2>
+      <form id="advice-form" autocomplete="off">
+        <div id="advice-form-slot"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btn-generate">生成</button>
+          <span class="muted" id="generate-hint"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel hidden" id="panel-result">
+      <h2 id="result-title">报告</h2>
+      <p class="ai-generated-notice">
+        <span class="ai-generated-tag">AI 生成</span>
+        本报告由 AI 生成，仅供关系决策参考，不构成心理诊断或医疗建议。
+      </p>
+      <div id="advice-body"></div>
+      <div class="form-actions" id="result-actions">
+        <button type="button" class="btn btn-primary" id="btn-share-card">保存分享卡</button>
+        <button type="button" class="btn btn-secondary" id="btn-share-link">复制分享链接</button>
+        <button type="button" class="btn btn-ghost" id="btn-again">再来一次</button>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="panel-list">
+      <h2>我之前的诊断</h2>
+      <p class="panel-hint">点开可回看，分享链接 30 天内有效。</p>
+      <div id="advice-list-body"><div class="empty-state">加载中…</div></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-line">
+      <span>域名 qtvq.cn · <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></span>
+      <a class="footer-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备：19045082号</a>
+    </p>
+    <p class="footer-copyright">我心永恒（北京）网络科技有限公司版权所有</p>
+    <p class="footer-support">
+      <a href="help.html">使用帮助</a>
+      · <a href="privacy.html">隐私说明</a>
+      · <a href="pitfalls.html">避坑大全</a>
+      · <a href="report.html">配对报告</a>
+      · <a href="account.html">我的账户</a>
+    </p>
+  </footer>
+
+  <script type="module" src="js/layout.js"></script>
+  <script type="module" src="js/advice.js"></script>
+</body>
+</html>

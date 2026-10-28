@@ -145,9 +145,37 @@ export async function transcribeBlob(blob) {
   if (!res.ok) {
     const err = new Error(data.error || data.message || '语音识别失败');
     err.code = data.code;
+    // 把诊断信息一并带出：控制台里能看到具体原因（如 40020503 缺 NLS 权限），
+    // 而给用户看的 toast 保持简短。
+    err.nlsCode = data.nlsCode || null;
+    err.hint = data.hint || null;
+    err.raw = data.raw || null;
+    err.status = res.status;
     throw err;
   }
   return data.text || '';
+}
+
+/**
+ * 语音是否**真的可用**。
+ * 用 /api/speech 的 GET 探测（会真去换一次 token），而不是 /api/health 的
+ * `speechConfigured` —— 后者只证明环境变量存在，本项目实际遇到过
+ * "变量齐全但 AccessKey 无 NLS 权限"：那时 configured 为 true、按钮亮着，点了才失败。
+ * @returns {Promise<{ready: boolean, reason: string|null, configured: boolean, nlsCode: string|null}>}
+ */
+export async function probeSpeechApiDetailed() {
+  try {
+    const res = await apiFetch('/api/speech', { method: 'GET' });
+    const data = await res.json();
+    return {
+      configured: !!data.configured,
+      ready: !!data.ready,
+      reason: data.reason || null,
+      nlsCode: data.nlsCode || null,
+    };
+  } catch (err) {
+    return { configured: false, ready: false, reason: err?.message || '探测失败', nlsCode: null };
+  }
 }
 
 export async function probeSpeechApi() {

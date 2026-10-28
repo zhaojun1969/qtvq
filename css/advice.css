@@ -1,0 +1,164 @@
+/* 避坑诊断 / 关系复盘页（advice.html）
+ *
+ * 只用 report.css 已有的面板、按钮、价格卡样式，这里只补本页独有的输入框与分栏。
+ * 刻意不依赖 styles.css 里未定义过的 .input / textarea 全局规则：
+ * 之前报告页出现过「样式靠浏览器默认」的情况，跨浏览器差异很大。
+ */
+
+.advice-field {
+  margin-bottom: 18px;
+}
+
+.advice-field .field-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #a0a0b0);
+}
+
+.advice-field .field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0b0);
+}
+
+.advice-field textarea,
+.advice-field input[type='text'] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.advice-field textarea:focus,
+.advice-field input[type='text']:focus {
+  outline: none;
+  border-color: #ff6b81;
+  background: rgba(255, 107, 129, 0.06);
+}
+
+.advice-field textarea::placeholder,
+.advice-field input[type='text']::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.advice-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.advice-scene {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.advice-scene.active {
+  border-color: #ff6b81;
+  background: rgba(255, 107, 129, 0.16);
+  color: #ffd7dd;
+}
+
+/* 两栏（复盘的双视角）：窄屏自动堆叠 */
+.advice-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 720px) {
+  .advice-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 结论 + 三段 */
+.advice-summary {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 107, 129, 0.18), rgba(108, 92, 231, 0.18));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+
+.advice-block {
+  margin-bottom: 22px;
+}
+
+.advice-block h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: #ff9aab;
+}
+
+.advice-block ol,
+.advice-block ul {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.85;
+}
+
+.advice-block li {
+  margin-bottom: 6px;
+}
+
+.advice-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #a0a0b0;
+}
+
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.advice-list .advice-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.advice-list .advice-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.advice-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: advice-spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes advice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

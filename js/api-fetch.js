@@ -1,7 +1,50 @@
 /** API 请求：Cloudflare 优先，超时/失败时读阿里云 OSS 备份 */
 
-import { apiUrl, BACKUP_ORIGIN, CROSS_ORIGIN } from './config.js';
-import { DAILY_ASK_LIMIT, PLANS } from './quota.js';
+import { apiUrl, BACKUP_ORIGIN, CROSS_ORIGIN, DIRECT_CANDIDATES, PROBE_MAX_MS, setDirectOrigin } from './config.js';
+/*
+ * 探测直连 Pages 的候选源站，决定**下次页面加载**走哪条主路径。
+ *
+ * 为什么不在本次加载就用：API_ORIGIN 在模块加载时同步求值，而探测是异步的。
+ * 「本次探测、下次生效」换来零闪烁；失败时天然退回同源。
+ *
+ * 两个候选并行探测，取「成功且最快」且 <1500ms 的那个：
+ *   · api.qtvq.cn       —— 理想形态，依赖一条 DNS 记录（可能尚未就绪）；
+ *   · qtvq-api.pages.dev —— 不需要任何 DNS 改动，今天就能绕开 ECS 中转。
+ * 实测客户端直连 pages.dev 约 0.94s，而同源路径（经 ECS 中转）2.9s —— 慢的一直是 ECS↔Pages 那段。
+ */
+let directProbeStarted = false;
+export function probeDirectOrigin() {
+  if (directProbeStarted || typeof location === 'undefined' || !location.origin) return;
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+  directProbeStarted = true;
+
+  const probe = (origin) =>
+    new Promise((resolve) => {
+      const started = Date.now();
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(() => ctrl.abort(), 2500) : null;
+      fetch(`${origin}/api/health`, { method: 'GET', signal: ctrl ? ctrl.signal : undefined })
+        .then((res) => resolve(res.ok ? { origin, ms: Date.now() - started } : null))
+        .catch(() => resolve(null))
+        .finally(() => {
+          if (timer) clearTimeout(timer);
+        });
+    });
+
+  /*
+   * 三方同场竞速：api.qtvq.cn / pages.dev / 同源，取最快的一个。
+   * 让同源也参与，是为了在网络好的时候**不要把用户从快的路径切到慢的路径**；
+   * 选到同源就等于"不切换"（setDirectOrigin('')）。
+   */
+  const sameOrigin = location.origin;
+  const candidates = [...DIRECT_CANDIDATES, sameOrigin];
+  Promise.all(candidates.map(probe)).then((results) => {
+    const usable = results.filter(Boolean).sort((a, b) => a.ms - b.ms);
+    const best = usable[0];
+    if (!best || best.ms > PROBE_MAX_MS || best.origin === sameOrigin) setDirectOrigin('');
+    else setDirectOrigin(best.origin);
+  });
+}import { DAILY_ASK_LIMIT, PLANS } from './quota.js';
 
 /**
  * 主接口超时：生产走同源（qtvq.cn → nginx 反代 Pages），典型 1.6s，
@@ -153,22 +196,32 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (method === 'GET') {
-    // 主接口与备接口互为 failover：
-    //   主 = 同源（qtvq.cn → nginx 反代 Pages），实测典型 1.6s；
-    //   备 = 直连 Cloudflare Pages，国内偶尔 8–14s 甚至直接失败。
-    // 两条都失败才读阿里云 OSS 备份（最后一道，要求桶里 backup/api 前缀为公共读）。
-    // 2026-09-16 线上正是因为这条链缺了中间一段、且 OSS 兜底是私有的 403，
-    // 才在点「微信在线支付」时直接抛「API 不可用且无备份」。
-    const alt = primary.startsWith(CROSS_ORIGIN)
-      ? (typeof location !== 'undefined' && location.origin ? `${location.origin}${path}` : null)
-      : `${CROSS_ORIGIN}${path}`;
-    if (alt) {
+    // 主接口与备接口互为 failover。候选顺序按"能不用 Cloudflare 中转就不用"：
+    //   同源（qtvq.cn → nginx 反代 Pages）：现状，实测典型 1.6s 但也可能被跨太平洋链路拖到数秒；
+    //   独立域名（api.qtvq.cn → 直连 Pages）：只剩一跳，但依赖 DNS；
+    //   pages.dev：国内常超时，仅作最后的外部尝试。
+    // 三选二的思路：**除了 primary 本身，其余两个都试**，这样无论 API_ORIGIN 指向哪一个，
+    // 都还有同源与 pages.dev 两条退路（2026-09-16 事故就是链条缺了一段才报"API 不可用且无备份"）。
+    const originOf = (u) => {
+      try {
+        return new URL(u, typeof location !== 'undefined' ? location.href : 'https://local.invalid').origin;
+      } catch {
+        return '';
+      }
+    };
+    const pageOrigin = typeof location !== 'undefined' && location.origin ? location.origin : '';
+    const primaryOrigin = originOf(path);
+    const alts = [];
+    if (pageOrigin && primaryOrigin !== pageOrigin) alts.push(`${pageOrigin}${path}`);
+    if (primaryOrigin !== CROSS_ORIGIN) alts.push(`${CROSS_ORIGIN}${path}`);
+
+    for (const alt of alts) {
       const altTimeout = alt.startsWith(CROSS_ORIGIN) ? CROSS_ORIGIN_TIMEOUT_MS : PRIMARY_TIMEOUT_MS;
       try {
         const res = await fetchWithTimeout(alt, { method: 'GET', headers }, altTimeout);
         if (res.ok) return res;
       } catch {
-        /* 备接口也失败，继续走 OSS 备份 */
+        /* 这个备选也失败，继续下一个 */
       }
     }
 

@@ -3,26 +3,130 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>微信登录中… | 我心永恒 Q问</title>
+  <title>微信登录 | 我心永恒 Q问</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:60vh">
-  <p class="modal-hint">微信登录处理中，请稍候…</p>
+<body>
+  <main class="container" style="max-width:560px;padding:1.5rem 1rem 3rem">
+    <section class="account-panel" id="cb-panel">
+      <h3 style="margin-top:0" id="cb-title">微信登录处理中…</h3>
+      <p class="modal-hint" id="cb-message">正在用微信返回的凭证登录，请稍候…</p>
+
+      <!-- 失败时展示：不再自动跳转，避免"错误一闪而过"导致问题永远说不清 -->
+      <div id="cb-error" hidden>
+        <p class="modal-hint" style="color:#ff8a8a"><strong>登录没有成功</strong>，下面是这次失败的完整信息（可直接复制发给客服）：</p>
+        <pre id="cb-detail" class="code-block" style="white-space:pre-wrap;word-break:break-all;font-size:0.78rem;line-height:1.5;max-height:40vh;overflow:auto"></pre>
+        <div class="modal-actions" style="flex-wrap:wrap;gap:0.5rem">
+          <button type="button" class="btn btn-primary" id="cb-copy">复制诊断信息</button>
+          <button type="button" class="btn btn-secondary" id="cb-retry">重新扫码登录</button>
+          <a class="btn btn-secondary" href="account.html">返回我的账户</a>
+        </div>
+        <p class="modal-hint" style="margin-top:0.75rem">
+          常见原因：① 扫码不是在发起登录的同一个浏览器里完成的（<code>state</code> 校验不通过）；
+          ② 超过 10 分钟才完成扫码（凭证过期）；③ 回调地址与开放平台配置不一致。
+          短信找回密码不受影响：账户页 →「忘记密码」。
+        </p>
+      </div>
+
+      <div id="cb-ok" hidden>
+        <div class="modal-actions">
+          <a class="btn btn-primary" href="account.html">进入我的账户</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <script type="module">
     import { getClientId } from './js/quota.js';
-    import { handleWechatOpenCallback } from './js/auth.js';
-    import { showToast } from './js/toast.js';
+    import { handleWechatOpenCallback, startWechatOpenLogin } from './js/auth.js';
+
+    const titleEl = document.getElementById('cb-title');
+    const msgEl = document.getElementById('cb-message');
+    const errEl = document.getElementById('cb-error');
+    const detailEl = document.getElementById('cb-detail');
+    const okEl = document.getElementById('cb-ok');
+
+    /** 只收集诊断所需的信息；**绝不打印 code 本身**（code 可被换成 access_token，等同凭据） */
+    function collectDiagnostics(extra) {
+      const url = new URL(location.href);
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      let storageOk = true;
+      try {
+        localStorage.setItem('__qtvq_probe', '1');
+        localStorage.removeItem('__qtvq_probe');
+      } catch {
+        storageOk = false;
+      }
+      return {
+        时间: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+        页面: location.href.split('?')[0],
+        是否收到code: code ? `是（长度 ${code.length}，内容不打印）` : '否',
+        是否收到state: state ? `是（长度 ${state.length}）` : '否',
+        浏览器: navigator.userAgent,
+        在微信内打开: /MicroMessenger/i.test(navigator.userAgent) ? '是' : '否',
+        本地存储可用: storageOk ? '是' : '否（隐私模式可能导致 state 丢失）',
+        ...extra,
+      };
+    }
 
     getClientId();
+
     handleWechatOpenCallback()
       .then((data) => {
-        if (data) showToast('登录成功');
+        if (!data) {
+          // 回调 URL 里没有 code：通常是直接打开本页，或用户取消了授权
+          titleEl.textContent = '没有收到微信授权';
+          msgEl.textContent = '本页需要在微信授权后自动跳转到达才有意义；如果你是直接打开本页，请回到账户页重新点「微信扫码登录」。';
+          errEl.hidden = false;
+          detailEl.textContent = JSON.stringify(collectDiagnostics({ 说明: 'URL 中没有 code 参数' }), null, 2);
+          return;
+        }
+        titleEl.textContent = '登录成功';
+        msgEl.textContent = '微信身份已验证，正在进入你的账户…';
+        okEl.hidden = false;
         location.replace('account.html');
       })
       .catch((e) => {
-        showToast(e.message || '微信登录失败');
-        setTimeout(() => location.replace('account.html'), 1500);
+        titleEl.textContent = '微信登录失败';
+        msgEl.textContent = '已停在本页，不自动跳转 —— 这样你才能看清失败原因。';
+        errEl.hidden = false;
+        detailEl.textContent = JSON.stringify(
+          collectDiagnostics({
+            错误消息: e?.message || String(e),
+            错误原因: e?.diagnostic?.reason || '(未提供)',
+            HTTP状态: e?.diagnostic?.httpStatus ?? '(无)',
+            服务端响应: e?.diagnostic?.response ?? '(无)',
+            提示: e?.diagnostic?.hint || '(无)',
+          }),
+          null,
+          2,
+        );
       });
+
+    document.getElementById('cb-copy')?.addEventListener('click', async () => {
+      const text = detailEl.textContent || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        document.getElementById('cb-copy').textContent = '已复制 ✓';
+      } catch {
+        // 剪贴板不可用时退化为选中，方便手动复制
+        const range = document.createRange();
+        range.selectNodeContents(detailEl);
+        const sel = getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.getElementById('cb-copy').textContent = '已选中，请按 Ctrl+C';
+      }
+    });
+
+    document.getElementById('cb-retry')?.addEventListener('click', async () => {
+      try {
+        await startWechatOpenLogin();
+      } catch (err) {
+        detailEl.textContent += `\n\n重新发起登录失败：${err?.message || err}`;
+      }
+    });
   </script>
 </body>
 </html>
