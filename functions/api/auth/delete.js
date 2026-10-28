@@ -36,17 +36,62 @@ async function shortHash(text) {
 /**
  * 订单脱敏：保留金额/时间/套餐/状态，clientId 替换为 `deleted-<8位哈希>`，并去掉 openid。
  * 不能删订单 —— 那是财务与审计依据（业务方明确要求保留）。
+ *
+ * 2026-10-26 · 两份都要脱敏：
+ *   · KV：订单已剥离 PII，这里仍改 clientId（设备标识也是准标识符）；
+ *   · 境内 Mongo：**完整记录在这里**（openid / trace.phone / trace.ip）。
+ *     只改 KV 不改 Mongo 的话，"注销即删"就是句空话 —— 建议案 §7 的验收项。
+ * Mongo 侧失败不阻塞注销（否则 Mongo 抖动会让用户永远注销不掉），但会打进日志与返回体。
  */
 async function redactOrdersForClient(env, clientId) {
-  const kv = env?.QTVQ_KV;
-  if (!kv || !clientId) return 0;
+  if (!clientId) return { kv: 0, mongo: 0, mongoError: null };
   const tag = `deleted-${await shortHash(clientId)}`;
+  const kv = env?.QTVQ_KV;
+
+  /*
+   * 顺序：**先问境内 Mongo 要订单号，再用订单号精确改 KV**。
+   *
+   * 早期实现是「遍历 KV 全部 `order:` 键、逐个取值比对 clientId」——KV 没有二级索引，
+   * 只能全表扫。订单到 124 条时，这一步就让整个注销请求超时 504（2026-10-26 实测），
+   * 也就是说**删除权在订单量上来之后就失效了**。
+   * 现在 Mongo 的 `clientId` 有索引，一次查询就拿到 orderIds，KV 只动那几个键。
+   */
+  let orderIds = [];
+  let mongoRedacted = 0;
+  let mongoError = null;
+  const base = String(env?.NODE_API_BASE || '').replace(/\/+$/, '');
+  const adminKey = String(env?.NODE_ADMIN_KEY || '');
+  if (base && adminKey) {
+    try {
+      const res = await fetch(`${base}/v1/admin/orders/redact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Key': adminKey,
+          'User-Agent': 'qtvq-account-delete/1.0 (+https://qtvq.cn)',
+        },
+        body: JSON.stringify({ clientId, tag }),
+        signal: AbortSignal.timeout(4000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        mongoRedacted = Number(data?.data?.redacted) || 0;
+        orderIds = Array.isArray(data?.data?.orderIds) ? data.data.orderIds : [];
+      } else {
+        mongoError = data?.error || `HTTP ${res.status}`;
+      }
+    } catch (err) {
+      mongoError = err?.message || String(err);
+    }
+    if (mongoError) console.error('[delete] 境内订单脱敏失败：', mongoError);
+  }
+
+  // KV：只改 Mongo 点名的那几个键（精确、O(n) 于该用户自己的订单）
   let changed = 0;
-  let cursor;
-  for (let page = 0; page < 20; page += 1) {
-    const list = await kv.list({ prefix: ORDER_PREFIX, cursor });
-    for (const { name } of list.keys) {
-      const raw = await kv.get(name);
+  if (kv && orderIds.length) {
+    for (const orderId of orderIds) {
+      const key = `${ORDER_PREFIX}${orderId}`;
+      const raw = await kv.get(key);
       if (!raw) continue;
       let order;
       try {
@@ -54,16 +99,44 @@ async function redactOrdersForClient(env, clientId) {
       } catch {
         continue;
       }
-      if (order?.clientId !== clientId) continue;
       order.clientId = tag;
       delete order.openid;
-      await kv.put(name, JSON.stringify(order));
+      await kv.put(key, JSON.stringify(order));
       changed += 1;
     }
-    if (list.list_complete) break;
-    cursor = list.cursor;
   }
-  return changed;
+
+  /*
+   * 境内查询不可用时的兜底：仍做一次 KV 扫描，但要**限页**并如实报告"可能没扫全"。
+   * 宁可少改几个键并大声说明，也不能让注销请求挂到超时、连带把删除权整体废掉。
+   */
+  let scanIncomplete = false;
+  if (kv && mongoError) {
+    let cursor;
+    for (let page = 0; page < 3; page += 1) {
+      const list = await kv.list({ prefix: ORDER_PREFIX, cursor });
+      for (const { name } of list.keys) {
+        const raw = await kv.get(name);
+        if (!raw) continue;
+        let order;
+        try {
+          order = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+        if (order?.clientId !== clientId) continue;
+        order.clientId = tag;
+        delete order.openid;
+        await kv.put(name, JSON.stringify(order));
+        changed += 1;
+      }
+      if (list.list_complete) break;
+      cursor = list.cursor;
+      if (page === 2) scanIncomplete = true;
+    }
+  }
+
+  return { kv: changed, mongo: mongoRedacted, mongoError, scanIncomplete };
 }
 
 export async function onRequest(context) {
@@ -145,10 +218,13 @@ export async function onRequest(context) {
         `手机号：${result.phoneMasked || '（纯微信账号）'}`,
         `设备编号：${clientId || '（无）'}`,
         `时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
-        `脱敏保留的订单数：${redactedOrders}`,
+        `脱敏保留的订单数：${redactedOrders.kv}（历史 KV） + ${redactedOrders.mongo}（境内完整记录）`,
         '',
         '已删除：个人资料 / 登录凭证 / 全部会话 / 配额与提问记录 / 微信绑定 / OSS 备份（覆盖为墓碑）。',
-        '已保留：订单流水（clientId 已替换为不可逆短哈希，金额·时间·套餐·状态仍在）。',
+        '已保留：订单流水（clientId 已替换为不可逆短哈希，金额·时间·套餐·状态仍在；openid 与 trace 已清空）。',
+        ...(redactedOrders.mongoError
+          ? ['', `⚠️ 境内订单脱敏未完成：${redactedOrders.mongoError}`, '   → 需人工复核该设备在 orders 集合中的记录']
+          : []),
       ].join('\n'),
     });
   } catch (err) {

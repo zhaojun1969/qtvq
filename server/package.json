@@ -15,7 +15,8 @@
     "test:frontend": "node scripts/e2e-frontend.mjs",
     "test:billing": "node scripts/e2e-billing-safety.mjs",
     "test:all": "npm run check:imports && npm run test:e2e && npm run test:billing && npm run test:wheel && npm run test:frontend",
-    "check:ps1": "node ../tools/scripts/check-ps1-bom.mjs"
+    "check:ps1": "node ../tools/scripts/check-ps1-bom.mjs",
+    "diag:green": "node src/tools/diag-green.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

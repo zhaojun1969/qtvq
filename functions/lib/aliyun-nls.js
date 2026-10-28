@@ -9,10 +9,38 @@ const TOKEN_CACHE_KEY = 'nls:token:cache';
 
 function nlsConfig(env) {
   const appKey = String(env.NLS_APP_KEY || env.ALIYUN_NLS_APPKEY || '').trim();
-  const ak = String(env.OSS_ACCESS_KEY_ID || env.ALIYUN_ACCESS_KEY_ID || '').trim();
-  const sk = String(env.OSS_SECRET_ACCESS_KEY || env.ALIYUN_ACCESS_KEY_SECRET || '').trim();
-  if (!appKey || !ak || !sk) return null;
-  return { appKey, ak, sk };
+  // 凭据优先级（2026-09-17 修）：
+  //   1) NLS_ACCESS_KEY_ID / NLS_ACCESS_KEY_SECRET —— 给 NLS 用的专用 RAM 子账号（推荐）
+  //   2) ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET
+  //   3) OSS_ACCESS_KEY_ID / OSS_SECRET_ACCESS_KEY —— 兜底复用
+  // 原来 OSS 排在最前，结果是"OSS 凭据赢"，而 OSS 那个 RAM 用户**没有 NLS 权限**，
+  // CreateToken 直接返回 ErrCode 40020503 No permission! —— 语音因此从未成功过，
+  // 而线上只回一句 "No permission!"，完全指不出问题在哪。
+  const pairs = [
+    ['NLS_ACCESS_KEY_ID', 'NLS_ACCESS_KEY_SECRET'],
+    ['ALIYUN_ACCESS_KEY_ID', 'ALIYUN_ACCESS_KEY_SECRET'],
+    ['OSS_ACCESS_KEY_ID', 'OSS_SECRET_ACCESS_KEY'],
+  ];
+  for (const [idKey, skKey] of pairs) {
+    const ak = String(env[idKey] || '').trim();
+    const sk = String(env[skKey] || '').trim();
+    if (appKey && ak && sk) return { appKey, ak, sk, source: idKey };
+  }
+  return null;
+}
+
+/** 把阿里云的错误码翻译成人能直接执行的一句话（原始信息保留在 raw 里） */
+function nlsErrorHint(code, message) {
+  const map = {
+    40020503:
+      '语音识别所用的阿里云 AccessKey 没有「智能语音交互(NLS)」权限，或该账号未开通智能语音交互服务。'
+      + '请在 RAM 控制台给这个 AccessKey 所属用户授予 NLS 权限（或改用专用的 NLS 子账号 AK），'
+      + '并确认控制台已开通智能语音交互。',
+    40020502: '该 AccessKey 被禁用。',
+    'InvalidAccessKeyId.NotFound': 'AccessKey 不存在（可能已删除或复制错）。',
+    SignatureDoesNotMatch: 'AccessKeySecret 与 AccessKeyId 不匹配。',
+  };
+  return map[code] || message || '';
 }
 
 export function isNlsConfigured(env) {
@@ -69,7 +97,14 @@ async function aliyunRpc(env, host, action, version, extra = {}) {
   const res = await fetch(url, { method: 'GET' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.Code || data.ErrCode) {
-    throw new Error(data.Message || data.ErrMsg || data.msg || `NLS RPC ${action} failed`);
+    const code = data.Code || data.ErrCode || `HTTP_${res.status}`;
+    const hint = nlsErrorHint(code, data.Message || data.ErrMsg);
+    // 原始错误码必须带出去：只回 "No permission!" 时，业务方在页面上看到的是一句无用的英文，
+    // 而真正可执行的信息是 40020503 = 缺 NLS 权限。（这个坑本项目实际吃了一个多月。）
+    const err = new Error(hint || `NLS ${action} 失败`);
+    err.nlsCode = code;
+    err.raw = data.Message || data.ErrMsg || '';
+    throw err;
   }
   return data;
 }
@@ -104,6 +139,25 @@ async function getNlsToken(env) {
     );
   }
   return fresh.token;
+}
+
+/**
+ * 真实就绪探测：能不能真的换到 NLS token（token 本身在 KV 里缓存 12 小时，所以代价很低）。
+ *
+ * 存在的理由：`isNlsConfigured()` 只检查"环境变量非空"，而本项目实际出现过
+ * "变量齐全但 AccessKey 没有 NLS 权限"的情况 —— 于是健康检查说 configured:true、
+ * 前端按钮亮着，用户点下去才失败。**配置存在 ≠ 服务可用**，必须能区分。
+ */
+export async function probeNls(env) {
+  if (!isNlsConfigured(env)) {
+    return { ready: false, reason: '语音识别未配置（缺少 NLS_APP_KEY 或 AccessKey）', nlsCode: 'SPEECH_NOT_CONFIGURED' };
+  }
+  try {
+    await getNlsToken(env);
+    return { ready: true, reason: null, nlsCode: null };
+  } catch (err) {
+    return { ready: false, reason: err.message, nlsCode: err.nlsCode || 'TOKEN_FAILED' };
+  }
 }
 
 /**

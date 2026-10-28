@@ -10,6 +10,7 @@ import { getDB } from '../config/db.js';
 import { USER_STATUS } from '../constants.js';
 import { badRequest, notFound, ok, wrap } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
+import { agreeAdult, adultStatus, ADULT_AGREEMENT_VER } from '../middleware/adult.js';
 import { embedOne, profileText } from '../services/embed.js';
 import { assertSafe } from '../services/content-safety.js';
 
@@ -196,6 +197,24 @@ router.patch(
   }),
 );
 
+/*
+ * 年龄门（P0-T0.2）：提交出生年份 + 勾选《成年用户承诺》。
+ *
+ * 必须注册在 `/:uid` **之前** —— 否则 GET /adult 会被当成"查 uid=adult 的用户"直接 404。
+ * 这是实测踩到的坑，别把顺序改回去。
+ */
+router.get('/adult', requireAuth, wrap(async (req, res) => ok(res, await adultStatus(req.uid))));
+
+router.post(
+  '/adult',
+  requireAuth,
+  wrap(async (req, res) => {
+    const r = await agreeAdult(req.uid, { birthYear: req.body?.birthYear });
+    if (!r.ok) return res.status(400).json({ code: r.code, error: r.message });
+    return ok(res, { ...r, agreementVer: ADULT_AGREEMENT_VER });
+  }),
+);
+
 router.get(
   '/:uid',
   requireAuth,
@@ -209,3 +228,4 @@ router.get(
 );
 
 export default router;
+

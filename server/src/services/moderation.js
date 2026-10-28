@@ -14,7 +14,9 @@ import { badRequest, notFound } from '../lib/http.js';
 import { startOfDayCN } from './wallet.js';
 import { logAudit } from './audit.js';
 
-export const REPORT_REASONS = ['涉黄', '广告', '诈骗', '辱骂', '头像违规', '虚假资料', '其他'];
+/* 唯一来源：packages/shared（跨端同一份，见该文件头说明） */
+import { REPORT_REASONS } from '../../../packages/shared/src/index.js';
+export { REPORT_REASONS };
 export const TARGET_TYPES = ['user', 'report'];
 
 /** 自动隐藏阈值：不同举报人达到这个数量就把目标转为 invisible（等待人工确认） */

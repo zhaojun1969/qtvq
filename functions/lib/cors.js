@@ -19,7 +19,13 @@ export function corsHeaders(request) {
   return {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    /*
+     * Authorization 必须放行：独立域名（api.qtvq.cn）对 qtvq.cn 是**跨域**调用，
+     * 而 `/api/auth/*`、`/api/auth/me` 都带 Bearer 令牌。只放 Content-Type 的话，
+     * 预检（OPTIONS）会直接失败 —— 表现为"独立域名下登录态全部失效"。
+     * X-Admin-Key 供运营工具跨域使用（同样需要预检放行）。
+     */
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Key',
     'Access-Control-Max-Age': '86400',
   };
 }

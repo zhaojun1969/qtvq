@@ -5,17 +5,69 @@
 import { validClientId } from './quota-store.js';
 
 const USER_PREFIX = 'auth:user:';
+/* 旧明文键前缀：仅用于「惰性迁移」识别与清理，新代码不再写入 */
 const PHONE_PREFIX = 'auth:phone:';
 const CLIENT_PREFIX = 'auth:client:';
 const OPENID_PREFIX = 'auth:openid:';
 const UNION_PREFIX = 'auth:union:';
 const SESSION_PREFIX = 'auth:session:';
+
+/*
+ * 2026-10-26 · G1「数据境内化」：**索引与会话的键名改为不可逆哈希**（`auth:p:` / `auth:o:`
+ * / `auth:u:` / `auth:c:` / `auth:s:`）。
+ *
+ * 为什么必须改键名而不只是清空值：
+ * KV 的键名本身就是数据。改之前 `npx wrangler kv key list` 直接列出
+ *   · `auth:phone:13800001234` —— 明文手机号；
+ *   · `auth:openid:oXXXX` —— 微信用户标识；
+ *   · `auth:session:<64位token>` —— **可用的登录令牌**，拿到即可冒充用户。
+ * 这些是「看一眼键列表」就能拿到的信息，比值里存什么更危险。
+ *
+ * 哈希用 SHA-256 前 32 位十六进制：不可逆、定长、几乎无碰撞（本项目用户量级远低于 2^64）。
+ * 不加盐 —— 这里的目标是"键名不泄露信息"，不是"抗字典攻击"；
+ * 手机号空间有限，加盐也挡不住暴力枚举，真要防枚举应做限流（已有）。
+ */
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const memory = { users: new Map(), phones: new Map(), clients: new Map(), openids: new Map(), unions: new Map(), sessions: new Map() };
 
 function getKv(env) {
   return env?.QTVQ_KV || null;
+}
+
+/** SHA-256 前 32 位十六进制（不可逆） */
+async function hashKey(raw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(raw ?? '')));
+  return [...new Uint8Array(buf)]
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+const phoneKey = async (phone) => `auth:p:${await hashKey(`phone:${phone}`)}`;
+const openidKey = async (openid) => `auth:o:${await hashKey(`openid:${openid}`)}`;
+const unionKey = async (unionId) => `auth:u:${await hashKey(`union:${unionId}`)}`;
+const clientKey = async (clientId) => `auth:c:${await hashKey(`client:${clientId}`)}`;
+const sessionKey = async (token) => `auth:s:${await hashKey(`session:${token}`)}`;
+
+/**
+ * 读哈希键；未命中时回退读旧明文键，命中就顺手迁到哈希键并删除旧键。
+ * 这样存量数据不需要停机迁移，第一次访问即完成搬迁。
+ */
+async function kvGetMigrating(kv, hashedKey, legacyKey) {
+  const hit = await kv.get(hashedKey);
+  if (hit != null) return hit;
+  if (!legacyKey) return null;
+  const legacy = await kv.get(legacyKey);
+  if (legacy == null) return null;
+  try {
+    await kv.put(hashedKey, legacy);
+    await kv.delete(legacyKey);
+  } catch (err) {
+    // 迁移失败不影响本次读取（值已经拿到了），下次访问会再试
+    console.error('[auth] 索引键惰性迁移失败：', err?.message || err);
+  }
+  return legacy;
 }
 
 function validPhone(phone) {
@@ -66,23 +118,158 @@ async function loadUser(env, userId) {
     if (!raw) return null;
     try {
       return JSON.parse(raw);
-    } catch {
+    } catch (err) {
+      // 以前是静默返回 null —— 调用方会把它当成"用户不存在"，于是登录被拒、
+      // 会话失效，却没有任何日志可查。这里至少留下线索。
+      // （不返回默认对象：账号记录损坏时"当作用户不存在"比"当成新账号"安全，
+      //   后者可能让损坏记录被覆盖，或让人误以为账号是空的。）
+      console.error(`[auth] 用户记录损坏：userId=${userId}`, err?.message || err);
       return null;
     }
   }
   return memory.users.get(userId) || null;
 }
 
+/** 可识别字段名（KV 副本不含、境内记录的正是这几个） */
+const IDENTITY_KEYS = ['phone', 'wechatOpenId', 'wechatWebOpenId', 'wechatMpOpenId', 'wechatUnionId'];
+
+/** 只取有值的可识别字段：避免把 Mongo 的 `_id`/`updatedAt` 混进用户对象再写回 KV */
+function stripNulls(obj) {
+  const out = {};
+  for (const k of IDENTITY_KEYS) if (obj?.[k]) out[k] = obj[k];
+  return out;
+}
+
+/** 去掉可识别字段，得到可以放在境外的 KV 副本 */
+export function sanitizeUserForKv(user) {
+  if (!user || typeof user !== 'object') return user;
+  const {
+    phone: _phone,
+    wechatOpenId: _o1,
+    wechatWebOpenId: _o2,
+    wechatMpOpenId: _o3,
+    wechatUnionId: _u1,
+    ...rest
+  } = user;
+  return rest;
+}
+
+const IDENTITY_TIMEOUT_MS = 3000;
+
+/**
+ * 把可识别字段同步到境内。永不抛异常、永不阻断主流程。
+ * 失败只记日志：登录/鉴权不依赖它（KV 里有口令摘要），只是"认人"相关的少数路径会退化。
+ */
+async function syncUserIdentity(env, user, { remove = false } = {}) {
+  const base = String(env?.NODE_API_BASE || '').replace(/\/+$/, '');
+  const adminKey = String(env?.NODE_ADMIN_KEY || '');
+  if (!base || !adminKey || !user?.id) return { ok: false, reason: 'not-configured' };
+  try {
+    const url = remove
+      ? `${base}/v1/admin/auth-users/${encodeURIComponent(user.id)}`
+      : `${base}/v1/admin/auth-users`;
+    const res = await fetch(url, {
+      method: remove ? 'DELETE' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+        'User-Agent': 'qtvq-auth-identity/1.0 (+https://qtvq.cn)',
+      },
+      body: remove
+        ? undefined
+        : JSON.stringify({
+            userId: user.id,
+            clientId: user.clientId || null,
+            createdAt: user.createdAt || Date.now(),
+            phone: user.phone || null,
+            wechatOpenId: user.wechatOpenId || null,
+            wechatWebOpenId: user.wechatWebOpenId || null,
+            wechatMpOpenId: user.wechatMpOpenId || null,
+            wechatUnionId: user.wechatUnionId || null,
+          }),
+      signal: AbortSignal.timeout(IDENTITY_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error(`[auth] 可识别字段同步失败 ${user.id} HTTP ${res.status}`);
+      return { ok: false, reason: `http-${res.status}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('[auth] 可识别字段同步异常：', err?.message || err);
+    return { ok: false, reason: 'network' };
+  }
+}
+
+/**
+ * 取回可识别字段（phone / 各 openid）并与 KV 里的记录合并。
+ *
+ * 为什么需要显式调用：KV 副本刻意不含这些字段，任何"要认人"的逻辑（脱敏展示、
+ * 注销、微信身份匹配、收款通知）都必须先调它。**忘记调用的后果是静默的** ——
+ * 例如 `loginWechatUser` 里若拿到没有 openid 的用户对象，会把"已绑定微信的老账号"
+ * 当成"未绑定"，进而把新 openid 挂到一个本不该挂的账号上。
+ */
+export async function loadUserIdentity(env, userId) {
+  const base = String(env?.NODE_API_BASE || '').replace(/\/+$/, '');
+  const adminKey = String(env?.NODE_ADMIN_KEY || '');
+  if (!base || !adminKey || !userId) return null;
+  try {
+    const res = await fetch(`${base}/v1/admin/auth-users/${encodeURIComponent(userId)}`, {
+      headers: {
+        'X-Admin-Key': adminKey,
+        'User-Agent': 'qtvq-auth-identity/1.0 (+https://qtvq.cn)',
+      },
+      signal: AbortSignal.timeout(IDENTITY_TIMEOUT_MS),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      console.error(`[auth] 读取可识别字段失败 ${userId} HTTP ${res.status}`);
+      return null;
+    }
+    const j = await res.json().catch(() => null);
+    return j?.data || null;
+  } catch (err) {
+    console.error('[auth] 读取可识别字段异常：', err?.message || err);
+    return null;
+  }
+}
+
+/** 取完整用户（KV 记录 + 可识别字段）。仅用于确实需要认人的路径。 */
+export async function loadUserWithIdentity(env, userId) {
+  const user = await loadUser(env, userId);
+  if (!user) return null;
+  const identity = await loadUserIdentity(env, userId);
+  if (!identity) return user;
+  return {
+    ...user,
+    phone: identity.phone || user.phone || null,
+    wechatOpenId: identity.wechatOpenId || user.wechatOpenId || null,
+    wechatWebOpenId: identity.wechatWebOpenId || user.wechatWebOpenId || null,
+    wechatMpOpenId: identity.wechatMpOpenId || user.wechatMpOpenId || null,
+    wechatUnionId: identity.wechatUnionId || user.wechatUnionId || null,
+  };
+}
+
 async function saveUser(env, user) {
   const kv = getKv(env);
   if (kv) {
-    await kv.put(`${USER_PREFIX}${user.id}`, JSON.stringify(user));
-    if (user.phone) await kv.put(`${PHONE_PREFIX}${user.phone}`, user.id);
-    if (user.clientId) await kv.put(`${CLIENT_PREFIX}${user.clientId}`, user.id);
-    if (user.wechatOpenId) await kv.put(`${OPENID_PREFIX}${user.wechatOpenId}`, user.id);
-    if (user.wechatWebOpenId) await kv.put(`${OPENID_PREFIX}${user.wechatWebOpenId}`, user.id);
-    if (user.wechatMpOpenId) await kv.put(`${OPENID_PREFIX}${user.wechatMpOpenId}`, user.id);
-    if (user.wechatUnionId) await kv.put(`${UNION_PREFIX}${user.wechatUnionId}`, user.id);
+    // 值只写脱敏副本（无可识别字段）；完整字段进境内 Mongo
+    await kv.put(`${USER_PREFIX}${user.id}`, JSON.stringify(sanitizeUserForKv(user)));
+    // 索引一律写哈希键；同时清掉可能残留的旧明文键（删除失败不影响写入）
+    const idx = [];
+    if (user.phone) idx.push([await phoneKey(user.phone), `${PHONE_PREFIX}${user.phone}`]);
+    if (user.clientId) idx.push([await clientKey(user.clientId), `${CLIENT_PREFIX}${user.clientId}`]);
+    for (const oid of [user.wechatOpenId, user.wechatWebOpenId, user.wechatMpOpenId]) {
+      if (oid) idx.push([await openidKey(oid), `${OPENID_PREFIX}${oid}`]);
+    }
+    if (user.wechatUnionId) idx.push([await unionKey(user.wechatUnionId), `${UNION_PREFIX}${user.wechatUnionId}`]);
+    for (const [hashed, legacy] of idx) {
+      await kv.put(hashed, user.id);
+      try {
+        if ((await kv.get(legacy)) != null) await kv.delete(legacy);
+      } catch (err) {
+        console.error('[auth] 清理旧明文索引键失败：', err?.message || err);
+      }
+    }
   } else {
     memory.users.set(user.id, user);
     if (user.phone) memory.phones.set(user.phone, user.id);
@@ -92,18 +279,20 @@ async function saveUser(env, user) {
     if (user.wechatMpOpenId) memory.openids.set(user.wechatMpOpenId, user.id);
     if (user.wechatUnionId) memory.unions.set(user.wechatUnionId, user.id);
   }
+  // 可识别字段进境内（失败不阻断：登录靠 KV 里的口令摘要，不依赖它）
+  await syncUserIdentity(env, user);
 }
 
 async function findUserIdByOpenId(env, openid) {
   const kv = getKv(env);
-  if (kv) return (await kv.get(`${OPENID_PREFIX}${openid}`)) || null;
+  if (kv) return (await kvGetMigrating(kv, await openidKey(openid), `${OPENID_PREFIX}${openid}`)) || null;
   return memory.openids?.get(openid) || null;
 }
 
 async function findUserIdByUnionId(env, unionId) {
   if (!unionId) return null;
   const kv = getKv(env);
-  if (kv) return (await kv.get(`${UNION_PREFIX}${unionId}`)) || null;
+  if (kv) return (await kvGetMigrating(kv, await unionKey(unionId), `${UNION_PREFIX}${unionId}`)) || null;
   return memory.unions?.get(unionId) || null;
 }
 
@@ -124,21 +313,117 @@ function applyWechatIdentity(user, { openid, unionId, source = 'mp' }) {
 
 async function findUserIdByClientId(env, clientId) {
   const kv = getKv(env);
-  if (kv) return (await kv.get(`${CLIENT_PREFIX}${clientId}`)) || null;
+  if (kv) return (await kvGetMigrating(kv, await clientKey(clientId), `${CLIENT_PREFIX}${clientId}`)) || null;
   return memory.clients.get(clientId) || null;
 }
 
 async function findUserIdByPhone(env, phone) {
   const kv = getKv(env);
-  if (kv) return (await kv.get(`${PHONE_PREFIX}${phone}`)) || null;
+  if (kv) return (await kvGetMigrating(kv, await phoneKey(phone), `${PHONE_PREFIX}${phone}`)) || null;
   return memory.phones.get(phone) || null;
+}
+
+/* ------------------------------------------------ 会话：境内 Node 优先（2026-10-26） */
+
+/*
+ * 会话权威已迁到境内 Node（Mongo `auth_sessions`）。
+ *
+ * 但**微信登录 / 短信重置 / 注销仍在本侧**，它们同样要签发和校验会话。
+ * 若这里继续只写 KV，就会出现"微信登录成功、网页端却显示未登录"——
+ * 因为网页端走的是 Node 的 `/api/auth/me`，它读 Mongo。
+ *
+ * 所以三处都改成"先 Node，失败再 KV"。会话主键统一为
+ * `sha256('session:'+token)` 的前 32 个 hex 字符（与 KV 版同算法），两边算出来是同一个键。
+ */
+const SESSION_TIMEOUT_MS = 1500;
+
+function nodeAuthConfig(env) {
+  const base = String(env?.NODE_API_BASE || '').replace(/\/+$/, '');
+  const adminKey = String(env?.NODE_ADMIN_KEY || '');
+  return base && adminKey ? { base, adminKey } : null;
+}
+
+async function sessionIdOf(token) {
+  return hashKey(`session:${token}`);
+}
+
+async function saveSessionViaNode(env, token, payload) {
+  const cfg = nodeAuthConfig(env);
+  if (!cfg) return false;
+  try {
+    const res = await fetch(`${cfg.base}/v1/admin/auth-sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': cfg.adminKey,
+        'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)',
+      },
+      body: JSON.stringify({
+        hashId: await sessionIdOf(token),
+        userId: payload.userId,
+        clientId: payload.clientId,
+        expiresAt: payload.expiresAt,
+      }),
+      signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[auth] 写境内会话异常：', err?.message || err);
+    return false;
+  }
+}
+
+async function loadSessionViaNode(env, token) {
+  const cfg = nodeAuthConfig(env);
+  if (!cfg) return null;
+  try {
+    const res = await fetch(`${cfg.base}/v1/admin/auth-sessions/${await sessionIdOf(token)}`, {
+      headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+      signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const j = await res.json().catch(() => null);
+    const d = j?.data;
+    if (!d || !d.userId) return null;
+    if (Number(d.expiresAt || 0) <= Date.now()) return null;
+    return { userId: d.userId, clientId: d.clientId, expiresAt: d.expiresAt };
+  } catch (err) {
+    console.error('[auth] 读境内会话异常：', err?.message || err);
+    return null;
+  }
+}
+
+async function deleteSessionViaNode(env, token) {
+  const cfg = nodeAuthConfig(env);
+  if (!cfg) return false;
+  try {
+    const res = await fetch(`${cfg.base}/v1/admin/auth-sessions/${await sessionIdOf(token)}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+      signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[auth] 删境内会话异常：', err?.message || err);
+    return false;
+  }
 }
 
 async function saveSession(env, token, data) {
   const kv = getKv(env);
   const payload = { ...data, expiresAt: Date.now() + SESSION_TTL_MS };
+  // 先写境内；成功就不再写 KV（两处都写会分叉）
+  if (await saveSessionViaNode(env, token, payload)) return payload;
   if (kv) {
-    await kv.put(`${SESSION_PREFIX}${token}`, JSON.stringify(payload), { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) });
+    /*
+     * 会话键同样是哈希：`auth:s:<sha256>`。
+     * 旧写法 `auth:session:<token>` 把**可直接使用的登录令牌**放在键名里，
+     * 任何能列出 KV 键的途径（后台、误配的诊断脚本、日志）都等于拿到一批可用会话。
+     * 令牌本身仍只在客户端持有，服务端只存它的摘要。
+     */
+    await kv.put(await sessionKey(token), JSON.stringify(payload), {
+      expirationTtl: Math.ceil(SESSION_TTL_MS / 1000),
+    });
   } else {
     memory.sessions.set(token, payload);
   }
@@ -147,9 +432,12 @@ async function saveSession(env, token, data) {
 
 async function loadSession(env, token) {
   if (!token) return null;
+  // 境内 Node 优先（会话权威已迁到 Mongo）；读不到才回退 KV
+  const viaNode = await loadSessionViaNode(env, token);
+  if (viaNode) return viaNode;
   const kv = getKv(env);
   let raw = null;
-  if (kv) raw = await kv.get(`${SESSION_PREFIX}${token}`);
+  if (kv) raw = await kvGetMigrating(kv, await sessionKey(token), `${SESSION_PREFIX}${token}`);
   else raw = memory.sessions.get(token);
   if (!raw) return null;
   try {
@@ -162,9 +450,19 @@ async function loadSession(env, token) {
 }
 
 async function deleteSession(env, token) {
+  await deleteSessionViaNode(env, token);
   const kv = getKv(env);
-  if (kv) await kv.delete(`${SESSION_PREFIX}${token}`);
-  else memory.sessions.delete(token);
+  if (kv) {
+    await kv.delete(await sessionKey(token));
+    // 兼容：旧明文会话键也一并删除（迁移窗口内可能同时存在）
+    try {
+      if ((await kv.get(`${SESSION_PREFIX}${token}`)) != null) await kv.delete(`${SESSION_PREFIX}${token}`);
+    } catch {
+      /* 旧键清理失败不影响登出 */
+    }
+  } else {
+    memory.sessions.delete(token);
+  }
 }
 
 function publicUser(user) {
@@ -227,10 +525,23 @@ export async function loginUser(env, { phone, password, clientId }) {
 export async function loginWechatUser(env, { openid, unionId, clientId, source = 'mp' }) {
   if (!openid || !validClientId(clientId)) return { error: '无效参数' };
 
+  /*
+   * 这里**必须**取回可识别字段再判断：
+   * KV 副本不含 openid，若直接用 loadUser 的对象去看"是否已绑定微信"，
+   * 三个 openid 字段全是 undefined → 会把已绑定微信的老账号误判成未绑定，
+   * 进而把新 openid 挂到本不该挂的账号上（静默的账号串号）。
+   */
+  const loadFullUser = async (id) => {
+    const u = await loadUser(env, id);
+    if (!u) return null;
+    const identity = await loadUserIdentity(env, id);
+    return identity ? { ...u, ...stripNulls(identity) } : u;
+  };
+
   if (unionId) {
     const unionUserId = await findUserIdByUnionId(env, unionId);
     if (unionUserId) {
-      const user = await loadUser(env, unionUserId);
+      const user = await loadFullUser(unionUserId);
       if (!user) return { error: '账号异常，请联系客服' };
       applyWechatIdentity(user, { openid, unionId, source });
       if (user.clientId !== clientId) user.clientId = clientId;
@@ -241,7 +552,7 @@ export async function loginWechatUser(env, { openid, unionId, clientId, source =
 
   const existingId = await findUserIdByOpenId(env, openid);
   if (existingId) {
-    const user = await loadUser(env, existingId);
+    const user = await loadFullUser(existingId);
     if (!user) return { error: '账号异常，请联系客服' };
     applyWechatIdentity(user, { openid, unionId, source });
     if (user.clientId !== clientId) user.clientId = clientId;
@@ -251,7 +562,7 @@ export async function loginWechatUser(env, { openid, unionId, clientId, source =
 
   const clientUserId = await findUserIdByClientId(env, clientId);
   if (clientUserId) {
-    const user = await loadUser(env, clientUserId);
+    const user = await loadFullUser(clientUserId);
     if (user && !user.wechatOpenId && !user.wechatWebOpenId && !user.wechatMpOpenId) {
       applyWechatIdentity(user, { openid, unionId, source });
       await saveUser(env, user);
@@ -301,7 +612,7 @@ export async function resetPasswordWithWechat(env, { phone, newPassword, openid,
   const userId = await findUserIdByPhone(env, phone);
   if (!userId) return { error: '该手机号未注册' };
 
-  const user = await loadUser(env, userId);
+  const user = await loadUserWithIdentity(env, userId);
   if (!user) return { error: '该手机号未注册' };
   if (!user.wechatOpenId && !user.wechatWebOpenId && !user.wechatMpOpenId && !user.wechatUnionId) {
     return { error: '该账号未绑定微信，请先用微信登录一次，或联系客服' };
@@ -348,13 +659,11 @@ export async function logoutUser(env, token) {
 }
 
 export async function getPhoneByClientId(env, clientId) {
-  const kv = getKv(env);
-  let userId = null;
-  if (kv) userId = await kv.get(`${CLIENT_PREFIX}${clientId}`);
-  else userId = memory.clients.get(clientId);
+  const userId = await findUserIdByClientId(env, clientId);
   if (!userId) return null;
-  const user = await loadUser(env, userId);
-  return user ? maskPhone(user.phone) : null;
+  // 手机号在境内可识别字段里，KV 副本没有 —— 必须带 identity 才能脱敏展示
+  const user = await loadUserWithIdentity(env, userId);
+  return user && user.phone ? maskPhone(user.phone) : null;
 }
 
 /** 校验某账号的密码（注销等敏感操作需要二次确认）。纯微信账号无密码，返回 false。 */
@@ -374,7 +683,13 @@ export async function verifyUserPassword(env, userId, password) {
  * **订单不删**：业务方 2026-09-16 决定「注销后订单脱敏保留」（财务与审计需要）。
  */
 export async function deleteUserAccount(env, userId) {
-  const user = await loadUser(env, userId);
+  /*
+   * 必须取回可识别字段：KV 副本里已经没有 phone/openid，而注销恰恰要靠它们
+   * 去删对应的索引键（`auth:p:` / `auth:o:` / `auth:u:`）。
+   * 只用 loadUser 的话，索引键会全部留下来 —— 变成指向已删账号的孤儿索引，
+   * 而且手机号索引还在就意味着"这个号还占着"，用户重新注册会被判"已注册"。
+   */
+  const user = (await loadUserWithIdentity(env, userId)) || (await loadUser(env, userId));
   if (!user) return { ok: false, error: '账号不存在' };
 
   const kv = getKv(env);
@@ -382,32 +697,57 @@ export async function deleteUserAccount(env, userId) {
   if (kv) {
     const keys = [
       `${USER_PREFIX}${user.id}`,
+      user.phone ? await phoneKey(user.phone) : null,
+      user.clientId ? await clientKey(user.clientId) : null,
+      ...(await Promise.all(
+        [user.wechatOpenId, user.wechatWebOpenId, user.wechatMpOpenId]
+          .filter(Boolean)
+          .map((oid) => openidKey(oid)),
+      )),
+      user.wechatUnionId ? await unionKey(user.wechatUnionId) : null,
+      // 旧明文索引键也一并清掉（迁移窗口内可能残留）
       user.phone ? `${PHONE_PREFIX}${user.phone}` : null,
       user.clientId ? `${CLIENT_PREFIX}${user.clientId}` : null,
-      user.wechatOpenId ? `${OPENID_PREFIX}${user.wechatOpenId}` : null,
-      user.wechatWebOpenId ? `${OPENID_PREFIX}${user.wechatWebOpenId}` : null,
-      user.wechatMpOpenId ? `${OPENID_PREFIX}${user.wechatMpOpenId}` : null,
+      ...(user.wechatOpenId ? [`${OPENID_PREFIX}${user.wechatOpenId}`] : []),
+      ...(user.wechatWebOpenId ? [`${OPENID_PREFIX}${user.wechatWebOpenId}`] : []),
+      ...(user.wechatMpOpenId ? [`${OPENID_PREFIX}${user.wechatMpOpenId}`] : []),
       user.wechatUnionId ? `${UNION_PREFIX}${user.wechatUnionId}` : null,
     ].filter(Boolean);
     for (const k of keys) {
-      await kv.delete(k);
-      removedKeys += 1;
+      try {
+        await kv.delete(k);
+        removedKeys += 1;
+      } catch (err) {
+        console.error('[auth] 删除索引键失败：', k.slice(0, 12) + '…', err?.message || err);
+      }
     }
 
-    // 吊销该账号的全部会话：KV 不能按值查询，只能列前缀后逐条比对。
-    // 会话数量很小，最多翻 10 页，避免极端情况下无限循环。
-    let cursor;
-    for (let page = 0; page < 10; page += 1) {
-      const list = await kv.list({ prefix: SESSION_PREFIX, cursor });
-      for (const { name } of list.keys) {
-        const s = await loadSession(env, name.slice(SESSION_PREFIX.length));
-        if (s?.userId === user.id) {
-          await kv.delete(name);
-          removedKeys += 1;
+    /*
+     * 吊销该账号的全部会话。会话键现在是哈希（`auth:s:`），**键名里已经没有 token**，
+     * 所以不能再像以前那样从键名反推 token 去 loadSession —— 必须直接读值比对 userId。
+     * 新旧两种前缀都要扫，避免迁移窗口内旧会话漏网。
+     */
+    for (const prefix of ['auth:s:', SESSION_PREFIX]) {
+      let cursor;
+      for (let page = 0; page < 10; page += 1) {
+        const list = await kv.list({ prefix, cursor });
+        for (const { name } of list.keys) {
+          const raw = await kv.get(name);
+          if (!raw) continue;
+          let s = null;
+          try {
+            s = JSON.parse(raw);
+          } catch {
+            continue;
+          }
+          if (s?.userId === user.id) {
+            await kv.delete(name);
+            removedKeys += 1;
+          }
         }
+        if (list.list_complete) break;
+        cursor = list.cursor;
       }
-      if (list.list_complete) break;
-      cursor = list.cursor;
     }
   }
 
@@ -423,6 +763,9 @@ export async function deleteUserAccount(env, userId) {
     if (s?.userId === user.id) memory.sessions.delete(token);
   }
 
+  // 境内可识别字段：注销就是删除权，整条删掉（不做脱敏保留 —— 需要保留的是订单）
+  await syncUserIdentity(env, { id: user.id }, { remove: true });
+
   return {
     ok: true,
     removedKeys,
@@ -432,3 +775,9 @@ export async function deleteUserAccount(env, userId) {
 }
 
 export { maskPhone, validPhone };
+/*
+ * 键派生函数导出给迁移脚本复用（`tools/scripts/migrate-auth-keys-hash.mjs`）。
+ * 与 `order-store.projectForKv` 同样的理由：脚本自己再实现一遍哈希规则的话，
+ * 一旦两边漂移，脚本就会"迁移"出一批代码永远查不到的孤儿键 —— 登录会莫名其妙失败。
+ */
+export { phoneKey, openidKey, unionKey, clientKey, sessionKey };

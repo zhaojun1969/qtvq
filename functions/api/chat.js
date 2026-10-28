@@ -5,6 +5,7 @@
 import { canAsk, recordAsk, getQuota } from '../lib/quota-store.js';
 import { corsPreflight, jsonResponse } from '../lib/http.js';
 import { retrievePitfalls, isRagReady } from '../lib/rag.js';
+import { runChatChain, isLlmReady } from '../lib/llm-chain.js';
 
 const SYSTEM_PROMPT = `你是「我心永恒-Q问」的情感智慧顾问。你的风格是「避坑+直线解决」：
 - 不说鸡汤，不给模糊安慰
@@ -38,38 +39,23 @@ function buildSystemPrompt(message, ragContext) {
   return SYSTEM_PROMPT + knowledge + (extra ? '\n' + extra : '');
 }
 
-const AI_MODELS = [
-  '@cf/zai-org/glm-4.7-flash',
-  '@cf/qwen/qwen3-30b-a3b-fp8',
-  '@cf/meta/llama-3.1-8b-instruct',
-  '@cf/meta/llama-3-8b-instruct',
-];
-
-async function runAI(env, systemContent, userContent) {
-  if (!env.AI) return { reply: null, reason: 'AI_NOT_BOUND' };
-
-  let lastError = null;
-  for (const model of AI_MODELS) {
-    try {
-      const response = await env.AI.run(model, {
-        messages: [
-          { role: 'system', content: systemContent },
-          { role: 'user', content: userContent },
-        ],
-        max_tokens: 512,
-      });
-      const reply =
-        response?.response ||
-        response?.result?.response ||
-        response?.choices?.[0]?.message?.content ||
-        (typeof response === 'string' ? response : null);
-      if (reply) return { reply, model };
-    } catch (err) {
-      lastError = err;
-      console.error(`AI model ${model} failed:`, err);
-    }
-  }
-  return { reply: null, reason: 'AI_RUN_FAILED', error: lastError?.message };
+/*
+ * 模型链已经搬进 `lib/llm-chain.js`（跨提供方：百炼/通义 → Workers AI）。
+ *
+ * 为什么不再写死在这里：原实现只认 Workers AI 绑定，模型名同时在 chat.js 与 health.js
+ * 各写一份 —— 换一次模型要改两处，还很容易只改一处（health 的模型链就因为漏改废弃模型
+ * 报过两次假阴性）。现在两边都从同一个 resolveChain(env) 取，`LLM_CHAIN` 一个环境变量即可切换。
+ */
+function runAI(env, systemContent, userContent) {
+  return runChatChain(env, {
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ],
+    // 2000 对一个会先"思考"再回答的模型是必要的：预算给 512 时推理过程会吃掉全部额度，
+    // `content` 变成 null，看起来像"模型没回答"（成本量级：每次约 ¥0.004）。
+    maxTokens: 2000,
+  });
 }
 
 const MOCK_REPLIES = [
@@ -132,15 +118,42 @@ export async function onRequestPost(context) {
   try {
     const rag = await retrievePitfalls(env, message.trim());
     const systemContent = buildSystemPrompt(message, rag.context);
+
+    // 链里一条可用的都没有（既没配 DASHSCOPE_API_KEY 也没绑定 Workers AI）→ 不必白跑一轮
+    if (!isLlmReady(env)) {
+      const mock = MOCK_REPLIES[Math.floor(Math.random() * MOCK_REPLIES.length)];
+      if (!followUp) await recordAsk(env, cid);
+      return jsonResponse(request, {
+        reply: mock,
+        qCoins: 5,
+        wisdom: 1,
+        followUpHint: '点击「再问一步」获取更具体的行动措辞',
+        quota: await getQuota(env, cid, { withBilling: false }),
+        rag: { ready: isRagReady(), method: rag.method, hits: [] },
+        fallback: true,
+        fallbackReason: 'NO_MODEL_CONFIGURED',
+        ai: { provider: null, model: null, attempts: 0 },
+      });
+    }
+
+    // 链式调用：百炼（通义角色模型）→ Workers AI → 上层兜底文案
     const ai = await runAI(env, systemContent, userContent);
-    let reply = ai.reply;
+    let reply = ai.text;
+    let viaReasoning = false;
+    // 整条链都拿不到正式回答时，宁可给模型的思考过程也不给模板（模板与问题无关）
+    if (!reply && ai.reasoningOnly?.text) {
+      reply = ai.reasoningOnly.text;
+      viaReasoning = true;
+    }
+
+    const attempts = ai.errors || [];
     let fallback = false;
     let fallbackReason = null;
 
     if (!reply) {
       reply = MOCK_REPLIES[Math.floor(Math.random() * MOCK_REPLIES.length)];
       fallback = true;
-      fallbackReason = ai.reason || 'MOCK';
+      fallbackReason = attempts.length ? 'ALL_MODELS_FAILED' : 'NO_MODEL_CONFIGURED';
     }
 
     if (!followUp) await recordAsk(env, cid);
@@ -150,13 +163,21 @@ export async function onRequestPost(context) {
       qCoins: fallback ? 5 : 10,
       wisdom: fallback ? 1 : Math.min(5, Math.floor(message.length / 50) + 1),
       followUpHint: '点击「再问一步」获取更具体的行动措辞',
-      quota: await getQuota(env, cid),
+      quota: await getQuota(env, cid, { withBilling: false }),
       rag: {
         ready: isRagReady(),
         method: rag.method,
         hits: rag.hits?.map((h) => ({ id: h.id, title: h.title, category: h.category })) || [],
       },
-      ...(fallback ? { fallback: true, fallbackReason, aiError: ai.error || null } : {}),
+      // 用哪个模型答的、试了几次、失败原因都回给前端：客服/运营排查时不用再开 Dashboard 看日志
+      ai: {
+        provider: ai.provider || null,
+        model: ai.model || null,
+        attempts: ai.attempts || 0,
+        viaReasoning,
+        errors: attempts.map((e) => `${e.provider}:${e.model} → ${e.error}`),
+      },
+      ...(fallback ? { fallback: true, fallbackReason, aiError: attempts[0]?.error || null } : {}),
     });
   } catch (err) {
     console.error('AI error:', err);

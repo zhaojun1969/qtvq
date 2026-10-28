@@ -72,6 +72,7 @@
     <button data-tab="moderation">举报处理</button>
     <button data-tab="users">用户与充值</button>
     <button data-tab="ledger">流水</button>
+    <button data-tab="metrics">指标看板</button>
     <button data-tab="audit">审计日志</button>
   </nav>
 
@@ -141,6 +142,49 @@
         <thead><tr><th>时间</th><th>用户</th><th>方向</th><th>金额</th><th>原因</th><th>关联单号</th><th>状态</th><th>余额</th></tr></thead>
         <tbody id="ledger-body"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
       </table>
+    </div>
+  </section>
+
+  <!-- 指标看板（P4） -->
+  <section id="tab-metrics" hidden>
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <label class="muted">窗口</label>
+        <select id="metrics-days">
+          <option value="7">最近 7 天</option>
+          <option value="30" selected>最近 30 天</option>
+          <option value="90">最近 90 天</option>
+        </select>
+        <button id="metrics-refresh">刷新</button>
+        <button id="metrics-rebuild">重算最近 7 天</button>
+        <span class="grow"></span>
+        <span class="muted" id="metrics-gate-at"></span>
+      </div>
+      <!-- 验收门横幅：三项判据 + 结论。数据不足时明确写"不下结论"，不给绿灯 -->
+      <div class="msg show" id="metrics-gate" style="background:#2a2338"></div>
+      <div class="cards" id="metrics-cards" style="margin-top:12px"><div class="card"><div class="k">加载中…</div></div></div>
+      <p class="muted" style="margin:10px 0 0">口径：次日留存 = 当日注册且次日仍有任意行为的 uid ÷ 当日注册数（D+1 未过完显示"待定"，不记 0）；转化 = 窗口内激活且至少付过一单的 uid ÷ 激活 uid（不限商品）；「报告单 / 报告付费 / 报告实收」只算 sku ∈ diagnose/retro/pair 的订单，「全部实收」含会员与充值单；CAC 只用人工录入的成本，未录就不算。</p>
+    </div>
+    <div class="panel">
+      <h2>逐日</h2>
+      <table>
+        <thead><tr><th>日期</th><th>新增</th><th>激活</th><th>次日留存</th><th>报告浏览</th><th>报告单</th><th>报告付费</th><th>0元单</th><th>报告实收</th><th>全部实收</th><th>分享</th><th>落地曝光</th></tr></thead>
+        <tbody id="metrics-body"><tr><td colspan="12" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>渠道归因</h2>
+      <table>
+        <thead><tr><th>渠道</th><th>新增</th><th>付费</th><th>转化</th><th>营收</th><th>成本</th><th>CAC</th><th>LTV</th></tr></thead>
+        <tbody id="metrics-channels-body"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <input id="cost-date" placeholder="YYYY-MM-DD" style="width:130px">
+        <input id="cost-channel" placeholder="渠道码，如 xhs01" style="width:150px">
+        <input id="cost-fen" placeholder="金额（元）" style="width:110px">
+        <input id="cost-note" placeholder="备注（投放/激励）" style="width:200px">
+        <button id="cost-add" class="primary">录入成本</button>
+      </div>
     </div>
   </section>
 
@@ -341,17 +385,117 @@ async function loadAudit(){
   }catch(err){ $('audit-body').innerHTML=`<tr><td colspan="5" class="empty">加载失败：${esc(err.message)}</td></tr>`; }
 }
 
+// ---------------- 指标看板
+function pct(v){ return v==null ? '—' : (v*100).toFixed(1)+'%'; }
+function yuan(fen){ return fen==null ? '—' : '¥'+(Number(fen)/100).toFixed(2); }
+
+async function loadMetrics(){
+  try{
+    const days = Number($('metrics-days').value) || 30;
+    const [m, ch] = await Promise.all([
+      api('/v1/admin/metrics?days='+days),
+      api('/v1/admin/metrics/channels?days=90'),
+    ]);
+    const gate = m.gate || {};
+    const look = { passed:['✅ 验收通过','var(--ok)'], failed:['❌ 验收不达标','var(--err)'], insufficient:['⏳ 数据不足，暂不下结论','#e8b84b'] }[gate.status] || ['—',''];
+    $('metrics-gate').innerHTML = `<b style="color:${look[1]}">${esc(look[0])}</b>`
+      + (gate.reasons && gate.reasons.length ? ` · ${esc(gate.reasons.join('；'))}` : '')
+      + '<div style="margin-top:8px">' + (gate.checks||[]).map(c=>{
+          const mark = c.ok===null ? '·' : c.ok ? '✅' : '❌';
+          return `${mark} ${esc(c.label)}：<b>${c.key==='efficiency'? (c.value==null?'—':c.value.toFixed(2)+'×') : pct(c.value)}</b> <span class="muted">门槛 ${c.key==='efficiency'?('≥ '+(1/3).toFixed(2)+'×（CAC < LTV/3）'):pct(c.threshold)} · ${esc(c.detail)}</span>`;
+        }).join('<br>') + '</div>';
+    $('metrics-gate-at').textContent = `覆盖 ${gate.coverage||0}/90 天 · 激活 ${gate.activated||0} 人`;
+
+    const s = m.summary || {};
+    $('metrics-cards').innerHTML = [
+      ['新增用户', s.newUsers ?? 0], ['激活用户', s.activated ?? 0],
+      ['次日留存', s.d1Rate==null?'—':pct(s.d1Rate)], ['报告浏览', s.reportViews ?? 0],
+      ['报告单', s.reportOrders ?? 0], ['报告付费', s.reportPaid ?? 0],
+      ['0元单', s.zeroPaid ?? 0], ['报告实收', yuan(s.reportRevenueFen)],
+      ['全部实收', yuan(s.revenueFen)],
+      ['分享卡', s.shareGenerated ?? 0], ['分享回流', s.shareLanding ?? 0],
+      ['落地曝光', s.landingViews ?? 0],
+    ].map(([k,v])=>`<div class="card"><div class="k">${esc(k)}</div><div class="v num">${esc(v)}</div></div>`).join('');
+
+    if(!m.rows || !m.rows.length){ $('metrics-body').innerHTML='<tr><td colspan="12" class="empty">还没有聚合数据，点「重算最近 7 天」</td></tr>'; }
+    else $('metrics-body').innerHTML = m.rows.slice().reverse().map(r=>`
+      <tr>
+        <td class="mono">${esc(r.date)}</td>
+        <td class="num">${r.newUsers}</td>
+        <td class="num">${r.activated}</td>
+        <td class="num">${r.d1Retained==null?'<span class="muted">待定</span>':`${r.d1Retained}/${r.d1Eligible} · ${pct(r.d1Rate)}`}</td>
+        <td class="num">${r.reportViews}</td>
+        <td class="num">${r.reportOrders}</td>
+        <td class="num">${r.reportPaid}</td>
+        <td class="num">${r.zeroPaid||0}</td>
+        <td class="num">${yuan(r.reportRevenueFen||0)}</td>
+        <td class="num">${yuan(r.revenueFen)}</td>
+        <td class="num">${r.shareGenerated}</td>
+        <td class="num">${r.landingViews||0}</td>
+      </tr>`).join('');
+
+    const rows = ch.channels || [];
+    if(!rows.length){ $('metrics-channels-body').innerHTML='<tr><td colspan="8" class="empty">暂无归因数据</td></tr>'; }
+    else $('metrics-channels-body').innerHTML = rows.map(c=>`
+      <tr>
+        <td class="mono">${esc(c.channel)}${c.channel==='direct'?' <span class="tag">自然流量</span>':''}</td>
+        <td class="num">${c.newUsers}</td>
+        <td class="num">${c.paidUsers}</td>
+        <td class="num">${pct(c.conversion)}</td>
+        <td class="num">${yuan(c.revenueFen)}</td>
+        <td class="num">${yuan(c.costFen)}</td>
+        <td class="num">${c.cacFen==null?'<span class="muted">未录成本</span>':yuan(c.cacFen)}</td>
+        <td class="num">${yuan(c.ltvFen)}</td>
+      </tr>`).join('');
+  }catch(err){
+    $('metrics-gate').textContent = '加载失败：'+err.message;
+    $('metrics-body').innerHTML=`<tr><td colspan="12" class="empty">加载失败：${esc(err.message)}</td></tr>`;
+    $('metrics-channels-body').innerHTML=`<tr><td colspan="8" class="empty">加载失败：${esc(err.message)}</td></tr>`;
+  }
+}
+
+async function rebuildMetrics(){
+  try{
+    const r = await api('/v1/admin/metrics/rebuild', { method:'POST', body:{ days:7 } });
+    msg(`已重算 ${r.rebuilt} 天（${r.first} ~ ${r.last}）`,'ok'); loadMetrics();
+  }catch(err){ msg('重算失败：'+err.message,'err'); }
+}
+
+async function addCost(){
+  const date = $('cost-date').value.trim();
+  const channel = $('cost-channel').value.trim();
+  const yuanVal = Number($('cost-fen').value);
+  const note = $('cost-note').value.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ msg('日期请填 YYYY-MM-DD','err'); return; }
+  if(!channel){ msg('请填渠道码','err'); return; }
+  if(!Number.isFinite(yuanVal) || yuanVal < 0){ msg('金额请填元（可含小数）','err'); return; }
+  try{
+    await api('/v1/admin/metrics/cost', { method:'POST', body:{ date, channel, amountFen: Math.round(yuanVal*100), note: note||null } });
+    msg('成本已记录','ok'); $('cost-note').value=''; loadMetrics();
+  }catch(err){ msg('录入失败：'+err.message,'err'); }
+}
+
 // ---------------- 事件
+const TABS = ['overview','moderation','users','ledger','metrics','audit'];
+function showTab(tab){
+  if(!TABS.includes(tab)) tab='overview';
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+  TABS.forEach(t=>{ $('tab-'+t).hidden = t!==tab; });
+  if(tab==='overview') loadOverview();
+  if(tab==='moderation') loadModeration();
+  if(tab==='ledger') loadLedger();
+  if(tab==='metrics') loadMetrics();
+  if(tab==='audit') loadAudit();
+  if(location.hash !== '#'+tab) history.replaceState(null,'','#'+tab);
+}
+// /v1/admin/metrics.html 会跳到 #metrics —— 深链优先，口令连上之后才切 tab
+function afterConnect(){
+  const want = (location.hash||'').replace(/^#/,'');
+  if(want && want !== 'overview' && TABS.includes(want)) showTab(want);
+  else loadModeration();
+}
 document.querySelectorAll('nav button').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
-    const tab=b.dataset.tab;
-    ['overview','moderation','users','ledger','audit'].forEach(t=>{ $('tab-'+t).hidden = t!==tab; });
-    if(tab==='overview') loadOverview();
-    if(tab==='moderation') loadModeration();
-    if(tab==='ledger') loadLedger();
-    if(tab==='audit') loadAudit();
-  });
+  b.addEventListener('click',()=> showTab(b.dataset.tab));
 });
 
 $('connect').addEventListener('click', async ()=>{
@@ -359,7 +503,7 @@ $('connect').addEventListener('click', async ()=>{
   if(!k){ msg('请输入运营口令','err'); return; }
   adminKey=k;
   const ok = await loadOverview();
-  if(ok){ localStorage.setItem(KEY_STORE,k); msg('连接成功','ok'); loadModeration(); }
+  if(ok){ localStorage.setItem(KEY_STORE,k); msg('连接成功','ok'); afterConnect(); }
   else localStorage.removeItem(KEY_STORE);
 });
 $('forget').addEventListener('click', ()=>{ localStorage.removeItem(KEY_STORE); $('key').value=''; adminKey=''; setStatus('未连接'); msg('已清除本机保存的口令','ok'); });
@@ -381,10 +525,14 @@ $('user-body').addEventListener('click', e=>{
 });
 $('ledger-refresh').addEventListener('click', loadLedger);
 $('audit-refresh').addEventListener('click', loadAudit);
+$('metrics-refresh').addEventListener('click', loadMetrics);
+$('metrics-days').addEventListener('change', loadMetrics);
+$('metrics-rebuild').addEventListener('click', rebuildMetrics);
+$('cost-add').addEventListener('click', addCost);
 
 // 打开即尝试用本机保存的口令连接
 const saved = localStorage.getItem(KEY_STORE);
-if(saved){ $('key').value=saved; adminKey=saved; loadOverview().then(ok=>{ if(ok){ setStatus('已连接（本机口令）','var(--ok)'); loadModeration(); } }); }
+if(saved){ $('key').value=saved; adminKey=saved; loadOverview().then(ok=>{ if(ok){ setStatus('已连接（本机口令）','var(--ok)'); afterConnect(); } }); }
 else { setStatus('未连接'); }
 </script>
 </body>

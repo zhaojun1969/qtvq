@@ -39,15 +39,41 @@ export async function onRequest(context) {
   }
 
   if (body.action === 'static') {
-    const ok = await backupStaticApiSnapshots(env);
-    return jsonResponse(request, { ok, message: '静态 API 快照已写入 OSS' });
+    const r = await backupStaticApiSnapshots(env);
+    // 旧实现无论成败都返回 200 + 写死"已写入 OSS" —— 失败也报成功，等于把备份当成了安全感。
+    if (!r.ok) {
+      return jsonResponse(
+        request,
+        {
+          ok: false,
+          error: `静态 API 快照写入不完整（成功 ${r.written}/${r.total}）`,
+          written: r.written,
+          total: r.total,
+        },
+        500,
+      );
+    }
+    return jsonResponse(request, { ok: true, message: `静态 API 快照已写入 OSS（${r.written}/${r.total}）` });
   }
 
   const result = await backupAllKv(env);
-  if (!result.ok) return jsonResponse(request, result, 500);
+  if (!result.ok) {
+    return jsonResponse(
+      request,
+      {
+        ok: false,
+        error: result.error || `KV 备份不完整（成功 ${result.count} 条，失败 ${result.failed} 条）`,
+        count: result.count,
+        failed: result.failed,
+        snapshots: result.snapshots,
+      },
+      500,
+    );
+  }
   return jsonResponse(request, {
     ok: true,
     message: `已备份 ${result.count} 条 KV 记录至 OSS`,
     count: result.count,
+    snapshots: result.snapshots,
   });
 }

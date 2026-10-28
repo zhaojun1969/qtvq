@@ -1,10 +1,13 @@
 /**
- * 对话模型服务：dashscope（默认）/ workers-ai（复用现网模型链）/ openai
+ * 对话模型服务：按 `resolveLlmChain()` 的有序链依次尝试（可跨提供方）
+ *
+ * 与 Pages 侧 `functions/lib/llm-chain.js` 同语义，环境变量同名（`LLM_CHAIN` /
+ * `DASHSCOPE_API_KEY` / `TONGYI_CHARACTER_MODEL`），换模型只改配置不改代码。
  *
  * 与现网 `functions/api/chat.js` 同一套降级思想：失败不抛给用户，而是返回
  * null 让上层决定用兜底文案 —— 报告生成不能因为模型抖动而整体 500。
  */
-import { env } from '../config/env.js';
+import { env, resolveLlmChain } from '../config/env.js';
 import { ApiError } from '../lib/http.js';
 
 const TIMEOUT_MS = 45000;
@@ -62,16 +65,8 @@ async function chatWorkers({ model, messages, temperature, maxTokens }) {
   return postJson(url, { Authorization: `Bearer ${env.cf.token}` }, { messages, temperature, max_tokens: maxTokens });
 }
 
-function modelsFor(provider) {
-  if (provider === 'dashscope') {
-    const chain = Array.isArray(env.dashscope.chatModels) ? env.dashscope.chatModels : [];
-    return chain.length ? chain : [env.dashscope.chatModel];
-  }
-  if (provider === 'workers-ai') {
-    const chain = Array.isArray(env.cf.chatModels) ? env.cf.chatModels : [];
-    return chain.length ? chain : [env.cf.chatModel];
-  }
-  return [env.openai.chatModel];
+async function callOpenAiCompatible({ base, key, model, messages, temperature, maxTokens }) {
+  return chatCompletions({ base, key, model, messages, temperature, maxTokens });
 }
 
 /**
@@ -82,6 +77,9 @@ function modelsFor(provider) {
  * 这段**同样计入 max_tokens**。预算给小了就会出现
  * `content: null` + `finish_reason: "length"` —— 看起来像「返回内容为空」，
  * 实际是被思考过程吃光了额度。
+ *
+ * （Pages 侧 `functions/lib/llm-chain.js` 里有一份同样的实现 —— 两侧运行环境不同、
+ *   没有共享包，所以这份重复是刻意的；改动时请同时改两处，`npm run check:llm` 会暴露不一致。）
  */
 function isReasoningLike(model) {
   return /glm-4\.[0-9]|qwen3|qwq|deepseek|gpt-oss|thinking|reasoning/i.test(String(model));
@@ -95,25 +93,25 @@ function budgetFor(model, maxTokens) {
 /**
  * 依次尝试模型降级链，返回第一个成功的结果。
  *
- * 为什么要链：实测百炼在「仅使用免费额度」模式下会返回
- * `403 AllocationQuota.FreeTierOnly`，此时若只有一个模型，整份报告就会
- * 退化成兜底文案。多一个候选模型就能继续出真实内容。
+ * 为什么要链、且为什么**必须能跨提供方**：实测百炼在「仅使用免费额度」模式下会返回
+ * `403 AllocationQuota.FreeTierOnly`（英文为 `Free quota exhausted`），
+ * 若链只在一家内部兜底，整家额度用尽时整份报告就会退化成兜底文案。
+ * 跨提供方后，百炼不行还能落到已绑定的 Workers AI。
  *
  * @returns {Promise<{text: string|null, model: string, provider: string, attempts?: number, error?: string}>}
  */
 export async function chat({ messages, temperature = 0.8, maxTokens = 1200 }) {
-  const provider = env.llmProvider;
-  const models = modelsFor(provider);
+  const chain = resolveLlmChain();
   const errors = [];
 
-  for (const model of models) {
+  for (const { provider, model } of chain) {
     try {
       // 推理模型要把思考过程的 token 也算进去
       const budget = budgetFor(model, maxTokens);
       let payload;
-      if (provider === 'dashscope') {
+      if (provider === 'tongyi') {
         if (!env.dashscope.key) throw new ApiError(503, 'DASHSCOPE_API_KEY 未配置', 'E_NO_LLM_KEY');
-        payload = await chatCompletions({
+        payload = await callOpenAiCompatible({
           base: env.dashscope.base,
           key: env.dashscope.key,
           model,
@@ -124,9 +122,9 @@ export async function chat({ messages, temperature = 0.8, maxTokens = 1200 }) {
       } else if (provider === 'workers-ai') {
         if (!env.cf.accountId || !env.cf.token) throw new ApiError(503, 'CF_ACCOUNT_ID / CF_API_TOKEN 未配置', 'E_NO_LLM_KEY');
         payload = await chatWorkers({ model, messages, temperature, maxTokens: budget });
-      } else {
+      } else if (provider === 'openai') {
         if (!env.openai.key) throw new ApiError(503, 'OPENAI_KEY 未配置', 'E_NO_LLM_KEY');
-        payload = await chatCompletions({
+        payload = await callOpenAiCompatible({
           base: env.openai.base,
           key: env.openai.key,
           model,
@@ -134,6 +132,8 @@ export async function chat({ messages, temperature = 0.8, maxTokens = 1200 }) {
           temperature,
           maxTokens: budget,
         });
+      } else {
+        throw new ApiError(400, `未知模型提供方：${provider}`, 'E_BAD_LLM_PROVIDER');
       }
 
       const text = extractText(payload);
@@ -142,16 +142,16 @@ export async function chat({ messages, temperature = 0.8, maxTokens = 1200 }) {
           payload?.result?.choices?.[0]?.finish_reason || payload?.choices?.[0]?.finish_reason || null;
         const reasoningLen = (payload?.result?.choices?.[0]?.message?.reasoning || '').length;
         errors.push(
-          `${model}: 返回内容为空${finish === 'length' ? `（finish_reason=length，疑似思考过程占满 ${budget} tokens${reasoningLen ? `，reasoning 已 ${reasoningLen} 字` : ''}）` : ''}`,
+          `${provider}:${model}: 返回内容为空${finish === 'length' ? `（finish_reason=length，疑似思考过程占满 ${budget} tokens${reasoningLen ? `，reasoning 已 ${reasoningLen} 字` : ''}）` : ''}`,
         );
         continue;
       }
       return { text: String(text).trim(), model, provider, attempts: errors.length + 1 };
     } catch (err) {
-      console.error(`[llm] ${model} 失败: ${err.message}`);
-      errors.push(`${model}: ${err.message}`);
+      console.error(`[llm] ${provider}:${model} 失败: ${err.message}`);
+      errors.push(`${provider}:${model}: ${err.message}`);
     }
   }
 
-  return { text: null, model: models[0], provider, error: errors.join(' | ') };
+  return { text: null, model: chain[0]?.model || null, provider: chain[0]?.provider || null, error: errors.join(' | ') };
 }

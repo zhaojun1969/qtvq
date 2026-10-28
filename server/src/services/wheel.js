@@ -26,6 +26,7 @@ import { USER_STATUS } from '../constants.js';
 import { ApiError, badRequest } from '../lib/http.js';
 import { ageScore, cityScore, jaccard } from './dimensions.js';
 import { quote, spend, startOfDayCN } from './wallet.js';
+import { adultRange } from '../middleware/adult.js';
 
 /** 只取打分需要的字段；**绝不带 profileVector**（那是数 MB 的额外开销） */
 const CANDIDATE_PROJECTION = {
@@ -88,11 +89,21 @@ export async function loadCandidates(me, { limit = env.wheelSectors } = {}) {
     .toArray();
   const recentIds = recent.map((r) => r.targetUid);
 
+  /*
+   * 人群口径（再改造实施书 D9 / T0.2）：候选池默认 **18–30 岁**。
+   *
+   * 两条边界都要写清楚：
+   *   · 下界 18：未成年不得进入配对池 —— 这是合规底线，不是产品偏好；
+   *   · 上界 30：书里把目标人群定为 18–30，超出的不投放（如将来放宽，改 adultRange() 一处即可）。
+   * `birthYear` 缺失的用户会被排除：没有年龄就无法证明合规，宁可池子小一点。
+   */
+  const { min: minBirthYear, max: maxBirthYear } = adultRange();
   const filter = {
     _id: { $nin: [me._id, ...recentIds] },
     gender: targetGender,
     status: USER_STATUS.ACTIVE,
     nickname: { $nin: [null, ''] },
+    birthYear: { $gte: minBirthYear, $lte: maxBirthYear },
   };
 
   const pool = await db

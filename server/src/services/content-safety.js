@@ -15,124 +15,77 @@
  * 现状说明：小程序的 `msgSecCheck` 是给**小程序内**提交内容用的，用网站内容去校验属于灰色用法。
  * 正式上线建议接阿里云内容安全，本文件的 provider 结构就是为它预留的。
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { env } from '../config/env.js';
 import { ApiError } from '../lib/http.js';
+import { recordLedger } from './moderation-ledger.js';
+/*
+ * 本地词表比对（规范化 / 压扁 / 词表比对 / 正则比对 / 字段处置策略）已迁到
+ * `packages/safety`（跨端唯一来源，见该包头部说明）。服务端只保留**平台相关**部分：
+ * 外部持牌服务调用、微信接口、审核台账、配置与健康状态。
+ *
+ * `localCheck` 继续从这里再导出：路由与 `tools/scripts/check-content-safety.mjs` 的
+ * 既有 import 路径不必改动（也是刻意保持的兼容面）。
+ */
+import { localCheck, wordlistMeta } from '../../../packages/safety/src/index.js';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = path.resolve(HERE, '../../data/sensitive-words.json');
+export { localCheck };
 
-// 必须给 'pass' 一个数字：`x > undefined` 恒为 false，
-// 少了这一项会导致命中词表后 action 永远停留在 'pass'（内容查出来了却拦不住）。
-const SEVERITY_ORDER = { pass: 0, review: 1, block: 2 };
-
-let dict = null;
-
-function loadDict() {
-  if (dict) return dict;
-  try {
-    const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    const words = [];
-    for (const [category, conf] of Object.entries(raw.categories || {})) {
-      for (const w of conf.words || []) {
-        words.push({ word: w, category, severity: conf.severity || 'block', squashed: squash(w) });
-      }
-    }
-    const patterns = (raw.patterns || []).map((p) => ({
-      name: p.name,
-      category: p.category,
-      severity: p.severity || 'block',
-      regex: new RegExp(p.regex, 'gi'),
-    }));
-    dict = { words, patterns, version: raw.version || 0, note: raw.note || '' };
-    console.log(`[safety] 词表已加载：${words.length} 个词 / ${patterns.length} 条正则（v${dict.version}）`);
-  } catch (err) {
-    console.error('[safety] 词表加载失败，将只做正则与长度校验：', err.message);
-    dict = { words: [], patterns: [], version: 0 };
-  }
-  return dict;
-}
-
-/** 去掉零宽与全角差异 */
-function normalize(s) {
-  return String(s ?? '')
-    .replace(/[\u200b-\u200f\u2060\ufeff]/g, '')
-    .replace(/[\uff01-\uff5e]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    .toLowerCase();
-}
-
-/** 再压掉所有非字母数字汉字，用来对抗 "加 微 信" / "加*微*信" 这类绕过 */
-function squash(s) {
-  return normalize(s).replace(/[^0-9a-z\u4e00-\u9fa5]/g, '');
-}
-
-/** 不同字段的处置策略：资料里出现引流直接拒，提问里出现只标记待审 */
-const POLICY = {
-  profile: { 涉黄: 'block', 涉赌: 'block', 涉毒: 'block', 诈骗: 'block', 引流: 'block', 辱骂: 'review' },
-  question: { 涉黄: 'block', 涉赌: 'block', 涉毒: 'block', 诈骗: 'block', 引流: 'review', 辱骂: 'review' },
-  moderation: { 涉黄: 'review', 涉赌: 'review', 涉毒: 'review', 诈骗: 'review', 引流: 'review', 辱骂: 'review' },
-  default: { 涉黄: 'review', 涉赌: 'review', 涉毒: 'review', 诈骗: 'review', 引流: 'review', 辱骂: 'review' },
-};
-
-function policyFor(field) {
-  return POLICY[field] || POLICY.default;
-}
-
-/** 纯本地检查（同步、无网络） */
-export function localCheck(text, { field = 'default' } = {}) {
-  const d = loadDict();
-  const raw = String(text ?? '');
-  if (!raw.trim()) return { clean: true, hits: [], action: 'pass', provider: 'local' };
-
-  const norm = normalize(raw);
-  const sq = squash(raw);
-  const policy = policyFor(field);
-  const hits = [];
-
-  for (const item of d.words) {
-    const matched = norm.includes(item.word) || (item.squashed && sq.includes(item.squashed));
-    if (!matched) continue;
-    const severity = policy[item.category] || item.severity;
-    hits.push({ kind: 'word', word: item.word, category: item.category, severity });
-  }
-
-  for (const p of d.patterns) {
-    p.regex.lastIndex = 0;
-    const m = p.regex.exec(raw);
-    if (!m) continue;
-    hits.push({
-      kind: 'pattern',
-      word: p.name,
-      // 不回显命中内容，避免把用户手机号又写回日志/响应里
-      category: p.category,
-      severity: policy[p.category] || p.severity,
-    });
-  }
-
-  // 同一类别只留一条，避免响应里出现几十个重复项
-  const seen = new Set();
-  const unique = [];
-  for (const h of hits) {
-    const k = `${h.category}:${h.word}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    unique.push(h);
-  }
-
-  const action = unique.reduce(
-    (acc, h) => (SEVERITY_ORDER[h.severity] > SEVERITY_ORDER[acc] ? h.severity : acc),
-    'pass',
+/*
+ * 启动即打印词表装载情况。
+ * 运维必须能一眼确认"新词表真的生效了" —— 改完词表忘了重启，是最常见的"改了没生效"。
+ * 旧实现是惰性加载（第一次调用才读盘），一旦第一次调用发生在请求里，这行日志就淹没在流量里。
+ */
+{
+  const meta = wordlistMeta();
+  console.log(
+    `[safety] 词表已加载：${meta.wordCount} 个词 / ${meta.patternCount} 条正则（v${meta.version}，${meta.updatedAt}）`,
   );
+}
 
+// ---------------------------------------------------------------- 阿里云内容安全（持牌服务，负责本地词表覆盖不到的部分）
+//
+// 为什么必须接它：本地词表**刻意不含涉政类词**（见 packages/safety/src/words.js 的 note）——
+// 手工维护的政治敏感词表既不可能完整，也容易误伤；这类判断应由持牌内容安全服务做。
+// 业务方 2026-10-11 明确要求"阿里云 Green + 本地 OCR + 敏感词"的多重方案。
+
+/** 把 Green 的判定升级成统一结构（与本地命中同构，便于上层一视同仁地拦） */
+function fromGreen(result) {
+  const hits = (result.labels || []).map((label, i) => ({
+    kind: 'provider',
+    word: `阿里云内容安全(${label})`,
+    category: result.categories?.[i] || label,
+    severity: 'block',
+  }));
   return {
-    clean: unique.length === 0,
-    hits: unique.slice(0, 6),
-    categories: [...new Set(unique.map((h) => h.category))],
-    action,
-    provider: 'local',
+    clean: false,
+    hits,
+    categories: result.categories || [],
+    action: 'block',
+    provider: result.provider,
+    riskLevel: result.riskLevel,
   };
+}
+
+/**
+ * 外部权威检查（阿里云 Green）。
+ *
+ * ⚠️ 失败时的处理是**刻意的**，不是"忘了处理异常"：
+ *   · 未配置 → 跳过（provider 标为 local），并在 health/诊断里如实体现"没有外部审核"；
+ *   · 调用失败（限流/网络/服务未开通）→ 返回 `degraded: true`，
+ *     **不把它当成 pass，也不直接 block 用户**；上层据 `degraded` 决定转人工复核。
+ *   之所以不"失败即拦截"：阿里云抖动会让所有用户都存不了资料（可用性事故）；
+ *   之所以不"失败即放行且不留痕"：那等于审核形同虚设。所以是"放行 + 标记待复核"。
+ */
+async function greenCheck(text) {
+  const { greenTextCheck, isGreenConfigured } = await import('./aliyun-green.js');
+  if (!isGreenConfigured()) return { skipped: true, reason: 'not_configured' };
+  try {
+    const r = await greenTextCheck(text);
+    return { skipped: false, result: r };
+  } catch (err) {
+    console.error('[safety] 阿里云内容安全调用失败（标记为待复核）：', err.message);
+    return { skipped: false, error: err.message, degraded: true };
+  }
 }
 
 // ---------------------------------------------------------------- 微信安全接口（可选）
@@ -183,13 +136,26 @@ async function wechatCheck(text) {
 // ---------------------------------------------------------------- 对外统一入口
 
 /**
- * 综合检查：本地必过，外部服务能查到问题就升级为 block。
- * **外部服务异常不阻塞业务**：只在日志留痕，按本地结果放行 —— 否则微信侧抖动会直接让用户存不了资料。
+ * 综合检查：**本地必过 + 外部权威服务（阿里云 Green）能查到问题就拦**。
+ *
+ * 顺序与理由：
+ *   1. 本地词表先跑：零成本、最快，命中即拦（绝大多数违规在这里就被挡住，不必付费调外部）；
+ *   2. 本地干净时再问 Green：覆盖本地词表**做不到**的（涉政/暴恐/违禁品/色情变体/广告违规）；
+ *   3. Green **调用失败不阻塞业务**：返回 `degraded`，按本地结果放行并标记待复核 ——
+ *      否则阿里云抖动会直接让用户存不了资料（可用性事故）。
+ *      但**未配置**与**失败**必须区分：未配置 = 没有外部审核（如实报），失败 = 本次结论不完整。
  */
-export async function checkText(text, { field = 'default' } = {}) {
+async function checkTextCore(text, { field = 'default' } = {}) {
   const local = localCheck(text, { field });
   if (local.action === 'block') return local;
 
+  // ① 阿里云内容安全（持牌服务；未配置时 skipped）
+  const green = await greenCheck(text);
+  if (!green.skipped && green.result && !green.result.clean) {
+    return fromGreen(green.result);
+  }
+
+  // ② 微信小程序内容安全（仅当配置了且 safetyProvider 含 wechat）
   if (isWechatConfigured()) {
     try {
       const remote = await wechatCheck(text);
@@ -198,7 +164,42 @@ export async function checkText(text, { field = 'default' } = {}) {
       console.error('[safety] 微信内容检查失败（放行，按本地结果处理）:', err.message);
     }
   }
-  return local;
+
+  // 把"外部审核是否真的生效"如实带回给调用方（供运营台/健康检查展示）
+  return {
+    ...local,
+    external: {
+      green: green.skipped ? 'skipped' : green.degraded ? 'degraded' : green.error ? 'error' : 'ok',
+      ...(green.error ? { greenError: green.error } : {}),
+    },
+    // 外部服务异常时标记待复核：放行但留痕，运营可事后抽查
+    ...(green.degraded ? { needsReview: true, degradedReason: green.error } : {}),
+  };
+}
+
+/**
+ * 对外入口：跑完整审核链路 + 写审核台账（P0-4）。
+ *
+ * 台账是**旁路**：`recordLedger` 内部吞掉所有异常，台账问题绝不会挡住正常审核；
+ * 但它会 `await`，因为 Node 服务常驻，多一次 insert（1–3 ms）换取"每条审核都有记录"
+ * 比"偶尔丢一条记录"划算得多 —— 台账的价值就在于完整性。
+ *
+ * 早期版本只 `console.log`，导致既无法回答申诉复议，也拿不出监管要求的审核记录。
+ */
+export async function checkText(text, { field = 'default', uid = null, clientId = null } = {}) {
+  const result = await checkTextCore(text, { field });
+  await recordLedger({
+    field,
+    uid,
+    clientId,
+    text,
+    action: result.action,
+    provider: result.provider || (Array.isArray(result.categories) && result.categories.length ? 'remote' : 'local'),
+    categories: result.categories || [],
+    hits: result.hits || [],
+    degraded: !!(result.degraded || result.needsReview),
+  });
+  return result;
 }
 
 /** 直接抛错版本，便于路由里一行接入 */
@@ -214,12 +215,26 @@ export async function assertSafe(text, { field = 'default', label = '内容' } =
   return r;
 }
 
+/**
+ * 内容安全现状（供 `/v1/safety/status` 与运营台展示）。
+ *
+ * 这里的每一个字段都是**运维必须能一眼看到的真相**：
+ *   · 本地词表版本/词数 —— 确认新词表真的被加载了（改完词表没重启是最常见的"改了没生效"）；
+ *   · 外部服务是否配置 —— "本地兜底"与"有持牌服务在审"是两件事，不能含糊。
+ * 历史教训：这里曾写死 `aliyunGreenImplemented: false`，业务方看到后以为"还没做"，
+ * 而实际是当时确实没做。现在改成如实反映实现与配置状态。
+ */
 export function safetyStatus() {
+  const d = wordlistMeta();
   return {
     provider: env.safetyProvider,
-    localWords: loadDict().words.length,
-    localPatterns: loadDict().patterns.length,
+    wordVersion: d.version,
+    localWords: d.wordCount,
+    localPatterns: d.patternCount,
     wechatConfigured: isWechatConfigured(),
-    aliyunGreenImplemented: false,
+    // 阿里云内容安全：代码已实现（services/aliyun-green.js），是否生效取决于 key + 服务开通
+    aliyunGreenImplemented: true,
+    aliyunGreenConfigured: !!(process.env.GREEN_ACCESS_KEY_ID || process.env.ALIYUN_SMS_ACCESS_KEY_ID)
+      && !!(process.env.GREEN_ACCESS_KEY_SECRET || process.env.ALIYUN_SMS_ACCESS_KEY_SECRET),
   };
 }

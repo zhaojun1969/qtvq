@@ -1,0 +1,10 @@
+{
+  "name": "@qtvq/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q问 跨端共享的常量与纯规则（网页 / 小程序 / 服务端共用同一份，避免各写一份而漂移）",
+  "exports": {
+    ".": "./src/index.js"
+  }
+}

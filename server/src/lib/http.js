@@ -23,13 +23,23 @@ export function notFound(message = '资源不存在') {
 export function ok(res, data) {
   return res.json({ code: 0, data });
 }
-/** 统一错误出口：永远不要把内部堆栈返回给客户端 */
+/**
+ * 统一错误出口：永远不要把内部堆栈返回给客户端。
+ *
+ * 关于 5xx 的文案：默认一律显示"服务器错误"（避免泄漏内部细节）。
+ * 但有一类错误**必须让调用方看到原因** —— 例如"图片审核未配置 Green 密钥"（503）：
+ * 若也显示"服务器错误"，运维只看到一个 503，不知道该配什么，
+ * 而这恰恰是"配上才生效"的关键信息。
+ * 因此增加显式开关 `err.expose = true`：**只有明确标记的错误**才把 message 透出去，
+ * 默认行为完全不变。
+ */
 export function errorHandler(err, req, res, _next) {
   const status = err instanceof ApiError ? err.status : 500;
   if (status >= 500) console.error('[error]', req.method, req.originalUrl, err);
+  const showMessage = status < 500 || err?.expose === true;
   res.status(status).json({
     code: status,
-    error: status >= 500 ? '服务器错误' : err.message,
+    error: showMessage ? err.message : '服务器错误',
     ...(err instanceof ApiError && err.code ? { errorCode: err.code } : {}),
     // 内容安全命中类别等结构化补充信息，便于前端给出具体提示
     ...(err && err.safety ? { safety: err.safety } : {}),

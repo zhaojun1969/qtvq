@@ -108,36 +108,48 @@ export async function backupStaticApiSnapshots(env) {
     bank: '中国工商银行北京海淀西区马连洼支行',
   };
 
-  await ossPutJson(env, 'api/payment.json', { company: COMPANY, source: 'oss-backup' });
-  await ossPutJson(env, 'api/health.json', {
-    project: 'qtvq-api',
-    source: 'oss-backup',
-    aiBound: false,
-    kvBound: true,
-    hint: 'Cloudflare 不可用时的备份健康检查',
-  });
-  await ossPutJson(env, 'api/quota-default.json', {
-    unlimited: false,
-    used: 0,
-    remaining: DAILY_ASK_LIMIT,
-    limit: DAILY_ASK_LIMIT,
-    resetAt: null,
-    subscription: null,
-    paymentPending: null,
-    plans: PLANS,
-    storage: 'oss-backup',
-    source: 'oss-backup',
-  });
+  const results = await Promise.all([
+    ossPutJson(env, 'api/payment.json', { company: COMPANY, source: 'oss-backup' }),
+    ossPutJson(env, 'api/health.json', {
+      project: 'qtvq-api',
+      source: 'oss-backup',
+      aiBound: false,
+      kvBound: true,
+      hint: 'Cloudflare 不可用时的备份健康检查',
+    }),
+    ossPutJson(env, 'api/quota-default.json', {
+      unlimited: false,
+      used: 0,
+      remaining: DAILY_ASK_LIMIT,
+      limit: DAILY_ASK_LIMIT,
+      resetAt: null,
+      subscription: null,
+      paymentPending: null,
+      plans: PLANS,
+      storage: 'oss-backup',
+      source: 'oss-backup',
+    }),
+  ]);
 
-  return ossUpdateManifest(env, { staticApiBackedUpAt: new Date().toISOString() });
+  const written = results.filter(Boolean).length;
+  // 只有 3 个快照全部写成功才更新 manifest。
+  // 旧实现无条件返回 ossUpdateManifest 的结果：三个快照全失败、只要 manifest 写成功，
+  // 调用方仍会得到 ok:true —— 典型的"失败也报成功"。
+  const manifestOk = written === results.length ? await ossUpdateManifest(env, { staticApiBackedUpAt: new Date().toISOString() }) : false;
+  return { ok: written === results.length && manifestOk, written, total: results.length };
 }
 
 export async function backupAllKv(env) {
   const kv = env?.QTVQ_KV;
   if (!kv) return { ok: false, error: 'KV not bound' };
 
+  // OSS 没配就没得备份 —— 旧实现会继续跑完整个 KV 遍历、把每条都算进 count，
+  // 最后返回 ok:true 与一个漂亮的数字，而 OSS 上什么都没有。这里提前失败。
+  if (!ossConfig(env)) return { ok: false, error: 'OSS 未配置（OSS_ACCESS_KEY_ID / OSS_SECRET_ACCESS_KEY / OSS_BUCKET）' };
+
   let cursor;
   let count = 0;
+  let failed = 0;
 
   do {
     const page = await kv.list({ prefix: 'client:', cursor, limit: 100 });
@@ -146,14 +158,16 @@ export async function backupAllKv(env) {
       if (!raw) continue;
       const clientId = name.slice('client:'.length);
       try {
-        await ossPutJson(env, `kv/clients/${clientId}.json`, {
+        const written = await ossPutJson(env, `kv/clients/${clientId}.json`, {
           clientId,
           backedUpAt: new Date().toISOString(),
           record: JSON.parse(raw),
         });
-        count += 1;
+        // 只有真的写进 OSS 才算数（旧实现无条件 count += 1，把失败也统计成成功）
+        if (written) count += 1;
+        else failed += 1;
       } catch {
-        /* skip */
+        failed += 1;
       }
     }
     cursor = page.list_complete ? undefined : page.cursor;
@@ -168,16 +182,23 @@ export async function backupAllKv(env) {
       if (!raw) continue;
       try {
         const record = JSON.parse(raw);
-        await ossPutJson(env, `kv/contacts/${record.id || name}.json`, record);
-        count += 1;
+        const written = await ossPutJson(env, `kv/contacts/${record.id || name}.json`, record);
+        if (written) count += 1;
+        else failed += 1;
       } catch {
-        /* skip */
+        failed += 1;
       }
     }
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
 
-  await backupStaticApiSnapshots(env);
-  await ossUpdateManifest(env, { fullBackupAt: new Date().toISOString(), kvObjectCount: count });
-  return { ok: true, count };
+  const snapshots = await backupStaticApiSnapshots(env);
+  const ok = count > 0 && failed === 0 && snapshots.ok;
+  await ossUpdateManifest(env, {
+    fullBackupAt: new Date().toISOString(),
+    kvObjectCount: count,
+    kvObjectFailed: failed,
+    snapshotWritten: snapshots.written,
+  });
+  return { ok, count, failed, snapshots };
 }

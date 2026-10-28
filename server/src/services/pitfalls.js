@@ -36,6 +36,58 @@ export function invalidatePitfallCache() {
   cacheAt = 0;
 }
 
+/**
+ * 公开的避坑列表（按分类/关键词分页取）。
+ *
+ * 为什么需要它：本项目**原来没有 pitfalls 的 HTTP 接口** —— 网页端用的是本地静态数据
+ * （`js/data.js`），而 MongoDB 里的 `pitfalls` 集合只服务于报告生成的向量检索。
+ * 结果就是：鸿蒙/App 这类"没有本地静态数据"的端**拿不到避坑内容**，
+ * 只能各自抄一份（必然漂移）。2026-09-22 写鸿蒙工程时实际踩到：
+ * 我按记忆写了 `/v1/profile/pitfalls`，而那个路由根本不存在（会 404）。
+ *
+ * 投影只给"能公开"的字段，**不含 vector**（1024 维向量既没用又占带宽），
+ * 也不返回任何用户数据。
+ *
+ * @param {{category?: string, keyword?: string, page?: number, pageSize?: number}} opts
+ */
+export async function listPitfalls({ category = '', keyword = '', page = 1, pageSize = 20 } = {}) {
+  const docs = await loadAll();
+  const kw = String(keyword || '').trim().toLowerCase();
+
+  let items = docs;
+  if (category) {
+    const c = String(category).trim();
+    items = items.filter((d) => String(d.category || '') === c);
+  }
+  if (kw) {
+    items = items.filter((d) => {
+      const blob = `${d.category || ''} ${d.title || ''} ${d.lesson || ''} ${d.steps || ''}`.toLowerCase();
+      return blob.includes(kw);
+    });
+  }
+
+  const size = Math.min(50, Math.max(1, Number(pageSize) || 20));
+  const p = Math.max(1, Number(page) || 1);
+  const total = items.length;
+  const slice = items.slice((p - 1) * size, p * size);
+
+  return {
+    total,
+    page: p,
+    pageSize: size,
+    categories: [...new Set(docs.map((d) => String(d.category || '')).filter(Boolean))].sort(),
+    items: slice.map((d) => ({
+      id: d.id,
+      category: d.category || '',
+      title: d.title || '',
+      // 面向用户的正文：优先"教训"，其次"步骤"（两者都是给读者看的）
+      lesson: d.lesson || '',
+      steps: d.steps || '',
+      cost: d.cost || '',
+    })),
+  };
+}
+
 /** 关键词兜底：模型/向量不可用时仍能给出相关案例 */
 function keywordTop(text, docs, k) {
   const q = String(text || '').toLowerCase();

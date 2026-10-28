@@ -12,3 +12,20 @@ binding = "AI"
 binding = "QTVQ_KV"
 id = "4ec5d9cc8b3e4210bd29112073a6c502"
 preview_id = "2ccfcfce96164bb4b5805c51f0375f4e"
+
+# ---------------------------------------------------------------------------
+# 模型配置（非机密，写成明文变量；机密只有 DASHSCOPE_API_KEY，用 npm run llm:secrets 推）
+#
+# 参数命名与 FTVF 项目（D:\ftvf夫道）保持一致，两边只看同一套名字：
+#   LLM_CHAIN / DASHSCOPE_API_KEY / TONGYI_BASE_URL / TONGYI_CHARACTER_MODEL
+#
+# 关于"通义星辰"：tongyi.aliyun.com/character/ 是通义 App 的角色页，**没有公开 API**
+# （FTVF 实测该角色编号当 app_id 调用返回 403 App.AccessDenied）。
+# 等价可用形态是百炼的角色扮演模型 qwen-plus-character（人设写在 system 消息里），
+# 已用本项目现有 key 实测可用。想改成"百炼角色应用（人设在控制台配）"时，
+# 换用 LLM_CHAIN 里对应的应用调用形态即可，无需改代码。
+# ---------------------------------------------------------------------------
+[vars]
+LLM_CHAIN = "tongyi:qwen-plus-character,tongyi:qwen-long,workers-ai:@cf/zai-org/glm-4.7-flash,workers-ai:@cf/qwen/qwen3-30b-a3b-fp8,workers-ai:@cf/meta/llama-3.1-8b-instruct-fp8"
+TONGYI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+TONGYI_CHARACTER_MODEL = "qwen-plus-character"

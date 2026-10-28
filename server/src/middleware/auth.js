@@ -6,15 +6,17 @@
  * 现有系统的会话存在 Cloudflare KV，只有 Pages Functions 能验证。
  * 因此本中间件按顺序尝试：
  *   1) 本服务自签 JWT（JWT_SECRET 已配置时）—— 供日后独立注册使用
- *   2) 回源校验：带旧 token 调 LEGACY_API_BASE/api/auth/me，取回 user.id 作为 uid
- *   3) 开发模式 dev-login 签发的 token（ALLOW_DEV_LOGIN=1 时才可能被签出）
+ *   2) **本机会话**（Mongo `auth_sessions`）—— /api/auth 注册或登录签发的 token
+ *   3) 回源校验：带旧 token 调 LEGACY_API_BASE/api/auth/me，取回 user.id 作为 uid
  *
- * 这样老的注册/登录/微信扫码/支付/会员全部不用动，
- * 新功能却可以立刻用到同一批用户 —— 迁移可以分批、可回滚。
+ * ⚠️ 第 2 步不能省：`/api/auth` 早已迁到本机，注册/登录拿到的是**本机会话 token**，
+ * 它既不是 JWT 也不是 KV 里的老 token。少了这一步，新注册用户能登录、能看"我的"，
+ * 但一买报告/填资料就 401 —— 表现为"注册成功却什么都不能用"，且只有新用户会中招。
  */
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { unauthorized } from '../lib/http.js';
+import { resolveSession } from '../services/auth-store.js';
 
 const LEGACY_TIMEOUT_MS = 6000;
 
@@ -40,6 +42,24 @@ function verifyLocal(token) {
 export function signLocalToken(uid) {
   if (!env.jwtSecret) throw new Error('JWT_SECRET 未配置，无法签发本地 token');
   return jwt.sign({ uid }, env.jwtSecret, { expiresIn: env.jwtTtl });
+}
+
+/**
+ * 本机会话（/api/auth 注册、登录签发）
+ *
+ * 放在回源之前：这是一次本地 Mongo 查询（毫秒级），而回源要跨境 6 秒超时；
+ * 反过来的话每个新用户每次调接口都要先等一次超时。
+ */
+async function verifyLocalSession(token) {
+  try {
+    const found = await resolveSession(token);
+    const uid = found?.user?.userId;
+    if (!uid) return null;
+    return { uid, source: 'session', legacy: false, localUser: found.user };
+  } catch {
+    /* 查库失败就当没有，继续走回源（不能因为 Mongo 抖动把老用户也踢掉） */
+    return null;
+  }
 }
 
 async function verifyWithLegacy(token) {
@@ -80,6 +100,8 @@ export async function resolveIdentity(req) {
   if (!token) return null;
   const local = verifyLocal(token);
   if (local) return { ...local, membership: { active: false } };
+  const session = await verifyLocalSession(token);
+  if (session) return { ...session, membership: { active: false } };
   return verifyWithLegacy(token);
 }
 

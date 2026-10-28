@@ -1,0 +1,43 @@
+/**
+ * ⚠️ 本文件由 tools/scripts/write-app-releases.mjs 生成，请勿手改。
+ * 唯一数据源：app-releases.json（仓库根）
+ * 用途：Cloudflare Pages（`/api/app/bootstrap`）
+ * 生成时间：2026-10-11T07:43:34.272Z
+ *
+ * 各端发布记录 —— 版本/更新的唯一数据源。JSON 不能带注释，说明写在这里。
+ * 谁在用它：① Node 服务 GET /v1/app/bootstrap?channel=&version=（各端专用端口）；
+ * ② tools/scripts/write-release-manifest.mjs 生成静态站 release/version.json（H5/桌面兜底轮询）。
+ * 没有列出的端一律按出厂基线 1.0.0『已最新』处理，客户端不需要特殊分支。
+ * 字段：version 最新版本（1~4 段纯数字）/ minVersion 低于它才强制 / mode silent|prompt|force /
+ *       notes 更新说明 / downloadUrl 下载或安装地址（App、桌面端必填，小程序端由平台托管可留空）/ publishedAt。
+ * 改完必须重启服务（nginx 反代到 /v1/，无热重载）：sudo systemctl restart qtvq-report
+ */
+
+export const GENERATED_AT = "2026-10-11T07:43:34.272Z";
+
+export const APP_RELEASES_GENERATED = {
+  "windows": {
+    "version": "1.0.6",
+    "minVersion": "1.0.0",
+    "mode": "prompt",
+    "notes": "Windows 桌面客户端首个版本",
+    "downloadUrl": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
+    "publishedAt": "2026-09-21T07:42:00.000Z"
+  },
+  "wechat": {
+    "version": "1.0.6",
+    "minVersion": "1.0.0",
+    "mode": "prompt",
+    "notes": "",
+    "downloadUrl": null,
+    "publishedAt": "2026-09-18T00:00:00.000Z"
+  },
+  "web": {
+    "version": "1.0.6",
+    "minVersion": "1.0.0",
+    "mode": "silent",
+    "notes": "",
+    "downloadUrl": null,
+    "publishedAt": "2026-09-20T00:00:00.000Z"
+  }
+};

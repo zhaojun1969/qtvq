@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { env } from '../config/env.js';
 import { ok, wrap } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireAdult } from '../middleware/adult.js';
 import { loadCandidates, listSpins, quoteSpin, spin } from '../services/wheel.js';
 
 const router = Router();
@@ -50,6 +51,8 @@ router.get(
 router.post(
   '/spin',
   requireAuth,
+  // 付费入口必须过年龄门；免费转由 services/wheel.js 内部判定，不在此拦截
+  requireAdult,
   wrap(async (req, res) => {
     const idempotencyKey =
       String(req.body?.idempotencyKey || req.headers['x-idempotency-key'] || '').trim().slice(0, 80) || null;
