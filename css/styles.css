@@ -2150,6 +2150,23 @@ a.feature-card-link:focus-visible {
   margin-bottom: 1.75rem;
 }
 
+/*
+ * 协议里的"必须看见"段落（免责、危机转介、退款边界）。
+ *
+ * 为什么单独一个类而不是给 <p> 加内联：这类段落在 terms.html 里有三处，
+ * 内联会在每处各写一遍颜色与边框，日后改色一定漏改其中一处；
+ * 而且审核看的是"是否显著"，边框 + 背景比只加粗更容易被判为显著。
+ */
+.legal-warn {
+  color: var(--text);
+  line-height: 1.75;
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0 1.25rem;
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  border-left: 3px solid var(--accent, #ff6b81);
+  border-radius: 0.5rem;
+}
+
 .legal-section {
   scroll-margin-top: 5rem;
   margin-bottom: 1.75rem;

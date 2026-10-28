@@ -64,6 +64,10 @@
           <text>使用帮助</text>
           <text class="arrow">›</text>
         </view>
+        <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('terms')">
+          <text>用户协议</text>
+          <text class="arrow">›</text>
+        </view>
         <view class="menu-item" hover-class="menu-item-hover" @tap="openWeb('privacy')">
           <text>隐私说明</text>
           <text class="arrow">›</text>
@@ -299,10 +303,25 @@ function goAccount() {
   uni.navigateTo({ url: '/pages/account/account' });
 }
 
+/**
+ * 用 web-view 打开官网页面（帮助 / 用户协议 / 隐私说明 / 下载）。
+ *
+ * 标题必须走映射表：原来直接把 page 当标题传，导航栏显示的是 `terms`、`privacy`
+ * 这种英文文件名 —— 协议页顶着一个英文单词，审核侧看起来像"未汉化的脚手架页面"。
+ * 新增页面时在这里补一行，缺了会退回文件名（不白屏，仍可用）。
+ */
+const WEB_TITLES = {
+  help: '使用帮助',
+  terms: '用户协议',
+  privacy: '隐私说明',
+  download: '客户端下载',
+};
+
 function openWeb(page) {
   const url = `${WEB_BASE}/${page}.html`;
+  const title = WEB_TITLES[page] || page;
   uni.navigateTo({
-    url: `/pages/webview/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(page)}`,
+    url: `/pages/webview/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
   });
 }
 
