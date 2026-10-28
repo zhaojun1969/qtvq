@@ -1002,4 +1002,49 @@ router.get(
   }),
 );
 
+// ---------------------------------------------------------------- 测试数据清理
+/*
+ * 为什么后台需要这个入口（而不是"手动去 mongo 删"）：
+ *
+ * `tools/scripts/test-suite.mjs` 卖的是**真实链路**——真下单、真入账、真读运营台。
+ * 它每跑一次就在生产库留下几十条 `u_suite_probe` 的订单与账本（0.32 元的
+ * `admin_credit`），半年下来看板上会凭空多出几百单"付费"，把 90 天验收门的
+ * 转化率与 CAC 全部污染。第一版套件没有清理，已累积 32 单。
+ *
+ * 所以给出一个显式入口：按 uid 规则删探针数据，删之前**先整份备份**到
+ * `maintenance_backup`（财务记录不能只靠"我记得那是测试"），并写审计。
+ * 默认只跑 dryRun，要真删必须显式传 `{ "apply": true }`。
+ */
+const PROBE_UID_RE = /^u_(suite_probe|wxtest_.*|.*_probe|.*_probe_test|e2e_.*)$/;
+const PURGE_SKIP = new Set(['maintenance_backup', 'audit_logs']);
+
+router.post(
+  '/maintenance/purge-probe',
+  wrap(async (req, res) => {
+    const db = getDB();
+    const apply = req.body?.apply === true;
+    const names = (await db.listCollections({}, { nameOnly: true }).toArray())
+      .map((c) => c.name)
+      .filter((n) => !n.startsWith('system.') && !PURGE_SKIP.has(n));
+
+    const byCollection = {};
+    let backedUp = 0;
+    for (const name of names) {
+      const col = db.collection(name);
+      const filter = { $or: [{ uid: PROBE_UID_RE }, { userId: PROBE_UID_RE }, { ownerUid: PROBE_UID_RE }] };
+      const docs = await col.find(filter).project({ _id: 0 }).toArray();
+      if (!docs.length) continue;
+      byCollection[name] = docs.length;
+      if (!apply) continue;
+      await db.collection('maintenance_backup').insertMany(docs.map((doc) => ({ collection: name, doc, reason: 'probe-purge', at: new Date() })));
+      backedUp += docs.length;
+      await col.deleteMany(filter);
+    }
+
+    const total = Object.values(byCollection).reduce((a, b) => a + b, 0);
+    if (apply) await logAudit(req, 'maintenance.purge_probe', { byCollection, backedUp, total });
+    return ok(res, { applied: apply, byCollection, total, backedUp: apply ? backedUp : 0 });
+  }),
+);
+
 export default router;

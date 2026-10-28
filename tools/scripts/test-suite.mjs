@@ -258,6 +258,27 @@ const qr = await (await fetch(BASE + '/js/qr-render.js?suite=1')).text();
 check('二维码为本地实现（无境外服务调用）', qr.includes('toDataURL') && !/https:\/\/quickchart[^\s`'"]*/.test(qr.replace(/\/\*[\s\S]*?\*\//g, '')));
 
 /* ────────────────────────────── 汇总 ────────────────────────────── */
+/*
+ * 自清：套件跑的是真实链路（真下单、真入账），每跑一次就在生产库留下几十条
+ * `u_suite_probe` 的订单与账本。第一版没有清理，累积了 32 单 —— 这些"付费"
+ * 会直接进 90 天验收门的转化率与 CAC。这里在出结论前把探针数据删掉（服务端先备份）。
+ * 失败不影响结论：清理失败要在报告里看得见，但不该把功能通过判成不通过。
+ */
+try {
+  const purge = await (
+    await fetch(`${BASE}/v1/admin/maintenance/purge-probe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': nodeKey },
+      body: JSON.stringify({ apply: true }),
+    })
+  ).json();
+  const purged = purge.data?.total ?? 0;
+  console.log(`\n【清理】探针数据 ${purged} 条${purged ? `（已备份 ${purge.data?.backedUp ?? 0} 条）` : ''}`);
+  if (!purge.data) console.log('   ⚠️ 清理失败：' + JSON.stringify(purge).slice(0, 200));
+} catch (err) {
+  console.log('\n【清理】探针数据清理失败：' + err.message);
+}
+
 console.log('\n╔══════════════════════════════════════════════════════════╗');
 console.log('║  测试结论                                                ║');
 console.log('╚══════════════════════════════════════════════════════════╝');

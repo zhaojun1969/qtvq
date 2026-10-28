@@ -19,6 +19,7 @@
  * 这里保持「没配公钥 → 直接拒绝」，绝不静默跳过。
  */
 
+import fs from 'node:fs';
 import {
   decryptWechatResource,
   normalizePrivateKeyPem,
@@ -32,6 +33,30 @@ const URL_NATIVE = `${API}/v3/pay/transactions/native`;
 const URL_JSAPI = `${API}/v3/pay/transactions/jsapi`;
 const URL_APP = `${API}/v3/pay/transactions/app`;
 const URL_QUERY = `${API}/v3/pay/transactions/out-trade-no`;
+
+/**
+ * 密钥材料：先读环境变量，读不到再读 `*_FILE` 指向的文件。
+ *
+ * 为什么要支持文件：商户私钥是 1.7KB 的**多行 PEM**。塞进 `/opt/qtvq/server/.env`
+ * 有两个坑，都踩过或差点踩到：
+ *   1. systemd 的 `EnvironmentFile=` 与 dotenv 的解析规则不同（前者会处理反斜杠转义），
+ *      同一行在两个解析器里可能得到不同的值，而**systemd 注入的值优先**（dotenv 不覆盖已存在的）；
+ *   2. 值里有换行就得整行写成 `"…\n…"`，任何一次手改都可能截断私钥 ——
+ *      2026-09-16 那次"支付全 502"就是私钥被截断。
+ * 放文件（0600、root）没有这两个问题，也便于轮换：只改文件 + 重启，不动 .env。
+ */
+function envOrFile(valueKey, fileKey) {
+  const inline = String(process.env[valueKey] || '').trim();
+  if (inline) return inline;
+  const file = String(process.env[fileKey] || '').trim();
+  if (!file) return '';
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    console.error(`[wechat-pay] 读取密钥文件失败 ${file}：${err?.message || err}`);
+    return '';
+  }
+}
 
 /** 只支持 64 位以内的纯字母数字/下划线/斜杠；微信对 serial 有格式要求 */
 function normalizeMchSerial(serial) {
@@ -47,9 +72,9 @@ export function getWechatPayConfig() {
     mchId: String(process.env.WECHAT_MCH_ID || '').trim(),
     apiV3Key: String(process.env.WECHAT_API_V3_KEY || '').trim(),
     mchSerial: normalizeMchSerial(process.env.WECHAT_MCH_SERIAL),
-    privateKey: normalizePrivateKeyPem(process.env.WECHAT_MCH_PRIVATE_KEY || ''),
+    privateKey: normalizePrivateKeyPem(envOrFile('WECHAT_MCH_PRIVATE_KEY', 'WECHAT_MCH_PRIVATE_KEY_FILE')),
     notifyUrl: String(process.env.WECHAT_PAY_NOTIFY_URL || '').trim(),
-    platformPublicKey: String(process.env.WECHAT_PLATFORM_PUBLIC_KEY || '').trim(),
+    platformPublicKey: envOrFile('WECHAT_PLATFORM_PUBLIC_KEY', 'WECHAT_PLATFORM_PUBLIC_KEY_FILE').trim(),
     appPayId: String(process.env.WECHAT_APP_PAY_ID || '').trim(),
   };
 }
