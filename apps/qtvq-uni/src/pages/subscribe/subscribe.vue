@@ -18,16 +18,21 @@
     </view>
 
     <!--
-      iOS 端整块付费区替换成说明（E.44 · 微信审核硬项）。
+      付费区被平台规则禁用时，整块替换成说明（E.44 / E.46）。
 
-      不是"少一个按钮"：微信禁的是**在 iOS 小程序内完成虚拟商品交易**，
+      不是"少一个按钮"：禁的是**在小程序内完成虚拟商品交易**，
       把直接扣款换成静态收款码属于同一条违规的另一种写法。
-      所以这里 v-if 掉整块付费区，只留说明 + 去网页版的出口。
+      所以这里 v-if 掉整块付费区，只留说明。
+
+      两种禁用场景文案不同（见 utils/platform.js）：
+      · 微信 iOS —— 同一产品的另一端，给出"去浏览器/安卓"的出口
+      · 其它小程序端（快手/抖音/…）—— 整端不提供，且不给站外出口，
+        因为这些平台把"引导站外交易"本身当违规项
     -->
     <view v-if="payBlocked" class="card pay-blocked-card">
-      <text class="section-title">iOS 端暂不支持购买</text>
+      <text class="section-title">{{ payBlockScope }}暂不支持购买</text>
       <text class="hint pay-hint form-readable">{{ payBlockedTip }}</text>
-      <button class="btn-secondary btn-block btn-outline" @tap="copyBuyUrl">复制网页版地址</button>
+      <button v-if="canReferWeb" class="btn-secondary btn-block btn-outline" @tap="copyBuyUrl">复制网页版地址</button>
     </view>
 
     <view v-if="!payBlocked" class="card pay-online-card">
@@ -47,12 +52,6 @@
       <button class="btn-secondary btn-block btn-outline" :disabled="onlineLoading" @click="startQrPay">
         扫码支付（二维码，可选）
       </button>
-      <!-- #endif -->
-      <!-- #ifndef MP-WEIXIN || H5 || APP-PLUS -->
-      <text class="section-title">办理会员</text>
-      <text class="hint pay-hint form-readable">
-        界面与微信小程序一致：请使用下方静态收款码或对公汇款，提交核实后开通（月卡 ¥29 / 季卡 ¥79 / 年卡 ¥299）。
-      </text>
       <!-- #endif -->
     </view>
 
@@ -150,7 +149,7 @@ import { createWechatPayOrder, pollWechatPayOrder } from '../../api/payment-wech
 import { wechatLoginCode } from '../../api/auth.js';
 import { qrMatrix, drawQrToCanvas } from '../../utils/qr-render.js';
 // JSAPI（直接扣款）只有微信小程序可用 —— 用运行时判断给按钮做门控（见模板里的说明）
-import { supportsWechatJsapiPay, isVirtualPayBlocked, VIRTUAL_PAY_BLOCKED_TIP } from '../../utils/platform.js';
+import { supportsWechatJsapiPay, isVirtualPayBlocked, VIRTUAL_PAY_BLOCKED_TIP, payBlockScopeLabel, canReferWebPurchase } from '../../utils/platform.js';
 
 /**
  * 把订单码画到隐藏 canvas 并导出临时图片路径。
@@ -194,12 +193,15 @@ const payChannels = PAY_CHANNELS;
 /** 能否走"直接扣款"（JSAPI）：仅微信小程序**且非 iOS** 为 true；H5/App/其它小程序/iOS 为 false */
 const canJsapi = supportsWechatJsapiPay();
 /**
- * 是否整块禁用付费（当前只有 iOS 微信小程序）。
+ * 是否整块禁用付费（微信 iOS + 所有非微信小程序端，见 utils/platform.js）。
  * 与 canJsapi 分开：canJsapi 只关掉"直接扣款"这一个按钮，
  * payBlocked 关掉整个付费区（含静态码、对公汇款、提交核实表单）。
  */
 const payBlocked = isVirtualPayBlocked();
 const payBlockedTip = VIRTUAL_PAY_BLOCKED_TIP;
+/** 标题里的范围词（"iOS 端" / "小程序内"）与是否给站外出口，都随平台变 */
+const payBlockScope = payBlockScopeLabel();
+const canReferWeb = canReferWebPurchase();
 const selected = ref('month');
 const company = ref(null);
 const submitting = ref(false);
@@ -364,7 +366,7 @@ async function startWalletPay() {
   // 双保险：模板已 v-if 掉按钮，这里再挡一次 —— 以后谁把 v-if 改坏了，
   // 也不至于在 iOS 上真的调起支付（模板与逻辑各挡一次，是这类"合规开关"的固定写法）。
   if (payBlocked) {
-    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    uni.showModal({ title: payBlockScope + '暂不支持', content: payBlockedTip, showCancel: false });
     return;
   }
   onlineLoading.value = true;
@@ -386,7 +388,7 @@ async function startWalletPay() {
 
 async function startQrPay() {
   if (payBlocked) {
-    uni.showModal({ title: 'iOS 端暂不支持', content: payBlockedTip, showCancel: false });
+    uni.showModal({ title: payBlockScope + '暂不支持', content: payBlockedTip, showCancel: false });
     return;
   }
   onlineLoading.value = true;

@@ -71,7 +71,9 @@ import AdultGate from '../../components/AdultGate.vue';
 import { ensureAdult } from '../../utils/adult.js';
 import { track } from '../../utils/track.js';
 import { fetchWheelCandidates, fetchWheelQuote, spinWheel, fetchSpinHistory } from '../../api/wheel.js';
+import { needQuotaHint } from '../../utils/platform.js';
 
+const NEED_QUOTA_HINT = needQuotaHint();
 const canvasSize = 280;
 const loading = ref(true);
 const spinning = ref(false);
@@ -200,7 +202,7 @@ async function doSpin() {
       await ensureAdult(adultGate, '转盘抽奖');
       errorText.value = e?.message || '需要先完成成年用户确认';
     } else if (e?.code === 'E_INSUFFICIENT_BALANCE') {
-      errorText.value = `${e.message}。可以去「我的账户 → 缘值充值」用微信在线支付，付完自动到账。`;
+      errorText.value = `${e.message}${NEED_QUOTA_HINT}`;
     } else if (e?.code === 'E_NEED_PROFILE') {
       needsProfile.value = true;
       errorText.value = e.message || '请先完善资料';
