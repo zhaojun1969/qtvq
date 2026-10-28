@@ -96,8 +96,17 @@ $remoteCmd = "set -e; sudo mkdir -p '$Dest'; sudo tar -xzf /tmp/qtvq-static.tgz 
 $sshArgs += @($target, $remoteCmd)
 
 Write-Host ">> Extract on server at $Dest"
+# 远端 tar 解包也会对"时间戳在未来"（宿主机时钟快约 11 秒）打警告，
+# 警告随 ssh 的 stderr 回来。在 ErrorActionPreference=Stop 下，stderr 的第一行
+# 会被**直接当成终止错误抛出** —— 连 `2>$null` 都来不及生效（实测仍然 EXIT=1）。
+# 所以这里临时降到 Continue，判定只看退出码：远端命令末尾有 `test -f ... && echo OK`，
+# 真失败必然非 0。
+$eap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & ssh @sshArgs
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$sshCode = $LASTEXITCODE
+$ErrorActionPreference = $eap
+if ($sshCode -ne 0) { exit $sshCode }
 
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item $tar -Force -ErrorAction SilentlyContinue
