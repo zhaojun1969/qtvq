@@ -75,7 +75,10 @@
     "diag:green": "cd server && npm run diag:green",
     "check:content-safety": "node tools/scripts/check-content-safety.mjs",
     "check:review": "node tools/scripts/check-review-compliance.mjs",
-    "check:review-mutation": "node tools/scripts/test-review-compliance-mutation.mjs"
+    "check:review-mutation": "node tools/scripts/test-review-compliance-mutation.mjs",
+    "mp:upload": "node tools/scripts/upload-mp-weixin.mjs",
+    "check:data-export": "node tools/scripts/check-data-export.mjs",
+    "check:data-export-mutation": "node tools/scripts/test-data-export-mutation.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

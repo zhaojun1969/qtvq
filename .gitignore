@@ -48,3 +48,10 @@ __pycache__/
 # 发版靠 app-releases.json 指路，不该进 Git 历史。
 desktop/release/
 desktop/web/
+
+# 微信小程序上传私钥（miniprogram-ci 用）。
+# 微信后台生成时只显示一次，等同于"能发版"的凭据 —— 一旦进了 Git 历史，
+# 即使后来删除也仍能从历史里捞出来，必须从一开始就挡住。
+private.*.key
+private.key
+uploads.key
