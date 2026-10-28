@@ -354,7 +354,21 @@ async function onVoice() {
     await startRecording();
     voiceRecording.value = true;
     uni.showToast({ title: '正在录音，再点停止', icon: 'none' });
-  } catch {
+  } catch (e) {
+    /*
+     * 隐私授权被拒必须与"麦克风不可用"分开讲。
+     * 原来一并 toast「无法访问麦克风」，用户会去系统设置里找麦克风权限 ——
+     * 但真正要开的是小程序内的《隐私保护指引》，在系统里永远找不到，等于死路。
+     */
+    if (e?.code === 'PRIVACY_DENIED') {
+      uni.showModal({
+        title: '需要先同意隐私指引',
+        content:
+          '语音输入会用麦克风，需先同意《隐私保护指引》。请退出后重新进入小程序，在弹窗中点「允许」；若此前点过「拒绝」，可在右上角「···」→「设置」中重新开启。',
+        showCancel: false,
+      });
+      return;
+    }
     uni.showToast({ title: '无法访问麦克风', icon: 'none' });
   }
   // #endif
