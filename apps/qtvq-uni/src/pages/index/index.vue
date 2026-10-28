@@ -63,6 +63,25 @@
           <!-- 《人工智能生成合成内容标识办法》：AI 生成内容必须显式标识 -->
           <text v-if="m.role !== 'user'" class="msg-ai-label">本回答由 AI 生成</text>
           <text>{{ m.text }}</text>
+          <!--
+            危机求助卡片：只在服务端判定 level=urgent 时出现。
+            位置在回答**之后** —— 回答照常给，卡片是额外的一条出路，不是替代品。
+          -->
+          <view v-if="m.support" class="support-card">
+            <text class="support-title">{{ m.support.title }}</text>
+            <text v-if="m.support.body" class="support-body">{{ m.support.body }}</text>
+            <view
+              v-for="(r, ri) in m.support.resources"
+              :key="ri"
+              class="support-item"
+              hover-class="support-item-hover"
+              @tap="callSupport(r.phone)"
+            >
+              <text class="support-phone">{{ r.phone }}</text>
+              <text class="support-name">{{ r.name }}</text>
+              <text v-if="r.note" class="support-note">{{ r.note }}</text>
+            </view>
+          </view>
         </view>
         <view v-if="loading" class="msg msg-ai">思考中…</view>
         <view class="scroll-bottom-spacer" />
@@ -219,6 +238,29 @@ function goSubscribe() {
   uni.navigateTo({ url: '/pages/subscribe/subscribe' });
 }
 
+/**
+ * 拨打求助电话。
+ *
+ * 号码来自服务端（唯一来源在 packages/safety/src/crisis.js），前端不再硬编码，
+ * 也不做"这是不是心理热线"的判断 —— 服务端给什么就打什么。
+ * makePhoneCall 在小程序里会弹系统确认框，用户可取消，因此要把 fail 静默掉：
+ * 用户主动取消不是错误，不该弹红字。
+ */
+function callSupport(phone) {
+  const num = String(phone || '').replace(/[^0-9+]/g, '');
+  if (!num) return;
+  uni.makePhoneCall({
+    phoneNumber: num,
+    fail: () => {
+      /* 用户取消或环境不支持（如部分模拟器）：复制号码，至少让他能手动拨 */
+      uni.setClipboardData({
+        data: num,
+        success: () => uni.showToast({ title: '号码已复制', icon: 'none' }),
+      });
+    },
+  });
+}
+
 async function doAsk(followUp = false) {
   const text = followUp ? lastQuestion : question.value.trim();
   if (!text) {
@@ -234,7 +276,12 @@ async function doAsk(followUp = false) {
   scrollBottom();
   try {
     const data = await askChat(text, getClientId(), followUp);
-    messages.value.push({ role: 'ai', text: data.reply });
+    messages.value.push({
+      role: 'ai',
+      text: data.reply,
+      // 危机求助资源（服务端只在 level=urgent 时下发；没有就是 undefined，模板不渲染）
+      support: data.support || null,
+    });
     /*
      * 激活口径（`server/src/services/metrics.js::ACTIVATION_EVENTS`）：
      * 「完成资料」或「首问」。**只在真的拿到回答之后**报 ——
@@ -580,5 +627,66 @@ onMounted(async () => {
     color: #8b8aa0;
     margin-bottom: 10rpx;
     letter-spacing: 0.02em;
+  }
+
+  /*
+   * 危机求助卡片。与官网 `.support-card` 同一视觉语义（低饱和暖色边框，
+   * 不做成警报样式 —— 一个人说「我不想活了」时，红色感叹号式的界面像在审判他）。
+   * 小程序不能直接复用 CSS，所以数值在这里再写一遍；改配色时两处都要动，
+   * `check-safety-wiring.mjs` 会比对两边的号码来源而不比对样式，这是有意的取舍。
+   */
+  .support-card {
+    margin-top: 20rpx;
+    padding: 24rpx;
+    border: 1rpx solid rgba(255, 138, 138, 0.32);
+    border-radius: $radius-md;
+    background: rgba(255, 138, 138, 0.06);
+  }
+
+  .support-title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    line-height: 1.5;
+    color: $color-text-bright;
+    margin-bottom: 12rpx;
+  }
+
+  .support-body {
+    display: block;
+    font-size: 24rpx;
+    line-height: 1.75;
+    color: $color-text-soft;
+    margin-bottom: 16rpx;
+  }
+
+  .support-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding: 10rpx 0;
+  }
+
+  .support-item-hover {
+    opacity: 0.7;
+  }
+
+  .support-phone {
+    font-size: 34rpx;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: $color-success-bright;
+    margin-right: 12rpx;
+  }
+
+  .support-name {
+    font-size: 24rpx;
+    color: $color-text-muted;
+    margin-right: 12rpx;
+  }
+
+  .support-note {
+    font-size: 22rpx;
+    color: $color-text-faint;
   }
 </style>

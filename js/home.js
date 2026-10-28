@@ -277,6 +277,69 @@ function appendMessage(text, type, withAdopt = false) {
   container.scrollTop = container.scrollHeight;
 }
 
+/*
+ * 危机求助卡片。
+ *
+ * 触发条件只有服务端判定的 `support.level === 'urgent'`（明确的自伤/自杀表述）。
+ * 前端**不再做一遍判定** —— 号码与句式只在 packages/safety 一处，
+ * 前端复制一份必然会漂：某天加了新句式，网页更新了、小程序忘了。
+ *
+ * 全用 createElement + textContent，不拼 innerHTML：这段内容虽然来自服务端常量，
+ * 但它是"会显示电话号码"的位置，拼字符串出错就是把人引到错误号码。
+ */
+function appendSupportCard(support) {
+  const container = document.getElementById('chat-messages');
+  if (!container || !Array.isArray(support?.resources) || !support.resources.length) return;
+
+  const card = document.createElement('div');
+  card.className = 'support-card';
+  card.setAttribute('role', 'note');
+
+  const title = document.createElement('p');
+  title.className = 'support-title';
+  title.textContent = support.title || '如果你正在经历难以承受的时刻';
+  card.appendChild(title);
+
+  if (support.body) {
+    const body = document.createElement('p');
+    body.className = 'support-body';
+    body.textContent = support.body;
+    card.appendChild(body);
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'support-list';
+  for (const r of support.resources) {
+    if (!r?.phone) continue;
+    const li = document.createElement('li');
+    li.className = 'support-item';
+
+    const link = document.createElement('a');
+    link.className = 'support-phone';
+    // tel: 只保留数字与加号，避免把分隔符带进拨号
+    link.href = `tel:${String(r.phone).replace(/[^0-9+]/g, '')}`;
+    link.textContent = r.phone;
+    li.appendChild(link);
+
+    if (r.name) {
+      const name = document.createElement('span');
+      name.className = 'support-name';
+      name.textContent = r.name;
+      li.appendChild(name);
+    }
+    if (r.note) {
+      const note = document.createElement('span');
+      note.className = 'support-note';
+      note.textContent = r.note;
+      li.appendChild(note);
+    }
+    list.appendChild(li);
+  }
+  card.appendChild(list);
+  container.appendChild(card);
+  container.scrollTop = container.scrollHeight;
+}
+
 function showTyping() {
   const container = document.getElementById('chat-messages');
   const el = document.createElement('div');
@@ -333,6 +396,10 @@ async function handleAsk(followUp = false) {
     typing.remove();
     hideLoading();
     appendMessage(data.reply, 'ai', true);
+    // 求助资源紧跟在回答下方：回答照常给，卡片是额外的一条出路。
+    // 位置刻意在 appendMessage 之后 —— 若放在前面，用户会先看到"求助"再看到回答，
+    // 像是系统先给结论再补理由。
+    appendSupportCard(data.support);
     /*
      * 激活口径（`server/src/services/metrics.js::ACTIVATION_EVENTS`）：
      * 「完成资料」或「首问」。这里只报首问，且**只在真的拿到回答之后**报 ——

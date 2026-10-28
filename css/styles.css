@@ -2503,3 +2503,70 @@ a.feature-card-link:focus-visible {
   color: var(--text-muted);
   border: 1px solid rgba(108, 92, 231, 0.25);
 }
+/* ── 危机求助卡片（回答气泡下方） ─────────────────────────────────────────
+ * 只在服务端判定 level=urgent 时出现，因此不需要"折叠/可关闭"这类交互 ——
+ * 它本来就罕见。设计上刻意不做得像警报：一个人说「我不想活了」的时候，
+ * 红色感叹号式的界面会让他觉得被审判。低饱和暖色边框 + 可点击号码即可。
+ */
+.support-card {
+  margin: var(--space-md) 0 var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid rgba(255, 138, 138, 0.32);
+  border-radius: var(--radius-md);
+  background: rgba(255, 138, 138, 0.06);
+  max-width: 640px;
+}
+
+.support-title {
+  margin: 0 0 var(--space-sm);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+  line-height: 1.5;
+}
+
+.support-body {
+  margin: 0 0 var(--space-md);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-soft);
+}
+
+.support-list {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.support-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.support-phone {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--success-bright);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.support-phone:hover,
+.support-phone:focus-visible {
+  text-decoration: underline;
+}
+
+.support-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.support-note {
+  font-size: 12px;
+  color: var(--text-faint);
+}
