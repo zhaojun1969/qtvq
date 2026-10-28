@@ -55,7 +55,23 @@ export function isTongyiConfigured(env) {
 }
 
 /**
+ * 已完成算法备案、可向境内公众提供生成式 AI 服务的模型提供方白名单。
+ *
+ * 与 Node 侧 `server/src/config/env.js` 的 `DOMESTIC_LLM_PROVIDERS` **同一语义、同一份清单**：
+ * 进这个集合的标准是"备案合规"，不是"算力在哪个机房"。Workers AI（`@cf/...`）与
+ * openai 的服务主体与备案都不在境内清单里，所以不在此集合。
+ * 新增境内提供方前必须先确认其算法备案，再往这里加。
+ */
+const DOMESTIC_PROVIDERS = new Set(['tongyi']);
+
+/**
  * 解析链配置。
+ *
+ * 境内限定（E.44）：默认只保留 `DOMESTIC_PROVIDERS` 里的条目。
+ * 与 Node 侧同规则、同环境变量（`AI_DOMESTIC_ONLY`，默认开启，显式设 `false` 才关掉）。
+ * 过滤后为空时退回完整链并告警 —— 空链的表现是"每次都返回兜底话术"，
+ * 那比报错更难发现。
+ *
  * @returns {Array<{provider: string, model: string}>}
  */
 export function resolveChain(env) {
@@ -88,7 +104,19 @@ export function resolveChain(env) {
     if (!model) continue;
     parsed.push({ provider: provider === 'dashscope' ? 'tongyi' : provider, model });
   }
-  return parsed;
+
+  const domesticOnly = String(env?.AI_DOMESTIC_ONLY ?? '').trim().toLowerCase() !== 'false';
+  if (!domesticOnly) return parsed;
+
+  const domestic = parsed.filter((x) => DOMESTIC_PROVIDERS.has(x.provider));
+  if (!domestic.length) {
+    console.warn(
+      '[llm] AI_DOMESTIC_ONLY 已开启但链里没有境内提供方，本次退回完整链：' +
+        parsed.map((x) => `${x.provider}:${x.model}`).join(', '),
+    );
+    return parsed;
+  }
+  return domestic;
 }
 
 /** 供 /api/health 输出：链里各条是否"具备调用条件"，不泄漏密钥 */

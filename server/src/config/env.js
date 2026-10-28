@@ -53,6 +53,21 @@ export const env = {
   /** 角色模型名（与 FTVF 同名 TONGYI_CHARACTER_MODEL）：只覆盖链里第一个通义条目 */
   tongyiCharacterModel: process.env.TONGYI_CHARACTER_MODEL || '',
 
+  /*
+   * 是否只允许境内（已完成算法备案）的模型提供方（E.44，**默认开启**）。
+   *
+   * 为什么默认开启而不是默认关闭：本项目向境内公众提供生成式 AI 服务
+   * （AI 问答、配对报告文本），《生成式人工智能服务管理暂行办法》要求所用模型
+   * 已完成备案。链里的 Workers AI 条目是 `@cf/...` 的境外托管模型（llama / glm / qwen3 的
+   * Cloudflare 版本），作为**兜底**存在 —— 平时不触发，但一旦百炼配额耗尽就会被真正调用，
+   * 那一刻起就变成"向境内公众提供未备案模型生成的内容"。
+   *
+   * 默认关闭（保持现状）意味着这个风险要靠人记得去关；默认开启则把"忘记"变成
+   * "问答在百炼挂掉时直接失败"。后者是**可见的**故障，前者是不可见但违法的事实。
+   * 需要跨提供方兜底时显式设 `AI_DOMESTIC_ONLY=false`（例如离线压测、出海版本）。
+   */
+  aiDomesticOnly: String(process.env.AI_DOMESTIC_ONLY ?? '').trim().toLowerCase() !== 'false',
+
   dashscope: {
     key: process.env.DASHSCOPE_API_KEY || '',
     base: (process.env.DASHSCOPE_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, ''),
@@ -171,6 +186,18 @@ const DEFAULT_LLM_CHAIN = [
 ];
 
 /**
+ * 已完成算法备案、可向境内公众提供生成式 AI 服务的模型提供方白名单。
+ *
+ * 列在这里 = 允许作为 `AI_DOMESTIC_ONLY` 生效时的唯一候选。新增境内提供方
+ * （DeepSeek 官方 API、智谱、月之暗面等）时**必须先确认其算法备案**，
+ * 再往这里加 —— 这个集合的语义是"备案合规"，不是"服务器在哪"。
+ * Workers AI 的模型无论实际算力落在哪个机房，其服务主体与备案都不在境内清单里，
+ * 所以 `workers-ai` / `openai` 一律不在此集合。
+ */
+const DOMESTIC_LLM_PROVIDERS = new Set(['tongyi']);
+
+
+/**
  * 计算最终生效的模型链（有序、可跨提供方）。
  *
  * 规则：
@@ -222,7 +249,35 @@ export function resolveLlmChain() {
     if (!model) continue;
     parsed.push({ provider, model });
   }
-  return parsed;
+
+  /*
+   * 境内限定（E.44）：只保留已完成算法备案的境内提供方（当前即通义/百炼）。
+   *
+   * 与 Pages 侧 `functions/lib/llm-chain.js` 是同一份逻辑、同一个环境变量，
+   * 两侧必须同时改 —— `npm run check:llm` 会对比两边的链条构成。
+   *
+   * 过滤后**不允许为空**：链条空掉的表现是"每次问答都返回兜底话术"，
+   * 比直接报错更难发现（用户看到的是正常页面、只是答案很假）。
+   * 所以空链时退回完整链并大声告警，让问题在日志里可见，而不是静默降级。
+   */
+  let effective = parsed;
+  if (env.aiDomesticOnly) {
+    effective = parsed.filter((x) => DOMESTIC_LLM_PROVIDERS.has(x.provider));
+    if (!effective.length) {
+      console.warn(
+        '[llm] AI_DOMESTIC_ONLY 已开启，但链条里没有任何境内提供方（是否漏配 DASHSCOPE_API_KEY / LLM_CHAIN？）。' +
+          '为避免问答静默退化成兜底话术，本次退回完整链：' +
+          parsed.map((x) => `${x.provider}:${x.model}`).join(', '),
+      );
+      effective = parsed;
+    } else if (effective.length !== parsed.length) {
+      console.info(
+        `[llm] AI_DOMESTIC_ONLY 生效：已从链条中过滤 ${parsed.length - effective.length} 条非境内模型` +
+          `（保留 ${effective.map((x) => `${x.provider}:${x.model}`).join(', ')}）`,
+      );
+    }
+  }
+  return effective;
 }
 
 /** 供 /v1/health 输出：链里每一条是否具备调用条件（不泄漏密钥） */
