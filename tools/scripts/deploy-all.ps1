@@ -40,10 +40,15 @@ try {
 
 if (-not $SkipStatic) {
     Write-Host ""
-    Write-Host "=== 2/2 Sync static (qtvq.cn) ===" -ForegroundColor Cyan
-    & (Join-Path $PSScriptRoot "sync-static-from-windows.ps1")
+    Write-Host "=== 2/2 Publish static (qtvq.cn + static.qtvq.cn) ===" -ForegroundColor Cyan
+    # 2026-10-26 起静态站有**两份部署**：源站 nginx（HTML/CSS/JS）与
+    # Cloudflare Pages 的 qtvq-site（收款码图片，用来卸载源站 5 Mbps 带宽）。
+    # 只发一处 = 用户拿不到新收款码。publish-static.ps1 一条命令发两处，并在末尾
+    # 跑 check-static-domain-sync 比对两端图片的 SHA-256 —— 不一致就失败退出。
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "publish-static.ps1") -SkipBuild
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "静态未同步。可在服务器执行： cd /opt/qtvq && git pull && bash tools/scripts/sync-static.sh" -ForegroundColor Yellow
+        Write-Host "静态发布失败（源站或 Pages 未同步）。不要只发一处，重跑：" -ForegroundColor Yellow
+        Write-Host "  powershell -ExecutionPolicy Bypass -File tools/scripts/publish-static.ps1" -ForegroundColor Yellow
         exit 1
     }
 }

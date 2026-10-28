@@ -148,15 +148,26 @@
           ordersList.innerHTML = `<p>暂无在线订单（存储：${data.storage || '—'}）</p>`;
           return;
         }
-        ordersList.innerHTML = data.items.slice(0, 30).map((o) => `
+        ordersList.innerHTML = data.items.slice(0, 30).map((o) => {
+          // 把"这是哪个用户"所需的信息一并显示。
+          // 业务方 2026-09-18 反馈：列表里只有 clientId（q_xxx），没有手机号、下单时间、IP，
+          // 手工核查时根本认不出是哪个客户。现在下单即记录，这里直接展示。
+          const t = o.trace || {};
+          const when = o.createdAt ? new Date(o.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '—';
+          const paidWhen = o.paidAt ? new Date(o.paidAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '';
+          return `
           <div class="order-item">
             <div><strong>${o.clientId}</strong> · ${o.planLabel || o.plan} · ¥${o.amount}
               · <span class="${o.status === 'paid' ? 'status-paid' : 'status-pending'}">${o.status}</span></div>
+            <div>下单时间：${when}${paidWhen ? ` · 支付时间：${paidWhen}` : ''}</div>
+            <div>账号：${t.phone || '（未登录/未绑定手机）'}${t.uid ? ` · uid：${t.uid}` : ''}</div>
+            <div>IP：${t.ip || '—'}</div>
+            <div>浏览器：${(t.userAgent || '—').slice(0, 70)}</div>
             <div>订单：${o.orderId} · 渠道：${o.channel || '—'}</div>
             <div>微信单号：${o.platformTradeNo || '—'}</div>
             ${o.status === 'paid' ? '' : `<button type="button" class="btn btn-primary btn-order-verify" data-id="${o.clientId}" data-plan="${o.plan}">手动解禁</button>`}
-          </div>
-        `).join('');
+          </div>`;
+        }).join('');
         ordersList.querySelectorAll('.btn-order-verify').forEach((btn) => {
           btn.addEventListener('click', () => verify(btn.dataset.id, btn.dataset.plan));
         });

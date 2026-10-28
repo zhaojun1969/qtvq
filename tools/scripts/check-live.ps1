@@ -58,6 +58,29 @@ try {
         Write-Host '[static version] no version.js on CDN - run sync:static' -ForegroundColor Yellow
         $all = $false
     }
+
+    # 只比 BUILD_SHA 是不够的：工作区有未提交改动时，sha 两边一样但内容并不一样
+    # （本仓库常态就是几百个未提交文件），结果是"显示 MATCH、实际装的是另一份代码"。
+    # 所以再比 BUILD_SIG（css/js/根页面 的内容指纹），它只随内容变。
+    $localVerPath = Join-Path $Root 'js/version.js'
+    if (Test-Path $localVerPath) {
+        $localVer = Get-Content $localVerPath -Raw
+        $localSigMatch = [regex]::Match($localVer, "BUILD_SIG\s*=\s*'([a-z0-9]+)'")
+        $remoteSigMatch = [regex]::Match($ver.Content, "BUILD_SIG\s*=\s*'([a-z0-9]+)'")
+        if ($localSigMatch.Success -and $remoteSigMatch.Success) {
+            $localSig = $localSigMatch.Groups[1].Value
+            $remoteSig = $remoteSigMatch.Groups[1].Value
+            $sigSame = ($localSig -eq $remoteSig)
+            Write-Host ('[static content] remote=' + $remoteSig + ' local=' + $localSig + ' ' + $(if ($sigSame) { 'MATCH' } else { 'OUT OF DATE' })) -ForegroundColor $(if ($sigSame) { 'Green' } else { 'Yellow' })
+            if (-not $sigSame) { $all = $false }
+            if ($localVer -match 'BUILD_DIRTY\s*=\s*true') {
+                Write-Host '[static content] 本地工作区 DIRTY：BUILD_SHA 只代表最后一次提交，版本以 BUILD_SIG 为准' -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host '[static content] 缺少 BUILD_SIG（旧版 version.js 或线上未更新）' -ForegroundColor Yellow
+            $all = $false
+        }
+    }
 } catch {
     Write-Host '[static version] no version.js on CDN - run sync:static' -ForegroundColor Yellow
     $all = $false

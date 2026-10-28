@@ -38,7 +38,7 @@ EXCLUDE_FILES = {".env", "boot-out.txt", "boot-err.txt"}
 # 除了 server/，还要带上静态同步依赖的文件：
 # sync-static.sh 会调用同目录的 write-version.sh 与 copy-verify-root.sh，
 # 只给 server/ 的话服务器上拿到的仍是那份有泄露缺陷的旧脚本。
-EXTRA_PATHS = ["tools", ".assetsignore"]
+EXTRA_PATHS = ["tools", "packages", ".assetsignore"]
 
 # 文本类文件打进 Linux 包时必须转成 LF。
 # 本仓库 core.autocrlf=true，工作区的 .sh 可能是 CRLF —— 原样打包的话，
@@ -184,6 +184,38 @@ def build_bundle() -> Path:
     return out
 
 
+def source_fingerprint() -> tuple[str, int]:
+    """算出 `server/src` 的构建指纹（与服务端 build-info.js、tools/scripts/server-build-sha.mjs 同算法）。
+
+    为什么发布脚本也要算：交付命令里必须带上**预期值**，否则"部署完了吗"只能靠人眼比对；
+    而且两边独立实现算出同一个值，本身就是对算法正确性的交叉验证（2026-09-18 已用 JS 两处实现互验过）。
+
+    算法（三处必须完全一致）：server/src 下所有文件按相对 POSIX 路径排序，
+    对每个文件依次 update(路径) + "\\0" + update(内容) + "\\0"，最后取 sha256 前 16 位十六进制。
+    """
+    root = SERVER_DIR / "src"
+    rels: list[str] = []
+    for path in root.rglob("*"):
+        rel = path.relative_to(root)
+        if any(part in EXCLUDE_PARTS for part in rel.parts):
+            continue
+        if path.is_file():
+            rels.append(rel.as_posix())
+    rels.sort()
+    h = hashlib.sha256()
+    for rel in rels:
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        # 行尾归一化（CRLF→LF）后再哈希，与 add_tree() 打包时的转换保持一致。
+        # 线上 build-info.js 算的是**转换后**部署上去的字节；若这里对原始字节哈希，
+        # 工作区里带 CRLF 的文件（core.autocrlf=true 下很常见）会永远与线上不一致，
+        # 看起来就像"部署没生效" —— 2026-10-11 在 server/src/lib/aliyun-nls.js 上实测过。
+        # 三处实现必须一致：本函数、server/src/lib/build-info.js、tools/scripts/server-build-sha.mjs。
+        h.update((root / rel).read_bytes().replace(b"\r\n", b"\n"))
+        h.update(b"\0")
+    return h.hexdigest()[:16], len(rels)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expires", type=int, default=86400, help="签名有效期（秒），默认 24 小时")
@@ -229,18 +261,78 @@ def main() -> int:
     print(f">> 签名 URL 自检通过：{detail}")
 
     hours = args.expires / 3600
+    fp, fp_files = source_fingerprint()
+
+    # SSH 目标从 cf.env 读（与 sync-static-from-windows.ps1 同一套配置）
+    cf = load_env(ROOT / "cf.env")
+    ssh_host = os.environ.get("QTVQ_SSH_HOST") or cf.get("QTVQ_SSH_HOST") or "<你的服务器IP>"
+    ssh_user = os.environ.get("QTVQ_SSH_USER") or cf.get("QTVQ_SSH_USER") or "root"
+    ssh_prefix = f'ssh -i "$env:USERPROFILE\\.ssh\\id_ed25519" {ssh_user}@{ssh_host}'
+
     print()
     print("=" * 72)
     print(f"签名 URL（{hours:.1f} 小时内有效，请勿外传）：")
     print(url)
     print("=" * 72)
     print()
-    print("在服务器上执行（一次性，之后仓库目录里就有 server/ 了）：")
+    print(f"本次代码指纹（server/src，{fp_files} 个文件）：{fp}")
+    print("部署成功的判据 = 命令最后打印出的 sha 与它相同。")
     print()
-    print("  cd /opt/qtvq                 # 仓库克隆目录；若不存在改成你的实际路径")
-    print(f"  curl -fSL -o /tmp/{BUNDLE_NAME} '{url}'")
-    print(f"  tar -xzf /tmp/{BUNDLE_NAME} -C /opt/qtvq && rm -f /tmp/{BUNDLE_NAME}")
-    print("  ls server/src/app.js         # 确认落地")
+
+    # ------------------------------------------------------------------
+    # 为什么把命令写成"经 ssh 执行的一条"：
+    # 2026-09-20 连续两次部署没生效，两个原因各踩一次 ——
+    #   ① 多行命令被部分粘贴 → 只下载、没解压，而"下载成功"的输出让人以为做完了；
+    #   ② 命令被粘进 **Windows PowerShell**：PowerShell 5.1 不支持 `&&`，
+    #      整条直接解析失败（报"&&不是此版本中的有效语句分隔符"），一条都没执行。
+    # 所以现在默认输出**PowerShell 可直接粘贴**的形态：外层是 ssh，`&&` 在引号里由
+    # 服务器上的 bash 解析；并自带判据（从 127.0.0.1 读指纹，绕过 nginx 与缓存）。
+    # ------------------------------------------------------------------
+    print("-" * 72)
+    print("【方式一 · 推荐】在 Windows PowerShell 里直接粘这一条（经 SSH 到服务器执行）")
+    print("-" * 72)
+    print(
+        f"{ssh_prefix} "
+        f"\"cd /opt/qtvq && curl -fSL -o /tmp/{BUNDLE_NAME} '{url}' "
+        f"&& head -c 2 /tmp/{BUNDLE_NAME} | od -An -tx1 | grep -q 1f "
+        f"&& sudo tar -xzf /tmp/{BUNDLE_NAME} -C /opt/qtvq && rm -f /tmp/{BUNDLE_NAME} "
+        f"&& sudo systemctl restart qtvq-report && sleep 3 && systemctl is-active qtvq-report "
+        f"&& curl -sS http://127.0.0.1:3000/v1/health | grep -o .sha.:.[a-f0-9]*.\""
+    )
+    print()
+    print("  · PowerShell 里 `&&` 不是语句分隔符（5.1 会直接报错），所以整条交给服务器的 bash；")
+    print("    引号内的 && 不经过 PowerShell 解析。")
+    print("  · 若提示输入密码就输入服务器密码；若报 Permission denied，改用方式二。")
+    print()
+    print("-" * 72)
+    print("【方式二】先登录服务器（或已经在服务器上），再粘下面这一条")
+    print("-" * 72)
+    print(ssh_prefix)
+    print()
+    print(
+        f"cd /opt/qtvq && curl -fSL -o /tmp/{BUNDLE_NAME} '{url}' "
+        f"&& head -c 2 /tmp/{BUNDLE_NAME} | od -An -tx1 | grep -q '1f 8b' "
+        f"&& sudo tar -xzf /tmp/{BUNDLE_NAME} -C /opt/qtvq && rm -f /tmp/{BUNDLE_NAME} "
+        f"&& sudo systemctl restart qtvq-report && sleep 3 && systemctl is-active qtvq-report "
+        f"&& curl -sS 'http://127.0.0.1:3000/v1/health' | grep -o '\"sha\":\"[a-f0-9]*\"'"
+    )
+    print()
+    print(f"  期望最后一行是： \"sha\":\"{fp}\"（前面还有 active）")
+    print("  什么都不输出 → 下载或魔数校验失败（多半是链接过期）；")
+    print("  只到 active 没有 sha → 服务起来了但指纹读不到；")
+    print("  sha 是别的值 → 代码没被替换（解压没执行）。")
+    print()
+    print("-" * 72)
+    print("【诊断】若怀疑上次只跑了一半，先跑这条只读命令（不做任何改动）")
+    print("-" * 72)
+    print(
+        f"{ssh_prefix} "
+        f"\"ls -l --time-style=long-iso /opt/qtvq/server/src/config/env.js; "
+        f"systemctl show qtvq-report -p ActiveEnterTimestamp; "
+        f"curl -sS http://127.0.0.1:3000/v1/health | grep -o .sha.:.[a-f0-9]*.\""
+    )
+    print("  判读：env.js 修改时间是「刚才」但 sha 没变 → 只差重启；")
+    print("        修改时间还是旧的 → 解压没执行（命令没真正到服务器）。")
     print()
     return 0
 
