@@ -320,12 +320,16 @@ async function onSubmit(e) {
       // 付费报告会做"内容量守卫"：首稿偏短时带着上一稿扩写，最坏 3 次调用 ≈ 2 分钟。
       // 客户端等待上限必须大于这个值（服务端 pending 兜底是 5 分钟），否则用户会看到
       // "生成超时"，而报告其实几秒后就出来了 —— 这是最容易招来客诉的一种体验。
-      report = await api.waitForReport(report.reportId, {
-        timeoutMs: 180000,
-        onTick: (ms) => {
-          btn.innerHTML = `<span class="advice-spinner"></span>生成中… ${Math.round(ms / 1000)}s（内容较长，通常 30–120 秒）`;
-        },
-      });
+      // 优先走进度流（服务端 REPORT_STREAM=1 时可用）；任何异常都回退到轮询，
+      // 所以「流式」是纯增强：拿不到就用老路径，用户端行为不变。
+      const onGenTick = (ms) => {
+        btn.innerHTML = `<span class="advice-spinner"></span>生成中… ${Math.round(ms / 1000)}s（内容较长，通常 30–120 秒）`;
+      };
+      try {
+        report = await api.waitForReportStream(report.reportId, { onTick: onGenTick });
+      } catch (streamErr) {
+        report = await api.waitForReport(report.reportId, { timeoutMs: 180000, onTick: onGenTick });
+      }
     }
     state.report = report;
     state.shareToken = null;
