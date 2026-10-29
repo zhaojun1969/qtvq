@@ -260,7 +260,17 @@ async function onSubmit(e) {
   $('generate-hint').textContent = '';
   clearNotices();
   try {
-    let report = await api.generateReport({ sku, payload, idempotencyKey: api.newIdempotencyKey() });
+    /*
+     * 长度档：手机上一次性读 2000 字体验很差，默认要 short（≈800 字）；
+     * 网页默认 long（1000–2600 字）。客户明确要求短报告时也是 short。
+     */
+    const mobile = window.matchMedia('(max-width: 820px)').matches;
+    const lengthProfile = mobile ? 'short' : 'long';
+    let report = await api.generateReport({
+      sku,
+      payload: { ...(payload || {}), length: lengthProfile },
+      idempotencyKey: api.newIdempotencyKey(),
+    });
     if (report?.status === 'pending') {
       // 付费报告会做"内容量守卫"：首稿偏短时带着上一稿扩写，最坏 3 次调用 ≈ 2 分钟。
       // 客户端等待上限必须大于这个值（服务端 pending 兜底是 5 分钟），否则用户会看到
@@ -307,11 +317,26 @@ function renderReport(report) {
   $('result-title').textContent = `${KIND_TITLE[kind] || '报告'} · ${fmtDate(report?.createdAt)}`;
 
   const summary = sec.summary || String(report?.content || '').split('\n')[0] || '';
+  /*
+   * 阅读体验：长报告一次性铺开手机上要滑很久。
+   * 做法：顶部给三段锚点目录（点一下直接跳），每段用 <details> 折叠，
+   * 手机默认只展开第一段，桌面默认全展开 —— 不是把内容藏起来，是让读者自己决定先看哪段。
+   */
+  const desktop = window.matchMedia('(min-width: 821px)').matches;
+  const sections = [
+    { id: 'sec-risks', title: '风险点', html: sec.risks?.length ? listHtml(sec.risks, false) : '', count: sec.risks?.length || 0 },
+    { id: 'sec-cases', title: '对照案例', html: sec.cases?.length ? listHtml(sec.cases, false) : '', count: sec.cases?.length || 0 },
+    { id: 'sec-actions', title: '行动清单', html: sec.actions?.length ? listHtml(sec.actions, true) : '', count: sec.actions?.length || 0 },
+  ].filter((s) => s.count);
   const parts = [];
   if (summary) parts.push(`<div class="advice-summary">${escapeHtml(summary)}</div>`);
-  if (sec.risks?.length) parts.push(`<div class="advice-block"><h3>风险点</h3>${listHtml(sec.risks, false)}</div>`);
-  if (sec.cases?.length) parts.push(`<div class="advice-block"><h3>对照案例</h3>${listHtml(sec.cases, false)}</div>`);
-  if (sec.actions?.length) parts.push(`<div class="advice-block"><h3>行动清单</h3>${listHtml(sec.actions, true)}</div>`);
+  if (sections.length > 1) {
+    parts.push(`<nav class="advice-toc">${sections.map((s) => `<a href="#${s.id}">${s.title}<span>${s.count}</span></a>`).join('')}</nav>`);
+  }
+  sections.forEach((s, i) => {
+    const open = desktop || i === 0 ? ' open' : '';
+    parts.push(`<details class="advice-sec" id="${s.id}"${open}><summary>${s.title}<span>${s.count} 条</span></summary><div class="advice-sec-body">${s.html}</div></details>`);
+  });
   if (!parts.length) parts.push(`<div class="advice-block"><p>${escapeHtml(String(report?.content || '').slice(0, 1200))}</p></div>`);
 
   const meta = [];

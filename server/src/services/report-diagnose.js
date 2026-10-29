@@ -20,7 +20,7 @@
 import { chat } from './llm.js';
 import { formatPitfalls, publicHits, retrievePitfalls } from './pitfalls.js';
 import { completenessOf, runStructured, structuredFormatRule } from './report-kit.js';
-import { assessQuality, retryHint, QUALITY_SPECS } from './report-quality.js';
+import { assessQuality, retryHint, QUALITY_SPECS, normalizeLength, specFor } from './report-quality.js';
 import { assertSafe } from './content-safety.js';
 
 const SYSTEM = `你是「我心永恒-Q问」的避坑诊断师。你的风格是「避坑 + 直线解决」：
@@ -106,14 +106,15 @@ function toContent(sections) {
  * @param {{description: string, scenes?: string[], question?: string}} params
  * @returns {Promise<object>} 与 generateReport 同构的返回（分数类字段为 null）
  */
-export async function generateDiagnose({ description, scenes = [], question = '' }) {
+export async function generateDiagnose({ description, scenes = [], question = '', length = 'long' }) {
+  const lengthProfile = normalizeLength(length);
   const scenesNorm = normalizeScenes(scenes);
   const desc = String(description || '').trim().slice(0, 1200);
 
   const queryText = [desc, scenesNorm.map((s) => DIAGNOSE_SCENES[s]).join(' '), question].filter(Boolean).join(' ');
   const { hits, method } = await retrievePitfalls(queryText, 3);
 
-  const spec = QUALITY_SPECS.diagnose;
+  const spec = specFor('diagnose', lengthProfile);
   const basePrompt = buildPrompt({ description: desc, scenes: scenesNorm, question: String(question || '').slice(0, 300), hits });
 
   /*
@@ -133,7 +134,7 @@ export async function generateDiagnose({ description, scenes = [], question = ''
       maxTokens: spec.retryMaxTokens,
       temperature: 0.7,
     });
-    quality = assessQuality({ sku: 'diagnose', content: toContent(gen.sections || {}), sections: gen.sections });
+    quality = assessQuality({ sku: 'diagnose', content: toContent(gen.sections || {}), sections: gen.sections, spec });
     if (gen.fallback || quality.ok) break;
   }
 
@@ -158,6 +159,7 @@ export async function generateDiagnose({ description, scenes = [], question = ''
 
   return {
     kind: 'diagnose',
+    lengthProfile,
     quality: { ...quality, attempts },
     tier: 'advanced',
     // 诊断报告没有"契合度"这类分数：显式给 null，前端据此不渲染分数区

@@ -14,7 +14,7 @@
 import { chat } from './llm.js';
 import { formatPitfalls, publicHits, retrievePitfalls } from './pitfalls.js';
 import { completenessOf, runStructured, structuredFormatRule } from './report-kit.js';
-import { assessQuality, retryHint, QUALITY_SPECS } from './report-quality.js';
+import { assessQuality, retryHint, QUALITY_SPECS, normalizeLength, specFor } from './report-quality.js';
 import { assertSafe } from './content-safety.js';
 
 const SYSTEM = `你是「我心永恒-Q问」的关系复盘师。你的风格是「避坑 + 直线解决」：
@@ -78,7 +78,8 @@ function toContent(sections) {
 /**
  * @param {{selfView: string, partnerView?: string, history?: string, question?: string}} params
  */
-export async function generateRetro({ selfView, partnerView = '', history = '', question = '' }) {
+export async function generateRetro({ selfView, partnerView = '', history = '', question = '', length = 'long' }) {
+  const lengthProfile = normalizeLength(length);
   const mine = String(selfView || '').trim().slice(0, 1200);
   const theirs = String(partnerView || '').trim().slice(0, 1200);
   const hist = String(history || '').trim().slice(0, 2000);
@@ -86,7 +87,7 @@ export async function generateRetro({ selfView, partnerView = '', history = '', 
   const queryText = [mine, theirs, hist, question].filter(Boolean).join(' ').slice(0, 2000);
   const { hits, method } = await retrievePitfalls(queryText, 3);
 
-  const spec = QUALITY_SPECS.retro;
+  const spec = specFor('retro', lengthProfile);
   const basePrompt = buildPrompt({ selfView: mine, partnerView: theirs, history: hist, question: String(question || '').slice(0, 300), hits });
 
   // 与 diagnose 同一套多轮生成：不够就带着上一稿再要一次，最多 spec.maxAttempts 次；
@@ -103,7 +104,7 @@ export async function generateRetro({ selfView, partnerView = '', history = '', 
       maxTokens: spec.retryMaxTokens,
       temperature: 0.7,
     });
-    quality = assessQuality({ sku: 'retro', content: toContent(gen.sections || {}), sections: gen.sections });
+    quality = assessQuality({ sku: 'retro', content: toContent(gen.sections || {}), sections: gen.sections, spec });
     if (gen.fallback || quality.ok) break;
   }
 
@@ -127,6 +128,7 @@ export async function generateRetro({ selfView, partnerView = '', history = '', 
 
   return {
     kind: 'retro',
+    lengthProfile,
     quality: { ...quality, attempts },
     tier: 'deep',
     scores: null,

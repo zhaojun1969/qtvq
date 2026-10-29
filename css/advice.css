@@ -162,3 +162,32 @@
     transform: rotate(360deg);
   }
 }
+
+/* ── 报告阅读：目录锚点 + 分段折叠（2026-10-29） ─────────────────────
+ * 长报告（1000–2600 字）在手机上一次性铺开要滑很久。
+ * 折叠不是藏内容：桌面默认全展开，手机默认只展开第一段，读者自己点。
+ */
+.advice-toc { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 10px; }
+.advice-toc a {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  background: rgba(108, 92, 231, 0.12); color: inherit; text-decoration: none;
+  font-size: 14px; border: 1px solid rgba(108, 92, 231, 0.28);
+}
+.advice-toc a span { font-size: 12px; opacity: 0.6; }
+.advice-toc a:active { background: rgba(108, 92, 231, 0.22); }
+
+.advice-sec { margin-top: 12px; border-radius: 12px; background: rgba(255,255,255,0.03); }
+.advice-sec > summary {
+  cursor: pointer; list-style: none; padding: 12px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 15px;
+}
+.advice-sec > summary::-webkit-details-marker { display: none; }
+.advice-sec > summary::after { content: "▾"; opacity: 0.5; font-size: 12px; }
+.advice-sec[open] > summary::after { content: "▴"; }
+.advice-sec > summary span { font-weight: 400; font-size: 12px; opacity: 0.55; margin-left: auto; margin-right: 10px; }
+.advice-sec-body { padding: 0 14px 14px; }
+.advice-sec-body ul, .advice-sec-body ol { margin: 0; padding-left: 20px; }
+.advice-sec-body li { margin: 8px 0; line-height: 1.75; }
+.advice-sec { scroll-margin-top: 16px; }

@@ -147,7 +147,7 @@ export async function generateReport({ me, ta, tier, question, myQa = [], taQa =
       temperature: 0.85,
       maxTokens: attempts === 1 ? baseTokens : Math.round(baseTokens * 1.5),
     });
-    quality = assessQuality({ sku: 'pair', content: (result && result.text) || '', skipStructure: true });
+    quality = assessQuality({ sku: 'pair', content: (result && result.text) || '', skipStructure: true, spec });
     if (!result || !result.text || quality.ok) break;
   }
 

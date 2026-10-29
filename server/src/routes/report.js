@@ -15,7 +15,7 @@ import { requireAuth, resolveIdentity } from '../middleware/auth.js';
 import { requireAdult } from '../middleware/adult.js';
 import { generateReport, publicProfile } from '../services/report.js';
 import { generateDiagnose, normalizeScenes, DIAGNOSE_SCENES } from '../services/report-diagnose.js';
-import { assessQuality } from '../services/report-quality.js';
+import { assessQuality, normalizeLength } from '../services/report-quality.js';
 import { generateRetro } from '../services/report-retro.js';
 import { assertSafe } from '../services/content-safety.js';
 import { markText } from '../services/watermark.js';
@@ -86,6 +86,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
   if (kind === 'diagnose') {
     const g = await generateDiagnose({
       description: payload?.description,
+      length: payload?.length || 'long',
       scenes: payload?.scenes,
       question,
     });
@@ -112,6 +113,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
   if (kind === 'retro') {
     const g = await generateRetro({
       selfView: payload?.selfView,
+      length: payload?.length || 'long',
       partnerView: payload?.partnerView,
       history: payload?.history,
       question,
@@ -671,7 +673,8 @@ router.post(
 
     // 只有配对合盘需要对方；diagnose/retro 是"只关于我自己"的报告
     if (kind === 'pair' && !targetUid) throw badRequest('缺少 targetUid', 'E_NO_TARGET');
-    const payload = reportPayload(kind, req.body || {});
+    // 长度档：客户要求短报告时传 short（≈800 字，手机友好）；默认 long（1000–2600 字）
+  const payload = { ...reportPayload(kind, req.body || {}), length: normalizeLength(req.body?.length) };
 
     /*
      * 计费决策：只有总开关打开（且命中灰度名单）才真的要求付款。

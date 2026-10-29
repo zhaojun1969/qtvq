@@ -66,6 +66,43 @@ export const QUALITY_SPECS = {
   },
 };
 
+/**
+ * 长度档（2026-10-29 按客户要求新增）：同一份报告允许两种长度。
+ *
+ *   short  约 800 字：手机阅读、只想快速拿到结论的场景（默认给移动端）
+ *   long   1000–2600 字：网页阅读、愿意细看的场景
+ *
+ * 结构（条数、单条长度、7 天观察指标）两档相同，只调字数上下限与 token 预算 ——
+ * "短"要的是少写废话，不是少给结论。客户要求短报告时明确选 short，不要靠模型自己压。
+ */
+export const LENGTH_PROFILES = {
+  diagnose: {
+    short: { minChars: 600, maxChars: 1100, retryMaxTokens: 1800, maxAttempts: 2 },
+    long: { minChars: 1000, maxChars: 2600, retryMaxTokens: 2600, maxAttempts: 2 },
+  },
+  retro: {
+    short: { minChars: 800, maxChars: 1500, retryMaxTokens: 2200, maxAttempts: 2 },
+    long: { minChars: 1400, maxChars: 3200, retryMaxTokens: 3000, maxAttempts: 3 },
+  },
+  pair: {
+    short: { minChars: 600, maxChars: 1600, retryMaxTokens: 2000, maxAttempts: 2 },
+    long: { minChars: 900, maxChars: 4000, retryMaxTokens: 3000, maxAttempts: 2 },
+  },
+};
+
+/** 归一化长度档：未知值一律落到 long（宁可多给内容，也不要悄悄给短报告） */
+export function normalizeLength(length) {
+  const v = String(length || '').trim().toLowerCase();
+  return v === 'short' || v === 'long' ? v : 'long';
+}
+
+/** 取某一档的规格：基础结构 + 长度档覆盖 */
+export function specFor(sku, length = 'long') {
+  const base = QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
+  const profile = (LENGTH_PROFILES[sku] || LENGTH_PROFILES.diagnose)[normalizeLength(length)];
+  return { ...base, ...profile };
+}
+
 /** 正文字数：去掉空白与 markdown 记号后计数（表格/标题符号不该算进"内容量"） */
 export function countChars(content) {
   return String(content || '')
@@ -78,8 +115,9 @@ export function countChars(content) {
  * 评估一份报告是否达到付费商品的密度。
  * @returns {{sku:string, chars:number, spec:object, ok:boolean, low:boolean, reasons:string[]}}
  */
-export function assessQuality({ sku, content, sections, skipStructure = false }) {
-  const spec = QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
+export function assessQuality({ sku, content, sections, skipStructure = false, spec: specOverride = null }) {
+  // spec 可由调用方传入（长度档 short/long 会改字数上下限）；不传才回落到默认档
+  const spec = specOverride || QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
   const chars = countChars(content);
   const reasons = [];
 
@@ -123,7 +161,7 @@ export function assessQuality({ sku, content, sections, skipStructure = false })
  * 注意事项写进指令里：不许编造用户没说过的事实、不许重复观点凑字数。
  */
 export function retryHint(sku, assessed, draft = '') {
-  const spec = QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
+  const spec = assessed?.spec || QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
   const s = spec.structure;
   const bits = [
     `上一稿只有 ${assessed.chars} 字，对 ¥${sku === 'retro' ? '19.9' : '9.9'} 的付费报告来说信息量不够。请`,
