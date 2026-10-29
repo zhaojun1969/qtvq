@@ -1095,4 +1095,67 @@ router.post(
   }),
 );
 
+/*
+ * 报告进度流（SSE）—— 实施书 T2.1「走流式」的第一步。
+ *
+ * 现在生成是异步的（pending → ready），前端每 1.5 秒轮询一次：30–120 秒里几十个请求，
+ * 而且用户看不到进展。这条路由把「状态变化」推给前端，轮询只在开关关闭或流失败时兜底。
+ *
+ * 刻意**不**做 token 级流式：正文要过内容安全与三段解析，边生成边吐字会让
+ * 「安全拦截 / 兜底文案」这两条路径变得不可控（拦截了半篇已发出去）。先做进度流，
+ * token 流作为独立改造。
+ *
+ * 开关：REPORT_STREAM=1 才注册；关掉即回到轮询，零风险回退。
+ */
+if (String(process.env.REPORT_STREAM || '') === '1') {
+  router.get('/stream/:id', requireAuth, async (req, res) => {
+    let id;
+    try {
+      id = new ObjectId(String(req.params.id || ''));
+    } catch {
+      return res.status(400).json({ code: 'E_BAD_ID', error: '报告编号无效' });
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (event, data) => res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
+    const started = Date.now();
+    let closed = false;
+    req.on('close', () => { closed = true; });
+
+    const tick = async () => {
+      if (closed || res.writableEnded) return;
+      try {
+        const doc = await getDB().collection('reports').findOne({ _id: id });
+        if (!doc || String(doc.uid) !== String(req.uid)) {
+          send('error', { error: '报告不存在' });
+          return res.end();
+        }
+        send('status', {
+          status: doc.status,
+          elapsedMs: Date.now() - started,
+          completeness: doc.completeness ?? null,
+          chars: doc.quality?.chars ?? null,
+        });
+        if (doc.status === 'ready' || doc.status === 'failed') {
+          send('done', { status: doc.status });
+          return res.end();
+        }
+        if (Date.now() - started > 5 * 60 * 1000) {
+          send('timeout', { elapsedMs: Date.now() - started });
+          return res.end();
+        }
+      } catch (err) {
+        send('error', { error: String(err?.message || err) });
+        return res.end();
+      }
+      setTimeout(tick, 2000);
+    };
+    tick();
+  });
+}
+
 export default router;
