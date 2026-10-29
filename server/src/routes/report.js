@@ -1169,4 +1169,26 @@ router.get('/shortcode/:code', async (req, res) => {
   return res.json({ uid });
 });
 
+/*
+ * 当前用户的小程序码（分享卡用）：直接回图片字节，前端 canvas 当图片画。
+ * 路径必须是两段（/minicode/card.png）：单段会被上面的 /:id 通配吃掉（2026-10-29 实测 404）。
+ *
+ * scene 用 8 位短码（t=<CODE>&c=<ch>），不截断、可反查（E.68）。
+ * 拿不到（未配置/接口失败）返回 503，前端据此退回 H5 短链二维码 —— 分享卡不能因为
+ * 小程序码挂掉而整体出不了图。
+ */
+router.get('/minicode/card.png', requireAuth, async (req, res) => {
+  const channel = String(req.query.ch || '').slice(0, 8);
+  const { ensureShortCode } = await import('../services/shortcodes.js');
+  const { getMiniProgramCode } = await import('../services/wechat-pay.js');
+  const code = await ensureShortCode(req.uid);
+  const r = await getMiniProgramCode({ shortCode: code, channel });
+  if (!r.ok) return res.status(503).json({ code: 'E_MINICODE_UNAVAILABLE', error: r.error || '小程序码不可用' });
+  res.set({
+    'Content-Type': r.mime || 'image/jpeg',
+    'Cache-Control': 'private, max-age=3600',
+  });
+  return res.end(r.buffer);
+});
+
 export default router;
