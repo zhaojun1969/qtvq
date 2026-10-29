@@ -325,3 +325,56 @@ export function notifySuccess() {
 export function notifyFail(message = '失败') {
   return { code: 'FAIL', message };
 }
+
+/*
+ * 小程序码（实施书 T2.4）：scene 里带 inviter_uid 与 ch，扫码即可归因。
+ *
+ * 用接口 B（wxacode.getUnlimited）：不带 path 限制，scene 最多 32 个可见字符，
+ * 所以 scene 用紧凑格式 `i=<uid>&c=<ch>`；page 指向落地页（默认 pages/land/land）。
+ * access_token 复用 content-safety 那套思路：内存缓存 + 提前 2 分钟过期；
+ * 失败返回 null 由调用方退回 H5 短链二维码（分享卡不能因为小程序码挂掉而出不来图）。
+ */
+let miniToken = null;
+function env(name) { return String(process.env[name] || ''); }
+async function miniAccessToken() {
+  if (miniToken && miniToken.expiresAt > Date.now()) return miniToken.value;
+  const appid = env('WECHAT_MINI_APPID');
+  const secret = env('WECHAT_MINI_SECRET');
+  if (!appid || !secret) throw new Error('未配置 WECHAT_MINI_APPID/SECRET');
+  const url = `https://api.weixin.qq.com/cgi-bin/stable_token`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'client_credential', appid, secret, force_refresh: false }),
+  });
+  const json = await res.json();
+  if (!json?.access_token) throw new Error(json?.errmsg || '获取 access_token 失败');
+  miniToken = { value: json.access_token, expiresAt: Date.now() + (json.expires_in || 7200) * 1000 - 120000 };
+  return miniToken.value;
+}
+
+/** 生成小程序码 PNG（Buffer）；失败返回 null，调用方退回 H5 二维码 */
+export async function getMiniProgramCode({ inviterUid = '', channel = '', page = 'pages/land/land', width = 280 } = {}) {
+  try {
+    const token = await miniAccessToken();
+    const scene = [`i=${String(inviterUid).slice(0, 16)}`, channel ? `c=${String(channel).slice(0, 8)}` : '']
+      .filter(Boolean)
+      .join('&')
+      .slice(0, 32);
+    const res = await fetch(`https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene, page, width, check_path: false }),
+    });
+    const buf = Buffer.from(await res.arrayBuffer());
+    // 成功是 PNG（89504e47），失败是 JSON：{errcode, errmsg}
+    // 成功可能是 PNG(89504e47) 也可能是 JPEG(ffd8ff) —— 微信 getwxacodeunlimit 实际返回 JPEG，
+    // 只认 PNG 会把成功当失败（2026-10-29 实测踩到）。
+    const isPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50;
+    const isJpeg = buf.length > 8 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    if (isPng || isJpeg) return { ok: true, buffer: buf, scene, mime: isPng ? 'image/png' : 'image/jpeg' };
+    return { ok: false, error: buf.toString('utf8').slice(0, 200), scene };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+}
