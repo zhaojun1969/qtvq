@@ -53,6 +53,42 @@ const CASES = [
         question: '这段关系还值得挽救吗？',
       }),
   },
+  {
+    sku: 'pair',
+    label: 'pair（配对：节奏差异 + 沟通方式不同）',
+    /*
+     * 两份「真实感」资料：结构参照公开平台上常见的自我介绍（职业/兴趣/相处期待/雷区），
+     * 但**不含任何真实用户的可识别信息** —— 回归要的是资料信息量，不是谁的资料。
+     * 这样 pair 分支也能进质量回归，不必等库里有真实用户。
+     */
+    run: (m) =>
+      m.generateReport({
+        me: {
+          _id: 'u_fixture_me',
+          nickname: '小雨',
+          gender: 'female',
+          age: 27,
+          city: '杭州',
+          tags: ['稳定工作', '早睡', '喜欢做饭', '计划型'],
+          intro:
+            '在互联网公司做产品，作息规律，晚上十一点前睡。喜欢周末在家做饭、看展。希望关系能被明确，一年内想谈婚论嫁；不能接受长期已读不回，也不接受先处着看。',
+          qa: [],
+        },
+        ta: {
+          _id: 'u_fixture_ta',
+          nickname: '阿哲',
+          gender: 'male',
+          age: 29,
+          city: '杭州',
+          tags: ['创业', '夜猫', '自由', '不喜欢被定义'],
+          intro:
+            '自己做小生意，时间不固定，经常凌晨才睡。喜欢自驾、livehouse。觉得两个人舒服最重要，不想太早谈结婚，也不喜欢被查行程；遇到压力会先自己待着，不太会主动解释。',
+          qa: [],
+        },
+        tier: 'deep',
+        question: '我们适不适合长期走下去？',
+      }),
+  },
 ];
 
 async function main() {
@@ -60,9 +96,10 @@ async function main() {
   const diagnose = await import('../src/services/report-diagnose.js');
   const retro = await import('../src/services/report-retro.js');
   const quality = await import('../src/services/report-quality.js');
+  const pairSvc = await import('../src/services/report.js');
   await connectDB();
 
-  const mod = { generateDiagnose: diagnose.generateDiagnose, generateRetro: retro.generateRetro };
+  const mod = { generateDiagnose: diagnose.generateDiagnose, generateRetro: retro.generateRetro, generateReport: pairSvc.generateReport };
   const cases = QUICK ? CASES.filter((c) => c.sku === 'diagnose') : CASES;
 
   console.log('\n=== 报告内容质量验收（付费口径）===');
@@ -78,14 +115,22 @@ async function main() {
     check(`${c.sku} 不是兜底文案（fallback=false）`, g.fallback === false, `fallback=${g.fallback} llmError=${g.llmError || ''}`);
     check(`${c.sku} 字数落在 ${spec.minChars}–${spec.maxChars}`, chars >= spec.minChars && chars <= spec.maxChars, `实际 ${chars} 字`);
     check(`${c.sku} quality.ok = true`, q.ok === true, JSON.stringify(q.reasons || q));
-    check(
+    if (c.sku === 'pair') {
+      // 配对报告没有三段结构：只校验字数与质量标记（字数断言在上方统一做）
+    } else check(
       `${c.sku} 结构条数达标（风险 ≥${spec.structure.risks.min} / 案例 ≥${spec.structure.cases.min} / 行动 ≥${spec.structure.actions.min}）`,
       (g.sections?.risks || []).length >= spec.structure.risks.min &&
         (g.sections?.cases || []).length >= spec.structure.cases.min &&
         (g.sections?.actions || []).length >= spec.structure.actions.min
     );
-    check(`${c.sku} 完整度 = 1`, g.completeness === 1, String(g.completeness));
-    check(`${c.sku} 结论不是空话（≥10 字）`, quality.countChars(g.sections?.summary) >= 10, g.sections?.summary || '');
+    // 配对报告没有三段结构，completeness 恒为 null —— 只对 diagnose/retro 断言
+    if (c.sku !== 'pair') check(`${c.sku} 完整度 = 1`, g.completeness === 1, String(g.completeness));
+    if (c.sku !== 'pair') check(`${c.sku} 结论不是空话（≥10 字）`, quality.countChars(g.sections?.summary) >= 10, g.sections?.summary || '');
+    if (c.sku === 'diagnose') {
+      const risks = g.sections?.risks || [];
+      const withIndicator = risks.filter((r) => /(7|七)\s*天|一周|观察|留意|记录/.test(String(r))).length;
+      check(`diagnose 每条风险点带 7 天可观察指标（${withIndicator}/${risks.length}）`, risks.length > 0 && withIndicator >= Math.ceil(risks.length / 2));
+    }
     // 重试次数必须受规格约束（diagnose 2 次、retro 3 次），防止守卫在死循环里烧钱
     check(`${c.sku} 重试次数不超过规格上限`, (q.attempts ?? 1) <= (spec.maxAttempts || 2), `${q.attempts} > ${spec.maxAttempts || 2}`);
   }

@@ -163,6 +163,7 @@ export function structuredFormatRule(sku = 'diagnose') {
 第一行：一句话核心结论（不超过 ${s.summaryMax} 字，直接点出关系性质或最大风险）
 ## 风险点
 - ${s.risks.min}–${s.risks.max} 条，每条 ${s.risks.len[0]}–${s.risks.len[1]} 字。每条按「具体信号（时间/频率/原话/频率）→ 为什么危险 → 对上你描述里的哪一句」来写
+${s.riskIndicator ? '- 每条风险点的最后一句**必须**是「7 天内观察：…」，给出可计数的事实（回复间隔、主动联系次数、是否提到未来），不要写无法证伪的判断' : ''}
 ## 对照案例
 - ${s.cases.min}–${s.cases.max} 条，每条 ${s.cases.len[0]}–${s.cases.len[1]} 字，必须点名上面给出的真实案例，并写清「你们像在哪、它后来怎么样了」
 ## 行动清单

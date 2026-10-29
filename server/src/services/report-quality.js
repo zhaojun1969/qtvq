@@ -39,6 +39,8 @@ export const QUALITY_SPECS = {
       risks: { min: 3, max: 5, len: [60, 150] },
       cases: { min: 2, max: 3, len: [60, 140] },
       actions: { min: 5, max: 7, len: [25, 60] },
+      // 每条风险点必须带一个可证伪的「7 天可观察指标」（结构密度策略，2026-10-29）
+      riskIndicator: true,
     },
   },
   retro: {
@@ -96,6 +98,20 @@ export function assessQuality({ sku, content, sections, skipStructure = false })
     }
   }
 
+
+  /*
+   * 诊断报告额外要求：每条风险点带一个「7 天可观察指标」（可证伪，才能指导行动）。
+   * 判定用宽松正则：模型写法多样（7 天 / 一周 / 观察 / 留意 / 记录 都可能），
+   * 只要半数以上条目带了就算过 —— 严格按字面匹配会误杀正常表达。
+   */
+  if (sku === 'diagnose' && !skipStructure) {
+    const risks = Array.isArray(sections?.risks) ? sections.risks : [];
+    const withIndicator = risks.filter((r) => /(7|七)\s*天|一周|观察|留意|记录/.test(String(r))).length;
+    if (risks.length && withIndicator < Math.ceil(risks.length / 2)) {
+      reasons.push(`只有 ${withIndicator}/${risks.length} 条风险点带 7 天可观察指标`);
+    }
+  }
+
   return { sku, chars, spec, ok: reasons.length === 0, low: chars < spec.minChars, reasons };
 }
 
@@ -113,6 +129,7 @@ export function retryHint(sku, assessed, draft = '') {
     `上一稿只有 ${assessed.chars} 字，对 ¥${sku === 'retro' ? '19.9' : '9.9'} 的付费报告来说信息量不够。请`,
     `**在保持原有结论与结构不变的前提下扩写**到 ${spec.minChars}–${spec.maxChars} 字（含标点）：`,
     `· 每条风险点扩到 ${s.risks.len[0]}–${s.risks.len[1]} 字：补"具体信号（时间/频率/原话）→ 为什么危险 → 对上用户描述的哪一句"；`,
+    ...(s.riskIndicator ? ['· 每条风险点最后补一句「7 天内观察：…」，必须是可计数的事实（回复间隔、主动次数、是否提到未来等）；'] : []),
     `· 每条对照案例扩到 ${s.cases.len[0]}–${s.cases.len[1]} 字：补"像在哪、它后来怎么样了、和你的差别在哪"；`,
     `· 每条行动扩到 ${s.actions.len[0]}–${s.actions.len[1]} 字：补"具体话术/动作、时限、做到什么程度算完成"。`,
     '硬约束：只能基于【用户自述】与【真实避坑案例】扩写，不许编造用户没说过的事实，不许重复观点凑字数，不许加客套话。',
