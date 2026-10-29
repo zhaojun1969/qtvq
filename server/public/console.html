@@ -415,6 +415,10 @@ async function loadMetrics(){
       ['全部实收', yuan(s.revenueFen)],
       ['分享卡', s.shareGenerated ?? 0], ['分享回流', s.shareLanding ?? 0],
       ['落地曝光', s.landingViews ?? 0],
+      // 报告质量：付费报告会做内容量守卫，偏短的标 quality.low；这个数偏高说明 prompt 或模型在退化
+      ['报告低质', m.quality ? `${m.quality.low}/${m.quality.total}` : '—'],
+      ['诊断均字', m.quality?.bySku?.diagnose?.avgChars ? `${m.quality.bySku.diagnose.avgChars} 字` : '—'],
+      ['复盘均字', m.quality?.bySku?.retro?.avgChars ? `${m.quality.bySku.retro.avgChars} 字` : '—'],
     ].map(([k,v])=>`<div class="card"><div class="k">${esc(k)}</div><div class="v num">${esc(v)}</div></div>`).join('');
 
     if(!m.rows || !m.rows.length){ $('metrics-body').innerHTML='<tr><td colspan="12" class="empty">还没有聚合数据，点「重算最近 7 天」</td></tr>'; }

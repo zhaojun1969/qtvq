@@ -59,7 +59,7 @@ export const QUALITY_SPECS = {
     minChars: 600,
     maxChars: 4000,
     retryMaxTokens: 3000,
-    maxAttempts: 1,
+    maxAttempts: 2,
     structure: { summaryMax: 80, risks: { min: 2, max: 6, len: [40, 200] }, cases: { min: 0, max: 3, len: [40, 160] }, actions: { min: 2, max: 6, len: [30, 120] } },
   },
 };
@@ -76,7 +76,7 @@ export function countChars(content) {
  * 评估一份报告是否达到付费商品的密度。
  * @returns {{sku:string, chars:number, spec:object, ok:boolean, low:boolean, reasons:string[]}}
  */
-export function assessQuality({ sku, content, sections }) {
+export function assessQuality({ sku, content, sections, skipStructure = false }) {
   const spec = QUALITY_SPECS[sku] || QUALITY_SPECS.diagnose;
   const chars = countChars(content);
   const reasons = [];
@@ -84,7 +84,7 @@ export function assessQuality({ sku, content, sections }) {
   if (chars < spec.minChars) reasons.push(`正文仅 ${chars} 字，低于下限 ${spec.minChars}`);
   else if (chars > spec.maxChars) reasons.push(`正文 ${chars} 字，超过上限 ${spec.maxChars}`);
 
-  for (const key of ['risks', 'cases', 'actions']) {
+  for (const key of skipStructure ? [] : ['risks', 'cases', 'actions']) {
     const rule = spec.structure?.[key];
     if (!rule) continue;
     const arr = Array.isArray(sections?.[key]) ? sections[key] : [];
@@ -116,6 +116,23 @@ export function retryHint(sku, assessed, draft = '') {
     `· 每条对照案例扩到 ${s.cases.len[0]}–${s.cases.len[1]} 字：补"像在哪、它后来怎么样了、和你的差别在哪"；`,
     `· 每条行动扩到 ${s.actions.len[0]}–${s.actions.len[1]} 字：补"具体话术/动作、时限、做到什么程度算完成"。`,
     '硬约束：只能基于【用户自述】与【真实避坑案例】扩写，不许编造用户没说过的事实，不许重复观点凑字数，不许加客套话。',
+  ];
+  if (draft) bits.push('', '【上一稿（在此基础上扩写，不要推翻结论）】', String(draft).slice(0, 4000));
+  return bits.join(String.fromCharCode(10));
+}
+
+/**
+ * pair（配对报告）的扩写指令：它的正文不是三段式，所以不能用 retryHint
+ * （那条会要求"风险点 3–5 条"，对配对报告是错的指令）。
+ */
+export function pairRetryHint(assessed, draft = '') {
+  const spec = QUALITY_SPECS.pair;
+  const bits = [
+    `上一稿只有 ${assessed.chars} 字，对 ¥29.9 的配对报告来说太薄。请在保持结论与契合度判断不变的前提下，扩写到 ${spec.minChars}–${spec.maxChars} 字：`,
+    '· 补充两人的具体互动场景（谁先开口、争执怎么起、怎么收场），不要泛泛而谈；',
+    '· 每个契合度维度都要落到「你们的差别是什么、会在什么场景下出问题、怎么互补」；',
+    '· 结尾给 3–5 条双方都能执行的具体建议，带场景与时限。',
+    '硬约束：只基于双方资料与问答、以及给出的真实案例扩写，不许编造用户没提供的事实，不许重复观点凑字数。',
   ];
   if (draft) bits.push('', '【上一稿（在此基础上扩写，不要推翻结论）】', String(draft).slice(0, 4000));
   return bits.join(String.fromCharCode(10));

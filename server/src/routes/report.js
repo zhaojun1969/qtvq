@@ -146,7 +146,8 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
     taQa,
   });
   // 配对报告也纳入同一套质量度量（只记录、不重试：它的长度由档位 prompt 控制）
-  const pairQuality = assessQuality({ sku: 'pair', content: generated.content, sections: generated.sections || {} });
+  // generateReport 内部已做长度守卫（可能重试一次），优先用它的结果；没有才本地补算
+  const pairQuality = generated.quality || assessQuality({ sku: 'pair', content: generated.content, sections: generated.sections || {}, skipStructure: true });
   return {
     status: generated.fallback && !generated.content ? REPORT_STATUS.FAILED : REPORT_STATUS.READY,
     overall: generated.overall,
@@ -156,7 +157,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
     content: generated.content,
     sections: null,
     completeness: null,
-    quality: { ...pairQuality, attempts: 1 },
+    quality: pairQuality,
     pitfalls: generated.pitfalls,
     retrieval: generated.retrieval,
     scenes: null,

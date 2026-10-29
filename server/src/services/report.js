@@ -12,6 +12,7 @@ import { TIERS } from '../constants.js';
 import { chat } from './llm.js';
 import { scoreDimensions } from './dimensions.js';
 import { formatPitfalls, publicHits, retrievePitfalls } from './pitfalls.js';
+import { assessQuality, pairRetryHint, QUALITY_SPECS } from './report-quality.js';
 import { cosine } from './embed.js';
 
 const SYSTEM = `你是「我心永恒-Q问」的配对分析师。你的风格是「避坑 + 直线解决」：
@@ -124,17 +125,35 @@ export async function generateReport({ me, ta, tier, question, myQa = [], taQa =
 
   const { hits, method } = await retrievePitfalls(queryText, tier === 'basic' ? 2 : 3);
 
-  const result = await chat({
-    messages: [
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: buildUserPrompt({ me: enrichedMe, ta: enrichedTa, score, hits, question, tier }) },
-    ],
-    temperature: 0.85,
-    maxTokens: Math.max(400, Math.round(t.maxWords * 1.8)),
-  });
+  /*
+   * 内容量守卫（与 diagnose/retro 同一套口径，见 services/report-quality.js）：
+   * 配对报告的长度原本完全由档位 prompt 决定，实测 deep 档常写到 600–900 字就收尾。
+   * 这里给它一次「带着上一稿扩写」的机会；仍不够就交付并标 quality.low（不注水、不截断）。
+   */
+  const spec = QUALITY_SPECS.pair;
+  const basePrompt = buildUserPrompt({ me: enrichedMe, ta: enrichedTa, score, hits, question, tier });
+  const baseTokens = Math.max(400, Math.round(t.maxWords * 1.8));
+  let result = null;
+  let quality = null;
+  let attempts = 0;
+  while (attempts < (spec.maxAttempts || 2)) {
+    attempts += 1;
+    const prompt = attempts === 1 ? basePrompt : basePrompt + String.fromCharCode(10, 10) + pairRetryHint(quality, result && result.text ? result.text : '');
+    result = await chat({
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.85,
+      maxTokens: attempts === 1 ? baseTokens : Math.round(baseTokens * 1.5),
+    });
+    quality = assessQuality({ sku: 'pair', content: (result && result.text) || '', skipStructure: true });
+    if (!result || !result.text || quality.ok) break;
+  }
 
-  const fallback = !result.text;
+  const fallback = !result || !result.text;
   const content = fallback ? fallbackContent({ score, hits, tier }) : result.text;
+  if (fallback) quality = assessQuality({ sku: 'pair', content, skipStructure: true });
 
   return {
     tier,
@@ -143,6 +162,7 @@ export async function generateReport({ me, ta, tier, question, myQa = [], taQa =
     basis: score.basis,
     labels: score.labels,
     content,
+    quality: { ...quality, attempts },
     pitfalls: publicHits(hits),
     retrieval: method,
     fallback,

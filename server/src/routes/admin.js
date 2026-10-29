@@ -945,6 +945,34 @@ router.get(
   '/metrics',
   wrap(async (req, res) => {
     const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+    /*
+     * 报告质量分布：付费报告会做内容量守卫，偏短的会被标 quality.low。
+     * 看板上必须能看到这个数 —— 否则「用户付了钱但拿到提纲」只会在投诉里被发现。
+     */
+    const since = new Date(Date.now() - days * 86400000);
+    const qualityAgg = await getDB()
+      .collection('reports')
+      .aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { sku: '$sku', low: { $ifNull: ['$quality.low', false] } },
+            n: { $sum: 1 },
+            chars: { $avg: { $ifNull: ['$quality.chars', null] } },
+          },
+        },
+      ])
+      .toArray();
+    const quality = { total: 0, low: 0, bySku: {} };
+    for (const r of qualityAgg) {
+      const sku = r._id.sku || 'unknown';
+      const row = quality.bySku[sku] || (quality.bySku[sku] = { total: 0, low: 0, avgChars: 0 });
+      row.total += r.n;
+      if (r._id.low) row.low += r.n;
+      if (Number.isFinite(r.chars)) row.avgChars = Math.round(r.chars);
+      quality.total += r.n;
+      if (r._id.low) quality.low += r.n;
+    }
     const [rows, gate, costs] = await Promise.all([listDaily({ days }), acceptanceGate({ days: GATE.windowDays }), listChannelCosts({ days })]);
     return ok(res, {
       days,
@@ -952,6 +980,7 @@ router.get(
       summary: summarize(rows),
       gate,
       costs,
+      quality,
       gateConfig: GATE,
     });
   }),
