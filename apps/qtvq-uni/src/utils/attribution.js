@@ -66,20 +66,45 @@ function validUid(v) {
 /**
  * 启动时抓归因。优先 scene，其次 query（H5 编译版直接带 query）。
  * 只写非空值 —— 不能让一次"没有 scene 的冷启动"把已经存下来的渠道码抹掉。
+ *
+ * 第三种 scene 写法（2026-10-29 新增，T2.4 小程序码）：
+ *   · `t=<8位短码>&c=xhs01` —— 分享卡的小程序码带来短码，需要异步反查成 uid。
+ * 反查放到 `resolveSceneShortCode()`，由 onLaunch 不阻塞地调用（网络失败不影响启动）。
  */
 export function captureAttribution(options = {}) {
   const fromScene = parseScene(options.scene);
   const fromQuery = options.query && typeof options.query === 'object' ? options.query : {};
 
-  const ch = validChannel(fromScene.ch || fromScene.channel || fromQuery.ch || fromQuery.channel);
+  // 小程序码用 t=（短码）/ c=（渠道）两个短键；与 H5 的 ch=/inviter_uid= 并存
+  const ch = validChannel(fromScene.ch || fromScene.channel || fromScene.c || fromQuery.ch || fromQuery.channel || fromQuery.c);
   if (ch) safeSet(CH_KEY, ch);
 
-  const inviterUid = validUid(fromScene.inviter_uid || fromScene.inviterUid || fromQuery.inviter_uid || fromQuery.inviterUid);
-  if (inviterUid) {
+  const inviterUid2 = validUid(fromScene.inviter_uid || fromScene.inviterUid || fromQuery.inviter_uid || fromQuery.inviterUid);
+  if (inviterUid2) {
     // 邀请人链接有效期跟分享 token 对齐（30 天），过期就不再归因，避免把老链接算成新邀请
-    safeSet(INV_KEY, JSON.stringify({ uid: inviterUid, at: Date.now() }));
+    safeSet(INV_KEY, JSON.stringify({ uid: inviterUid2, at: Date.now() }));
   }
-  return { ch, inviterUid };
+  const shortCode = String(fromScene.t || fromQuery.t || '').trim().toUpperCase();
+  return { ch, inviterUid: inviterUid2, shortCode: /^[A-Z2-9]{8}$/.test(shortCode) ? shortCode : '' };
+}
+
+/**
+ * 把 scene 里的短码换成邀请人 uid（调 /v1/report/shortcode/:code）。
+ *
+ * 为什么要异步、且失败静默：冷启动不能被一次网络请求卡住；短码换不到就只当渠道归因，
+ * 不影响用户进入小程序。换到就按既有 30 天规则落 inviter。
+ */
+export async function resolveSceneShortCode(shortCode, { baseUrl = '' } = {}) {
+  const code = String(shortCode || '').trim().toUpperCase();
+  if (!/^[A-Z2-9]{8}$/.test(code)) return '';
+  try {
+    const res = await uni.request({ url: `${baseUrl}/v1/report/shortcode/${code}`, method: 'GET', timeout: 6000 });
+    const uid = validUid(res?.data?.uid);
+    if (uid) safeSet(INV_KEY, JSON.stringify({ uid, at: Date.now() }));
+    return uid;
+  } catch {
+    return '';
+  }
 }
 
 export function channel() {

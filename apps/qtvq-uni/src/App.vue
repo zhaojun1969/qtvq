@@ -2,7 +2,7 @@
 import { onLaunch, onHide } from '@dcloudio/uni-app';
 import { getClientId } from './utils/clientId.js';
 import { initAutoUpdate } from './utils/update.js';
-import { captureAttribution } from './utils/attribution.js';
+import { captureAttribution, resolveSceneShortCode } from './utils/attribution.js';
 import { flush as flushTrack } from './utils/track.js';
 
 onLaunch((options = {}) => {
@@ -13,7 +13,9 @@ onLaunch((options = {}) => {
    * 丢了就永远补不回来；但它出问题也绝不能挡住启动。
    */
   try {
-    captureAttribution(options);
+    const att = captureAttribution(options);
+    // 小程序码带来的 8 位短码：异步反查成邀请人；失败静默，不阻塞启动、不影响渠道归因
+    if (att && att.shortCode) resolveSceneShortCode(att.shortCode);
   } catch {
     /* 归因失败静默 */
   }
