@@ -1158,4 +1158,15 @@ if (String(process.env.REPORT_STREAM || '') === '1') {
   });
 }
 
+/*
+ * 短码反查（公开）：落地页/小程序把 t=<code> 换成 uid，再走既有归因。
+ * 只返回 uid，不返回任何资料字段 —— 短码不是凭证，不能换出用户信息。
+ */
+router.get('/shortcode/:code', async (req, res) => {
+  const { resolveShortCode } = await import('../services/shortcodes.js');
+  const uid = await resolveShortCode(req.params.code);
+  if (!uid) return res.status(404).json({ code: 'E_SHORTCODE_NOT_FOUND', error: '短码不存在' });
+  return res.json({ uid });
+});
+
 export default router;

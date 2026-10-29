@@ -354,13 +354,12 @@ async function miniAccessToken() {
 }
 
 /** 生成小程序码 PNG（Buffer）；失败返回 null，调用方退回 H5 二维码 */
-export async function getMiniProgramCode({ inviterUid = '', channel = '', page = 'pages/land/land', width = 280 } = {}) {
+export async function getMiniProgramCode({ shortCode = '', inviterUid = '', channel = '', page = 'pages/land/land', width = 280 } = {}) {
   try {
     const token = await miniAccessToken();
-    const scene = [`i=${String(inviterUid).slice(0, 16)}`, channel ? `c=${String(channel).slice(0, 8)}` : '']
-      .filter(Boolean)
-      .join('&')
-      .slice(0, 32);
+    // 优先用 8 字符短码（t=），退而用 uid（i=，会被截断、仅调试用）
+    const id = shortCode ? `t=${String(shortCode).toUpperCase().slice(0, 8)}` : `i=${String(inviterUid).slice(0, 16)}`;
+    const scene = [id, channel ? `c=${String(channel).slice(0, 8)}` : ''].filter(Boolean).join('&').slice(0, 32);
     const res = await fetch(`https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
