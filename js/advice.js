@@ -439,7 +439,21 @@ async function onSaveCard() {
   btn.innerHTML = '<span class="advice-spinner"></span>出图中…';
   try {
     const token = await ensureShareToken();
-    const res = await downloadAdviceCard(state.report, { shareUrl: shortUrl(token) });
+    /*
+     * 小程序码优先（E.68–E.70）：scene 带 8 位短码 + 渠道码，扫码直接进小程序并归因。
+     * 渠道码来自落地页 ?ch=（track.js 已持久化）；拿不到时 report-share 会自动退回
+     * H5 短链二维码，所以这里传了也不会让出图变脆弱。
+     */
+    let cardChannel = '';
+    try {
+      cardChannel = String(localStorage.getItem('qtvq_channel') || '').slice(0, 8);
+    } catch {
+      cardChannel = '';
+    }
+    const res = await downloadAdviceCard(state.report, {
+      shareUrl: shortUrl(token),
+      miniCodeUrl: '/v1/report/minicode/card.png' + (cardChannel ? '?ch=' + encodeURIComponent(cardChannel) : ''),
+    });
     if (res.ok) {
       try {
         track('share_card_save', { sku: state.sku, kind: state.report?.kind || state.sku });
