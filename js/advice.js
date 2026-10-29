@@ -262,9 +262,13 @@ async function onSubmit(e) {
   try {
     let report = await api.generateReport({ sku, payload, idempotencyKey: api.newIdempotencyKey() });
     if (report?.status === 'pending') {
+      // 付费报告会做"内容量守卫"：首稿偏短时带着上一稿扩写，最坏 3 次调用 ≈ 2 分钟。
+      // 客户端等待上限必须大于这个值（服务端 pending 兜底是 5 分钟），否则用户会看到
+      // "生成超时"，而报告其实几秒后就出来了 —— 这是最容易招来客诉的一种体验。
       report = await api.waitForReport(report.reportId, {
+        timeoutMs: 180000,
         onTick: (ms) => {
-          btn.innerHTML = `<span class="advice-spinner"></span>生成中… ${Math.round(ms / 1000)}s`;
+          btn.innerHTML = `<span class="advice-spinner"></span>生成中… ${Math.round(ms / 1000)}s（内容较长，通常 30–120 秒）`;
         },
       });
     }
