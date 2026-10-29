@@ -26,6 +26,7 @@ const COSTS = 'metrics_costs';
 const AUTH_USERS = 'auth_users';
 const ORDERS = 'orders';
 const EVENTS_PREFIX = 'events_';
+const REPORTS = 'reports';
 
 /** 激活口径：完成资料 或 首次提问（与实施书 §P4 一致，二者任一即算激活） */
 const ACTIVATION_EVENTS = ['profile_complete', 'question_asked'];
@@ -207,6 +208,34 @@ export async function aggregateDay(key) {
   const d1Eligible = registeredUids.length;
   const d1Retained = d1Knowable ? registeredUids.filter((u) => nextActive.has(u.userId)).length : null;
 
+  /*
+   * 报告质量：把「今天生成了几份、其中几份偏短、平均多少字」也存进 metrics_daily。
+   * 为什么要存日聚合而不是查询时算：趋势要能看 90 天，逐日扫 reports 太贵；
+   * 而且报告量会随流量增长，聚合是每天一次、查询永远是一张窄表。
+   */
+  const reportDocs = await db
+    .collection(REPORTS)
+    .find(tsRange('createdAt', start, end))
+    .project({ _id: 0, sku: 1, quality: 1 })
+    .toArray();
+  let reportsGenerated = 0;
+  let reportsLowQuality = 0;
+  let reportCharsSum = 0;
+  const reportCharsBySku = {};
+  const reportCountBySku = {};
+  for (const r of reportDocs) {
+    reportsGenerated += 1;
+    const q = r.quality || {};
+    if (q.low === true) reportsLowQuality += 1;
+    const chars = Number(q.chars);
+    if (Number.isFinite(chars)) {
+      reportCharsSum += chars;
+      const sku = String(r.sku || r.kind || 'unknown');
+      reportCharsBySku[sku] = (reportCharsBySku[sku] || 0) + chars;
+      reportCountBySku[sku] = (reportCountBySku[sku] || 0) + 1;
+    }
+  }
+
   const paidUids = new Set();
   let revenueFen = 0;
   let zeroPaid = 0;
@@ -232,6 +261,11 @@ export async function aggregateDay(key) {
     paidUsers: paidUids.size,
     zeroPaid,
     revenueFen,
+    reportsGenerated,
+    reportsLowQuality,
+    reportCharsSum,
+    reportCharsBySku,
+    reportCountBySku,
     shareGenerated: shareGenerated.size,
     shareLanding,
     landingViews,
@@ -284,6 +318,9 @@ export function summarize(rows) {
     reportRevenueFen: sum('reportRevenueFen'),
     zeroPaid: sum('zeroPaid'),
     revenueFen: sum('revenueFen'),
+    reportsGenerated: sum('reportsGenerated'),
+    reportsLowQuality: sum('reportsLowQuality'),
+    reportCharsSum: sum('reportCharsSum'),
     shareGenerated: sum('shareGenerated'),
     shareLanding: sum('shareLanding'),
     landingViews: sum('landingViews'),

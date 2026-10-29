@@ -980,6 +980,20 @@ router.get(
       summary: summarize(rows),
       gate,
       costs,
+      /*
+       * 质量趋势（按天）：low = 当天生成的报告里偏短（quality.low）的份数，
+       * avgChars = 当天生成报告的平均字数。单看窗口内总数发现不了「最近三天开始变短」这种退化。
+       */
+      qualityTrend: rows.map((r) => {
+        const n = Number(r.reportsGenerated || 0);
+        const chars = Number(r.reportCharsSum || 0);
+        return {
+          date: r.date,
+          generated: n,
+          low: Number(r.reportsLowQuality || 0),
+          avgChars: n ? Math.round(chars / n) : null,
+        };
+      }),
       quality,
       gateConfig: GATE,
     });

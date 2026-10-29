@@ -175,6 +175,18 @@ async function main() {
   check('分享回流 = 1', row.shareLanding, 1);
   check('落地页曝光 = 2', row.landingViews, 2);
 
+  // 报告质量日聚合：趋势的最小单位是「一天生成了几份 / 几份偏短 / 平均多少字」
+  await db.collection('reports').insertMany([
+    { uid: 'm1_u1', sku: 'diagnose', kind: 'diagnose', status: 'ready', quality: { chars: 800, low: false }, createdAt: new Date(D.getTime() + 3 * 3600 * 1000) },
+    { uid: 'm1_u2', sku: 'diagnose', kind: 'diagnose', status: 'ready', quality: { chars: 400, low: true }, createdAt: new Date(D.getTime() + 5 * 3600 * 1000) },
+    { uid: 'm1_u3', sku: 'retro', kind: 'retro', status: 'ready', quality: { chars: 1500, low: false }, createdAt: new Date(D.getTime() + 7 * 3600 * 1000) },
+  ]);
+  const rowQ = await metrics.aggregateDay(dayKey(D));
+  check('当天报告份数 = 3', rowQ.reportsGenerated, 3);
+  check('其中低质 = 1', rowQ.reportsLowQuality, 1);
+  check('当天字数合计 = 2700', rowQ.reportCharsSum, 2700);
+  check('按 sku 统计 diagnose = 2 份', rowQ.reportCountBySku.diagnose, 2);
+
   // 当天（D+1 还没过完）不能给出留存 0，必须是 null
   const todayRow = await metrics.aggregateDay(dayKey());
   check('当天 d1Retained 为 null（不是 0）', todayRow.d1Retained, null);

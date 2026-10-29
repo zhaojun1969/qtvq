@@ -166,6 +166,11 @@
       <p class="muted" style="margin:10px 0 0">口径：次日留存 = 当日注册且次日仍有任意行为的 uid ÷ 当日注册数（D+1 未过完显示"待定"，不记 0）；转化 = 窗口内激活且至少付过一单的 uid ÷ 激活 uid（不限商品）；「报告单 / 报告付费 / 报告实收」只算 sku ∈ diagnose/retro/pair 的订单，「全部实收」含会员与充值单；CAC 只用人工录入的成本，未录就不算。</p>
     </div>
     <div class="panel">
+      <h2>报告质量趋势（按天）</h2>
+      <div class="muted" style="margin:-6px 0 10px">柱子=当天生成份数，橙色=其中偏短（quality.low）；折线=当天平均字数。看"最近几天是否变短"比看窗口总数有用。</div>
+      <div id="quality-trend" style="min-height:120px"></div>
+    </div>
+    <div class="panel">
       <h2>逐日</h2>
       <table>
         <thead><tr><th>日期</th><th>新增</th><th>激活</th><th>次日留存</th><th>报告浏览</th><th>报告单</th><th>报告付费</th><th>0元单</th><th>报告实收</th><th>全部实收</th><th>分享</th><th>落地曝光</th></tr></thead>
@@ -389,6 +394,37 @@ async function loadAudit(){
 function pct(v){ return v==null ? '—' : (v*100).toFixed(1)+'%'; }
 function yuan(fen){ return fen==null ? '—' : '¥'+(Number(fen)/100).toFixed(2); }
 
+/*
+ * 质量趋势：不引图表库。柱子用 div 高度表达份数，折线用一个 100x30 的 SVG polyline。
+ * 为什么自己做：运营台没有构建步骤，多引一个 CDN 就是多一个境外依赖（本站的硬约束）。
+ */
+function renderQualityTrend(rows){
+  const box = $("quality-trend");
+  if(!rows.length){ box.innerHTML = '<div class="muted">还没有报告质量数据（生成报告后这里会出现按天趋势）</div>'; return; }
+  const maxN = Math.max(1, ...rows.map(r=>r.generated||0));
+  const chars = rows.map(r=>r.avgChars).filter(v=>Number.isFinite(v));
+  const maxC = Math.max(1, ...chars);
+  const W = 100, H = 30;
+  const pts = rows.map((r,i)=>{
+    const x = rows.length === 1 ? 0 : (i/(rows.length-1))*W;
+    const y = H - ((Number(r.avgChars)||0)/maxC)*H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const bars = rows.map(r=>{
+    const h = Math.round(((r.generated||0)/maxN)*48);
+    const lowH = r.generated ? Math.round(((r.low || 0)/(r.generated||1)) * h) : 0;
+    return `<div title="${esc(r.date)}：生成 ${r.generated||0} 份 · 低质 ${r.low||0} · 均字 ${r.avgChars==null?"—":r.avgChars}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">`
+      + `<div style="width:70%;height:${h}px;background:linear-gradient(180deg,var(--pink,#ff6b81),var(--purple,#6c5ce7));border-radius:3px 3px 0 0;position:relative">`
+      + (lowH ? `<div style="position:absolute;bottom:0;left:0;right:0;height:${lowH}px;background:#e8b84b;border-radius:0 0 0 0"></div>` : "")
+      + `</div>`
+      + `<div class="mono" style="font-size:10px;color:#888">${esc(String(r.date).slice(5))}</div>`
+      + `</div>`;
+  }).join("");
+  box.innerHTML = `<div style="display:flex;align-items:flex-end;gap:6px;height:70px">${bars}</div>`
+    + `<svg viewBox="0 0 100 30" preserveAspectRatio="none" style="width:100%;height:40px;margin-top:6px"><polyline fill="none" stroke="#6c5ce7" stroke-width="0.6" points="${pts}"></polyline></svg>`
+    + `<div class="muted" style="font-size:12px">折线=平均字数（峰值 ${maxC} 字）· 黄段=偏短份数占比</div>`;
+}
+
 async function loadMetrics(){
   try{
     const days = Number($('metrics-days').value) || 30;
@@ -437,6 +473,8 @@ async function loadMetrics(){
         <td class="num">${r.shareGenerated}</td>
         <td class="num">${r.landingViews||0}</td>
       </tr>`).join('');
+
+    renderQualityTrend(m.qualityTrend || []);
 
     const rows = ch.channels || [];
     if(!rows.length){ $('metrics-channels-body').innerHTML='<tr><td colspan="8" class="empty">暂无归因数据</td></tr>'; }
