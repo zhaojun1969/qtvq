@@ -37,7 +37,8 @@ async function main() {
     .limit(LIMIT)
     .toArray();
 
-  if (!rows.length) { console.log('没有待对账的退款'); process.exit(0); }
+  // 不能在这里 exit：异常退款告警在循环之后，早退会让告警永远不执行
+  if (!rows.length) console.log('没有待对账的退款');
   console.log(`待对账退款 ${rows.length} 笔${DRY ? '（dry-run）' : ''}`);
 
   let done = 0, failed = 0;
@@ -60,7 +61,34 @@ async function main() {
       console.log(`  ❌ ${o.orderId} 查询失败：${err?.message || err}`);
     }
   }
-  console.log(`\n终态 ${done} · 仍处理中 ${rows.length - done - failed} · 异常 ${failed}`);
+  if (rows.length) console.log(`\n终态 ${done} · 仍处理中 ${rows.length - done - failed} · 异常 ${failed}`);
+
+  /*
+   * 异常退款要有人知道（E.61 遗留项）：只靠运营台列表等于指望有人天天看。
+   * 走既有 SMTP 通道发通知；发信失败不影响对账结果，只打日志。
+   * 用 refundNotifiedAt 做去重，避免每 15 分钟重复骚扰。
+   */
+  const bad = await db
+    .collection('orders')
+    .find({ status: 'refunded', refundStatus: { $in: ['ABNORMAL', 'CLOSED'] }, refundNotifiedAt: { $exists: false } })
+    .limit(20)
+    .toArray();
+  if (bad.length && !DRY) {
+    const { isMailConfigured, sendNoticeMail } = await import('../src/services/mail.js');
+    if (isMailConfigured()) {
+      try {
+        await sendNoticeMail({
+          title: `退款异常 ${bad.length} 笔，需要人工处理`,
+          lines: bad.map((r) => `${r.orderId} · ${r.sku || ''} · 金额 ${(Number(r.amountFen) / 100).toFixed(2)} 元 · ${r.refundStatus} · 退款单号 ${r.wxRefundId || '无'}`),
+        });
+        await db.collection('orders').updateMany({ orderId: { $in: bad.map((r) => r.orderId) } }, { $set: { refundNotifiedAt: new Date() } });
+        console.log(`已邮件通知运营：${bad.length} 笔异常退款`);
+      } catch (err) {
+        console.error('[reconcile-refunds] 通知邮件失败：', err?.message || err);
+      }
+    }
+  }
+
   process.exit(failed ? 1 : 0);
 }
 
