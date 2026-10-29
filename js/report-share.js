@@ -313,7 +313,37 @@ export async function renderReportCard(report, opts = {}) {
   const qrPad = 19;
 
   let qrDrawn = false;
-  if (/^https?:\/\//.test(shareUrl)) {
+  /*
+   * 小程序码优先（2026-10-29 · T2.4）：scene 里带 8 位短码，扫码直接进小程序并归因。
+   * 地址由调用方通过 options.miniCodeUrl 传入（形如 /v1/report/minicode/card.png?ch=xhs01）。
+   * 拿不到（接口 503 / 图加载失败 / 未登录）一律退回 H5 短链二维码 —— 分享卡不能因为
+   * 小程序码挂掉而整体出不了图。
+   */
+  let drawnMiniCode = false;
+  // 注意：本文件有两套入口（renderAdviceCard 用 options、renderReportCard 用 opts），
+  // 直接写 typeof options?.x 在 opts 那条路上会抛 ReferenceError（2026-10-29 走查抓到 pair 画不出图）。
+  const miniCodeUrl = typeof options !== 'undefined' && typeof options?.miniCodeUrl === 'string' ? options.miniCodeUrl : '';
+  if (miniCodeUrl) {
+    const full = /^https?:\/\//.test(options.miniCodeUrl) ? options.miniCodeUrl : `${location.origin}${options.miniCodeUrl}`;
+    const miniImg = await loadImage(full, 6000);
+    if (miniImg) {
+      try {
+        ctx.fillStyle = '#ffffff';
+        roundRect(ctx, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 10);
+        ctx.fill();
+        // 小程序码是方图 JPEG，按短边居中绘制，避免被拉伸
+        const side = Math.min(miniImg.width, miniImg.height);
+        const sx = (miniImg.width - side) / 2;
+        const sy = (miniImg.height - side) / 2;
+        ctx.drawImage(miniImg, sx, sy, side, side, qrX, qrY, qrSize, qrSize);
+        qrDrawn = true;
+        drawnMiniCode = true;
+      } catch {
+        qrDrawn = false;
+      }
+    }
+  }
+  if (!qrDrawn && /^https?:\/\//.test(shareUrl)) {
     const qrImg = await loadImage(qrCodeImageUrl(shareUrl, 300), 6000);
     if (qrImg) {
       try {
