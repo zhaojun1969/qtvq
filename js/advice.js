@@ -316,6 +316,8 @@ function renderReport(report) {
 
   const meta = [];
   if (typeof report?.completeness === 'number') meta.push(`结构完整度 ${(report.completeness * 100).toFixed(0)}%`);
+  // 付费报告的可感知信息量：字数比"完整度 100%"更直观（完整度只说明三段都有内容）
+  if (Number(report?.quality?.chars) > 0) meta.push(`正文 ${report.quality.chars} 字`);
   if (report?.fallback) meta.push('本次由兜底文案生成');
   if (report?.retrieval) meta.push(`案例检索：${report.retrieval === 'vector' ? '语义向量' : '关键词'}`);
   if (report?.scenes?.length) meta.push(`场景：${report.scenes.join('、')}`);

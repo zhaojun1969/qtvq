@@ -169,6 +169,7 @@
       <h2>报告质量趋势（按天）</h2>
       <div class="muted" style="margin:-6px 0 10px">柱子=当天生成份数，橙色=其中偏短（quality.low）；折线=当天平均字数。看"最近几天是否变短"比看窗口总数有用。</div>
       <div id="quality-trend" style="min-height:120px"></div>
+      <div id="quality-issues" class="muted" style="margin-top:10px;font-size:13px"></div>
     </div>
     <div class="panel">
       <h2>逐日</h2>
@@ -398,7 +399,7 @@ function yuan(fen){ return fen==null ? '—' : '¥'+(Number(fen)/100).toFixed(2)
  * 质量趋势：不引图表库。柱子用 div 高度表达份数，折线用一个 100x30 的 SVG polyline。
  * 为什么自己做：运营台没有构建步骤，多引一个 CDN 就是多一个境外依赖（本站的硬约束）。
  */
-function renderQualityTrend(rows){
+function renderQualityTrend(rows, issues){
   const box = $("quality-trend");
   if(!rows.length){ box.innerHTML = '<div class="muted">还没有报告质量数据（生成报告后这里会出现按天趋势）</div>'; return; }
   const maxN = Math.max(1, ...rows.map(r=>r.generated||0));
@@ -423,6 +424,22 @@ function renderQualityTrend(rows){
   box.innerHTML = `<div style="display:flex;align-items:flex-end;gap:6px;height:70px">${bars}</div>`
     + `<svg viewBox="0 0 100 30" preserveAspectRatio="none" style="width:100%;height:40px;margin-top:6px"><polyline fill="none" stroke="#6c5ce7" stroke-width="0.6" points="${pts}"></polyline></svg>`
     + `<div class="muted" style="font-size:12px">折线=平均字数（峰值 ${maxC} 字）· 黄段=偏短份数占比</div>`;
+  renderQualityIssues(issues);
+}
+
+/*
+ * 最近偏短的报告：只显示"哪份、多少字、为什么"，不做操作按钮。
+ * 运营据此判断是模型退化还是输入太短，再决定要不要调 prompt。
+ */
+function renderQualityIssues(issues){
+  const box = $("quality-issues");
+  if(!box) return;
+  if(!issues.length){ box.innerHTML = ""; return; }
+  box.innerHTML = "最近偏短的报告：" + issues.map((it)=>{
+    const day = String(it.createdAt || "").slice(5, 10);
+    const why = (it.reasons || []).join("；") || "未记录原因";
+    return `<div style="margin-top:4px">· <span class="mono">${esc(day)}</span> ${esc(it.sku || "")} · ${it.chars ?? "?"} 字 —— ${esc(why)}</div>`;
+  }).join("");
 }
 
 async function loadMetrics(){
@@ -474,7 +491,7 @@ async function loadMetrics(){
         <td class="num">${r.landingViews||0}</td>
       </tr>`).join('');
 
-    renderQualityTrend(m.qualityTrend || []);
+    renderQualityTrend(m.qualityTrend || [], m.qualityIssues || []);
 
     const rows = ch.channels || [];
     if(!rows.length){ $('metrics-channels-body').innerHTML='<tr><td colspan="8" class="empty">暂无归因数据</td></tr>'; }

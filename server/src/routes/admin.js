@@ -984,6 +984,25 @@ router.get(
        * 质量趋势（按天）：low = 当天生成的报告里偏短（quality.low）的份数，
        * avgChars = 当天生成报告的平均字数。单看窗口内总数发现不了「最近三天开始变短」这种退化。
        */
+      /*
+       * 低质报告明细：只知道「今天偏短 2 份」没法行动，得能看到是哪两份、为什么偏短。
+       * 只取最近 5 份，避免列表无限长；完整原因在报告文档的 quality.reasons 里。
+       */
+      qualityIssues: (
+        await getDB()
+          .collection('reports')
+          .find({ createdAt: { $gte: new Date(Date.now() - days * 86400000) }, 'quality.low': true })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .project({ _id: 1, sku: 1, kind: 1, createdAt: 1, 'quality.chars': 1, 'quality.reasons': 1 })
+          .toArray()
+      ).map((r) => ({
+        reportId: String(r._id),
+        sku: r.sku || r.kind || null,
+        createdAt: r.createdAt,
+        chars: r.quality?.chars ?? null,
+        reasons: Array.isArray(r.quality?.reasons) ? r.quality.reasons.slice(0, 3) : [],
+      })),
       qualityTrend: rows.map((r) => {
         const n = Number(r.reportsGenerated || 0);
         const chars = Number(r.reportCharsSum || 0);
