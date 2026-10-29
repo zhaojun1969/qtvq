@@ -1,0 +1,16 @@
+[Unit]
+Description=Reconcile QTVQ wechat refunds (PROCESSING → SUCCESS/CLOSED)
+Documentation=file:///opt/qtvq/server/scripts/reconcile-refunds.mjs
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qtvq/server
+# 退款是异步的：受理后通常几分钟到一天到账，15 分钟查一次足够
+ExecStart=/usr/bin/node --env-file=.env scripts/reconcile-refunds.mjs --limit=50
+User=root
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=120
+Nice=10

@@ -190,19 +190,52 @@ export async function cancelOrder(orderId, reason = 'abandoned') {
 }
 
 /** 退款：consumed/paid → refunded，并把钱退回钱包（幂等键 refund:<orderId>） */
+/**
+ * 退款（2026-10-29 修正）：**先调微信退款，成功后才改本地状态**。
+ *
+ * 原来的实现只把本地订单改成 refunded 就返回成功 —— 用户看到"已退款"，钱还在我们账上。
+ * 现在顺序是：调微信 refund → 受理成功(SUCCESS/PROCESSING) → 本地置 refunded 并记 refundId；
+ * 微信侧失败 → 本地保持原状态，返回 error，交给调用方告警/人工处理（不假装退成功）。
+ * 退款是异步到账：状态 PROCESSING 也算受理，真实到账看 queryRefund。
+ */
 export async function refundOrder(orderId, reason = 'report_failed') {
   const db = getDB();
   const current = await getOrder(orderId);
   if (!current) return { refunded: false, notFound: true };
   if (current.status === 'refunded') return { refunded: false, duplicate: true, order: current };
 
+  // ① 先向微信申请退款：失败就保持本地状态，绝不"账上退款"
+  const { createRefund } = await import('./wechat-pay.js');
+  let wxRefund = null;
+  try {
+    wxRefund = await createRefund({
+      orderId: current.orderId,
+      transactionId: current.wxTransactionId,
+      amountFen: Number(current.amountFen),
+      totalFen: Number(current.amountFen),
+      reason,
+    });
+    if (wxRefund && !wxRefund.stub && !['SUCCESS', 'PROCESSING'].includes(String(wxRefund.status))) {
+      return { refunded: false, order: current, error: `微信退款未受理（status=${wxRefund.status}）` };
+    }
+  } catch (err) {
+    console.error(`[orders] 微信退款失败 ${orderId}：`, err?.message || err);
+    return { refunded: false, order: current, error: String(err?.message || err) };
+  }
   const updated = await db.collection(COL).findOneAndUpdate(
     { orderId: String(orderId), status: { $in: ['paid', 'consumed'] } },
-    { $set: { status: 'refunded', refundedAt: new Date(), refundReason: reason } },
+    { $set: { status: 'refunded', refundedAt: new Date(), refundReason: reason, wxRefundId: wxRefund?.refundId || null, refundStatus: wxRefund?.status || 'local_only' } },
     { returnDocument: 'after' },
   );
   if (!updated) return { refunded: false, order: await getOrder(orderId) };
 
+  /*
+   * 钱包回补：**只有缘值充值单**需要（钱本来是换成余额的）。
+   * 报告/转盘单的交付物是内容本身，支付时就没进钱包（见 markPaid 的 topup-only 口径），
+   * 退款时更不该往钱包里加钱 —— 否则「买报告 → 生成失败 → 退款」会变成「白拿一份报告 + 余额变多」。
+   */
+  const topupOrder = String(updated.sku || '') === 'topup' || String(updated.plan || '') === 'topup';
+  if (!topupOrder) return { refunded: true, order: updated, walletRefunded: false };
   try {
     await refund(updated.uid, Number(updated.amountFen) / 100, {
       reason: 'refund',

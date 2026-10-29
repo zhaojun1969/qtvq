@@ -109,6 +109,14 @@ systemctl daemon-reload >/dev/null 2>&1 || true
 systemctl enable --now qtvq-reconcile.timer >/dev/null 2>&1 || true
 echo "   支付对账定时器：$(systemctl is-active qtvq-reconcile.timer 2>/dev/null || echo 未启用)"
 
+# 退款对账（2026-10-29）：微信退款是异步的，受理成功不等于到账；
+# 没有这个任务，refundStatus 会永远停在 PROCESSING。
+install -m 644 "$SRC_DIR/systemd/qtvq-refund-reconcile.service" /etc/systemd/system/qtvq-refund-reconcile.service
+install -m 644 "$SRC_DIR/systemd/qtvq-refund-reconcile.timer" /etc/systemd/system/qtvq-refund-reconcile.timer
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl enable --now qtvq-refund-reconcile.timer >/dev/null 2>&1 || true
+echo "   退款对账定时器：$(systemctl is-active qtvq-refund-reconcile.timer 2>/dev/null || echo 未启用)"
+
 # Cloudflare 边缘 IP 池（`/api/` 反代用）。
 # 为什么必须装：`qtvq-api.pages.dev` 的 DNS 只返回 172.66.44.129 / 172.66.47.127，
 # 而这两个 IP 从本站 ECS 出发 **ICMP 通但 HTTPS 被阻断**（实测 HTTP 000 超时），

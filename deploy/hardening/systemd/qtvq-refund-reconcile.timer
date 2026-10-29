@@ -1,0 +1,11 @@
+[Unit]
+Description=Every 15 minutes: reconcile wechat refunds
+
+[Timer]
+OnCalendar=*:0/15
+RandomizedDelaySec=90
+Persistent=true
+Unit=qtvq-refund-reconcile.service
+
+[Install]
+WantedBy=timers.target

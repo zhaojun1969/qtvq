@@ -33,6 +33,8 @@ const URL_NATIVE = `${API}/v3/pay/transactions/native`;
 const URL_JSAPI = `${API}/v3/pay/transactions/jsapi`;
 const URL_APP = `${API}/v3/pay/transactions/app`;
 const URL_QUERY = `${API}/v3/pay/transactions/out-trade-no`;
+const URL_REFUND = `${API}/v3/refund/domestic/refunds`;
+const URL_REFUND_QUERY = `${API}/v3/refund/domestic/refunds`;
 
 /**
  * 密钥材料：先读环境变量，读不到再读 `*_FILE` 指向的文件。
@@ -206,6 +208,36 @@ export function buildJsapiPayParams(prepayId) {
  * 查询订单。注意语义：`NOTPAY`/`CLOSED` 等也算 `ok: true`（查询本身成功），
  * 只有查询失败才 `ok: false`。
  */
+/**
+ * 申请退款（2026-10-29 补）。
+ *
+ * 之前 `orders.refundOrder()` 只把本地订单改成 refunded —— **钱根本没退**，
+ * 用户看到的"已退款"只是我们自己的账本。这里补上真正的微信退款调用：
+ *   out_refund_no 用「原订单号 + -r1」保证幂等（同一单重复退款微信只会受理一次）；
+ *   amount.refund 是本次退款金额（分），amount.total 必须是原订单金额；
+ *   部分退款也支持，但本项目只做全额退（生成失败原路退）。
+ *
+ * 退款是异步到账：接口返回 SUCCESS/PROCESSING 只代表受理成功，
+ * 真实到账还要看 `queryRefund()` 或退款回调 —— 所以调用方不能把"受理成功"当"已到账"。
+ */
+export async function createRefund({ orderId, transactionId, amountFen, totalFen, reason = '报告生成失败' }) {
+  if (!isWechatPayConfigured()) return { stub: true, refundId: null, status: null, message: '微信商户号未配置' };
+  if (!transactionId) throw new Error('退款需要微信 transaction_id（本地订单缺少 wxTransactionId）');
+  const body = {
+    out_trade_no: String(orderId),
+    out_refund_no: `${String(orderId)}-r1`,
+    reason: String(reason).slice(0, 80),
+    amount: { refund: Math.round(amountFen), total: Math.round(totalFen), currency: 'CNY' },
+  };
+  const data = await request('POST', URL_REFUND, body);
+  return { stub: false, refundId: data.refund_id || null, status: data.status || null, raw: data };
+}
+
+/** 查退款单状态（退款是异步的，受理成功 ≠ 已到账） */
+export async function queryRefund(outRefundNo) {
+  return request('GET', `${URL_REFUND_QUERY}/${encodeURIComponent(String(outRefundNo))}`);
+}
+
 export async function queryOrder(outTradeNo) {
   if (!outTradeNo) return { ok: false, error: '缺少订单号' };
   if (!isWechatPayConfigured()) return { ok: false, error: '微信商户号未配置' };
