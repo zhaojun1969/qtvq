@@ -117,6 +117,13 @@ systemctl daemon-reload >/dev/null 2>&1 || true
 systemctl enable --now qtvq-refund-reconcile.timer >/dev/null 2>&1 || true
 echo "   退款对账定时器：$(systemctl is-active qtvq-refund-reconcile.timer 2>/dev/null || echo 未启用)"
 
+# 每日运营简报（09:00 一封邮件）：营收/质量/退款/验收门
+install -m 644 "$SRC_DIR/systemd/qtvq-digest.service" /etc/systemd/system/qtvq-digest.service
+install -m 644 "$SRC_DIR/systemd/qtvq-digest.timer" /etc/systemd/system/qtvq-digest.timer
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl enable --now qtvq-digest.timer >/dev/null 2>&1 || true
+echo "   每日简报定时器：$(systemctl is-active qtvq-digest.timer 2>/dev/null || echo 未启用)"
+
 # Cloudflare 边缘 IP 池（`/api/` 反代用）。
 # 为什么必须装：`qtvq-api.pages.dev` 的 DNS 只返回 172.66.44.129 / 172.66.47.127，
 # 而这两个 IP 从本站 ECS 出发 **ICMP 通但 HTTPS 被阻断**（实测 HTTP 000 超时），

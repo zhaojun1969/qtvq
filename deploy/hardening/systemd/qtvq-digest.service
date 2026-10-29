@@ -1,0 +1,14 @@
+[Unit]
+Description=QTVQ daily ops digest email
+Documentation=file:///opt/qtvq/server/scripts/daily-digest.mjs
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qtvq/server
+ExecStart=/usr/bin/node --env-file=.env scripts/daily-digest.mjs
+User=root
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=120
