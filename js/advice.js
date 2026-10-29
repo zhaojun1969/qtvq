@@ -19,6 +19,7 @@ import { downloadAdviceCard } from './report-share.js';
 const $ = (id) => document.getElementById(id);
 
 const state = {
+  length: pickInitialLength(), // 报告长度：short≈800 字 / long 1000–2600 字
   loggedIn: false,
   skus: {},
   scenes: {},
@@ -124,6 +125,30 @@ function chooseSku(key) {
   $('panel-input').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function pickInitialLength() {
+  const q = new URLSearchParams(location.search).get('length');
+  if (q === 'short' || q === 'long') return q;
+  try {
+    const saved = localStorage.getItem('qtvq_report_length');
+    if (saved === 'short' || saved === 'long') return saved;
+  } catch {
+    /* 隐私模式下可能抛错 */
+  }
+  return window.matchMedia('(max-width: 820px)').matches ? 'short' : 'long';
+}
+
+function bindLengthPicker() {
+  const box = $('ad-length');
+  if (!box) return;
+  const sync = () => box.querySelectorAll('[data-length]').forEach((b) => b.classList.toggle('active', b.dataset.length === state.length));
+  box.querySelectorAll('[data-length]').forEach((b) => b.addEventListener('click', () => {
+    state.length = b.dataset.length;
+    try { localStorage.setItem('qtvq_report_length', state.length); } catch { /* 忽略 */ }
+    sync();
+  }));
+  sync();
+}
+
 function renderForm(key) {
   const slot = $('advice-form-slot');
   if (key === 'diagnose') {
@@ -144,7 +169,17 @@ function renderForm(key) {
       <div class="advice-field">
         <label class="field-label" for="ad-question">你最想问的一句话（选填）</label>
         <input id="ad-question" type="text" maxlength="80" placeholder="例如：我该不该主动问清楚？">
-      </div>`;
+      </div>
+      <div class="advice-field">
+        <span class="field-label">报告长度</span>
+        <div class="advice-scenes" id="ad-length">
+          <button type="button" class="advice-scene" data-length="short">简版 · 约 800 字</button>
+          <button type="button" class="advice-scene" data-length="long">详细版 · 1000–2600 字</button>
+        </div>
+        <p class="field-hint">手机默认简版；想看得更细可选详细版，也可用 ?length=long 打开本页。
+      </div>
+    `;
+    bindLengthPicker();
     slot.querySelectorAll('[data-scene]').forEach((chip) => {
       chip.addEventListener('click', () => {
         const k = chip.dataset.scene;
@@ -175,7 +210,17 @@ function renderForm(key) {
     <div class="advice-field">
       <label class="field-label" for="ad-question">你最想弄清楚的一句话（选填）</label>
       <input id="ad-question" type="text" maxlength="80" placeholder="例如：还有没有必要继续？">
-    </div>`;
+    </div>
+      <div class="advice-field">
+        <span class="field-label">报告长度</span>
+        <div class="advice-scenes" id="ad-length">
+          <button type="button" class="advice-scene" data-length="short">简版 · 约 800 字</button>
+          <button type="button" class="advice-scene" data-length="long">详细版 · 1000–2600 字</button>
+        </div>
+        <p class="field-hint">手机默认简版；想看得更细可选详细版，也可用 ?length=long 打开本页。
+      </div>
+  `;
+  bindLengthPicker();
 }
 
 // ---------------------------------------------------------------- 生成
@@ -264,8 +309,8 @@ async function onSubmit(e) {
      * 长度档：手机上一次性读 2000 字体验很差，默认要 short（≈800 字）；
      * 网页默认 long（1000–2600 字）。客户明确要求短报告时也是 short。
      */
-    const mobile = window.matchMedia('(max-width: 820px)').matches;
-    const lengthProfile = mobile ? 'short' : 'long';
+    // 长度档由用户在表单里选（默认按视口，?length= 优先）——不再由屏幕宽度替她决定
+    const lengthProfile = state.length;
     let report = await api.generateReport({
       sku,
       payload: { ...(payload || {}), length: lengthProfile },
@@ -333,9 +378,14 @@ function renderReport(report) {
   if (sections.length > 1) {
     parts.push(`<nav class="advice-toc">${sections.map((s) => `<a href="#${s.id}">${s.title}<span>${s.count}</span></a>`).join('')}</nav>`);
   }
+  const stateKey = `qtvq_sec_open:${report?.reportId || report?.id || 'latest'}`;
+  let savedOpen = null;
+  try { savedOpen = JSON.parse(localStorage.getItem(stateKey) || 'null'); } catch { /* 忽略 */ }
   sections.forEach((s, i) => {
-    const open = desktop || i === 0 ? ' open' : '';
-    parts.push(`<details class="advice-sec" id="${s.id}"${open}><summary>${s.title}<span>${s.count} 条</span></summary><div class="advice-sec-body">${s.html}</div></details>`);
+    const fallback = desktop || i === 0;
+    const open = Array.isArray(savedOpen) ? savedOpen.includes(s.id) : fallback;
+    const openAttr = open ? ' open' : '';
+    parts.push(`<details class="advice-sec" id="${s.id}"${openAttr}><summary>${s.title}<span>${s.count} 条</span></summary><div class="advice-sec-body">${s.html}</div></details>`);
   });
   if (!parts.length) parts.push(`<div class="advice-block"><p>${escapeHtml(String(report?.content || '').slice(0, 1200))}</p></div>`);
 
@@ -349,6 +399,15 @@ function renderReport(report) {
   if (meta.length) parts.push(`<p class="advice-meta">${escapeHtml(meta.join(' · '))}</p>`);
 
   $('advice-body').innerHTML = parts.join('');
+  // 记住每段的展开状态（按报告分开），下次打开同一份报告还是你上次的样子
+  try {
+    $('advice-body').querySelectorAll('details.advice-sec').forEach((d) => {
+      d.addEventListener('toggle', () => {
+        const openIds = [...$('advice-body').querySelectorAll('details.advice-sec[open]')].map((x) => x.id);
+        localStorage.setItem(stateKey, JSON.stringify(openIds));
+      });
+    });
+  } catch { /* 隐私模式忽略 */ }
   $('panel-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
