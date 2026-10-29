@@ -341,3 +341,50 @@ export const TIERS = [
 export function tierOf(key) {
   return TIERS.find((t) => t.key === key) || TIERS[2];
 }
+
+/**
+ * 订阅报告进度流（服务端 REPORT_STREAM=1 时才有）。
+ *
+ * 只做「等它完成」这一件事：收到 done 后再用 fetchReport 拉一次正文（流里只推进度，
+ * 不推正文 —— 正文要过内容安全，见 E.64）。任何异常/不支持都抛错，调用方回退轮询，
+ * 所以这个函数**永远可以安全地试**。
+ */
+export async function waitForReportStream(reportId, { onTick, timeoutMs = 180000 } = {}) {
+  if (typeof fetch !== 'function' || typeof TextDecoder === 'undefined') {
+    throw new Error('环境不支持流式');
+  }
+  const t = readStore(TOKEN_KEY);
+  const headers = { Accept: 'text/event-stream' };
+  if (t) headers.Authorization = `Bearer ${t}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const started = Date.now();
+  try {
+    const res = await fetch(`${REPORT_API_BASE}/v1/report/stream/${encodeURIComponent(reportId)}`, {
+      headers,
+      signal: ctrl.signal,
+    });
+    if (!res.ok || !res.body) throw new Error(`流式不可用（HTTP ${res.status}）`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error('流意外结束');
+      buf += decoder.decode(value, { stream: true });
+      const frames = buf.split('\n\n');
+      buf = frames.pop() || '';
+      for (const frame of frames) {
+        const ev = /event: (\w+)/.exec(frame)?.[1];
+        const dataLine = /data: (.+)/.exec(frame)?.[1];
+        if (!ev) continue;
+        const data = dataLine ? JSON.parse(dataLine) : {};
+        if (onTick) onTick(Date.now() - started, data);
+        if (ev === 'done') { reader.cancel().catch(() => {}); return fetchReport(reportId); }
+        if (ev === 'error' || ev === 'timeout') throw new Error(data.error || '流式等待超时');
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
