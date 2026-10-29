@@ -19,7 +19,8 @@
 
 import { chat } from './llm.js';
 import { formatPitfalls, publicHits, retrievePitfalls } from './pitfalls.js';
-import { STRUCTURED_FORMAT_RULE, completenessOf, runStructured } from './report-kit.js';
+import { completenessOf, runStructured, structuredFormatRule } from './report-kit.js';
+import { assessQuality, retryHint, QUALITY_SPECS } from './report-quality.js';
 import { assertSafe } from './content-safety.js';
 
 const SYSTEM = `你是「我心永恒-Q问」的避坑诊断师。你的风格是「避坑 + 直线解决」：
@@ -64,9 +65,10 @@ ${caseBlock}
 - 风险点要具体到"什么行为/什么信号"，不要写"可能有问题"这类废话
 - 对照案例只能引用上面给出的案例，不要自己发明
 - 行动清单必须是用户单方面能做的（不依赖对方配合）
-- 全篇不超过 600 字
+- 正文 ${QUALITY_SPECS.diagnose.minChars}–${QUALITY_SPECS.diagnose.maxChars} 字：这是 ¥9.9 的付费报告，
+  信息密度要够，但**不要注水**（不复述用户原话、不写通用鸡汤、不为凑字数重复观点）
 
-${STRUCTURED_FORMAT_RULE}`;
+${structuredFormatRule('diagnose')}`;
 }
 
 /** 模型不可用：仍然基于真实案例给确定性报告，绝不 500 */
@@ -108,13 +110,29 @@ export async function generateDiagnose({ description, scenes = [], question = ''
   const queryText = [desc, scenesNorm.map((s) => DIAGNOSE_SCENES[s]).join(' '), question].filter(Boolean).join(' ');
   const { hits, method } = await retrievePitfalls(queryText, 3);
 
-  const gen = await runStructured({
-    chat,
-    system: SYSTEM,
-    prompt: buildPrompt({ description: desc, scenes: scenesNorm, question: String(question || '').slice(0, 300), hits }),
-    maxTokens: 1600,
-    temperature: 0.7,
-  });
+  const spec = QUALITY_SPECS.diagnose;
+  const basePrompt = buildPrompt({ description: desc, scenes: scenesNorm, question: String(question || '').slice(0, 300), hits });
+
+  /*
+   * 多轮生成：先按规格写；字数/条数不够就**带着上一稿再要一次**（最多 maxAttempts 次）。
+   * 每次重试只放宽 token 预算、不降低标准 —— 宁可交付一份偏短的正确报告
+   * （标记 quality.low 供人工复核），也不要为了凑字数把内容注水。
+   */
+  let gen = null;
+  let quality = null;
+  let attempts = 0;
+  while (attempts < (spec.maxAttempts || 2)) {
+    attempts += 1;
+    gen = await runStructured({
+      chat,
+      system: SYSTEM,
+      prompt: attempts === 1 ? basePrompt : `${basePrompt}\n\n${retryHint('diagnose', quality, gen?.text || '')}`,
+      maxTokens: spec.retryMaxTokens,
+      temperature: 0.7,
+    });
+    quality = assessQuality({ sku: 'diagnose', content: toContent(gen.sections || {}), sections: gen.sections });
+    if (gen.fallback || quality.ok) break;
+  }
 
   let sections = gen.sections;
   let fallback = gen.fallback;
@@ -137,6 +155,7 @@ export async function generateDiagnose({ description, scenes = [], question = ''
 
   return {
     kind: 'diagnose',
+    quality: { ...quality, attempts },
     tier: 'advanced',
     // 诊断报告没有"契合度"这类分数：显式给 null，前端据此不渲染分数区
     scores: null,

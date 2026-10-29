@@ -13,7 +13,8 @@
 
 import { chat } from './llm.js';
 import { formatPitfalls, publicHits, retrievePitfalls } from './pitfalls.js';
-import { STRUCTURED_FORMAT_RULE, completenessOf, runStructured } from './report-kit.js';
+import { completenessOf, runStructured, structuredFormatRule } from './report-kit.js';
+import { assessQuality, retryHint, QUALITY_SPECS } from './report-quality.js';
 import { assertSafe } from './content-safety.js';
 
 const SYSTEM = `你是「我心永恒-Q问」的关系复盘师。你的风格是「避坑 + 直线解决」：
@@ -39,10 +40,13 @@ ${caseBlock}
 - 先在"核心结论"里用一句话概括这段关系的性质（例如"反复试探但无人明确表态"）
 - 风险点写**反复出现的模式**，不是单次事件
 - 对照案例只能引用上面给出的案例
-- 行动清单要分成"想挽救"和"想止损"两条路，各自不超过 3 条
-- 全篇不超过 800 字
+- 行动清单必须写成**两组，共 5–6 条**（只写 3 条会被判定不合格）：
+  「想挽救：」3 条 + 「想止损：」2–3 条，每条都以「想挽救：」或「想止损：」开头，
+  句式统一为「时限 + 具体动作 + 完成标准」，例如「想挽救：3 天内约一次 20 分钟对话，只谈一件事，结束时双方各说一句能接受的做法」。
+- 正文 ${QUALITY_SPECS.retro.minChars}–${QUALITY_SPECS.retro.maxChars} 字：这是 ¥19.9 的付费报告，
+  要能把时间线还原、冲突模式说透，但**不要注水**（不复述用户原话、不写通用鸡汤）
 
-${STRUCTURED_FORMAT_RULE}`;
+${structuredFormatRule('retro')}`;
 }
 
 function fallbackSections({ hits }) {
@@ -82,13 +86,26 @@ export async function generateRetro({ selfView, partnerView = '', history = '', 
   const queryText = [mine, theirs, hist, question].filter(Boolean).join(' ').slice(0, 2000);
   const { hits, method } = await retrievePitfalls(queryText, 3);
 
-  const gen = await runStructured({
-    chat,
-    system: SYSTEM,
-    prompt: buildPrompt({ selfView: mine, partnerView: theirs, history: hist, question: String(question || '').slice(0, 300), hits }),
-    maxTokens: 2000,
-    temperature: 0.7,
-  });
+  const spec = QUALITY_SPECS.retro;
+  const basePrompt = buildPrompt({ selfView: mine, partnerView: theirs, history: hist, question: String(question || '').slice(0, 300), hits });
+
+  // 与 diagnose 同一套多轮生成：不够就带着上一稿再要一次，最多 spec.maxAttempts 次；
+  // 偏短但内容正确仍交付，并标记 quality.low 供人工复核（不阻塞交付）
+  let gen = null;
+  let quality = null;
+  let attempts = 0;
+  while (attempts < (spec.maxAttempts || 2)) {
+    attempts += 1;
+    gen = await runStructured({
+      chat,
+      system: SYSTEM,
+      prompt: attempts === 1 ? basePrompt : `${basePrompt}\n\n${retryHint('retro', quality, gen?.text || '')}`,
+      maxTokens: spec.retryMaxTokens,
+      temperature: 0.7,
+    });
+    quality = assessQuality({ sku: 'retro', content: toContent(gen.sections || {}), sections: gen.sections });
+    if (gen.fallback || quality.ok) break;
+  }
 
   let sections = gen.sections;
   let fallback = gen.fallback;
@@ -110,6 +127,7 @@ export async function generateRetro({ selfView, partnerView = '', history = '', 
 
   return {
     kind: 'retro',
+    quality: { ...quality, attempts },
     tier: 'deep',
     scores: null,
     overall: null,

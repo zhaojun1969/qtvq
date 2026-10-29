@@ -12,13 +12,14 @@
  * 再不行就用规则生成的确定性内容。**任何情况下都不返回 500**。
  */
 
+import { QUALITY_SPECS } from './report-quality.js';
+
 /** 从模型输出里抠出三段：风险点 / 对照案例 / 行动清单 */
 const SECTION_ALIASES = {
   risks: ['风险点', '风险', '隐患', '坑在哪'],
   cases: ['对照案例', '相关案例', '参考案例', '案例'],
   actions: ['行动清单', '行动建议', '下一步', '该怎么做'],
 };
-
 function normalizeHeading(line) {
   // 去掉 markdown 装饰与序号：`## 一、风险点：` → `风险点`
   return String(line || '')
@@ -148,15 +149,28 @@ export function completenessOf(sections) {
   return Math.min(1, Number(score.toFixed(2)));
 }
 
-/** 三段式输出的格式要求（拼进 prompt） */
-export const STRUCTURED_FORMAT_RULE = `【输出格式（必须严格遵守，不要加任何前言或结尾客套）】
-第一行：一句话核心结论（不超过 30 字）
+/**
+ * 三段式输出的格式要求（拼进 prompt）。
+ *
+ * 2026-10-29 修正：原来这里是一条**全局**规则 ——「每条不超过 40 字，最多 5 条」。
+ * 它是按"分享卡文案 + 低 token 预算"定的，却被用在 ¥9.9/¥19.9 的付费正文上，
+ * 结果真实付费用户拿到的诊断报告只有 265 字（每条风险点 20–40 字），是提纲不是报告。
+ * 现在按 SKU 分别下发（数字与 `report-quality.js::QUALITY_SPECS` 同一份，不各写一套）。
+ */
+export function structuredFormatRule(sku = 'diagnose') {
+  const s = QUALITY_SPECS[sku]?.structure || QUALITY_SPECS.diagnose.structure;
+  return `【输出格式（必须严格遵守，不要加任何前言或结尾客套）】
+第一行：一句话核心结论（不超过 ${s.summaryMax} 字，直接点出关系性质或最大风险）
 ## 风险点
-- （逐条列出，每条不超过 40 字，最多 5 条）
+- ${s.risks.min}–${s.risks.max} 条，每条 ${s.risks.len[0]}–${s.risks.len[1]} 字。每条按「具体信号（时间/频率/原话/频率）→ 为什么危险 → 对上你描述里的哪一句」来写
 ## 对照案例
-- （引用给你的真实案例标题，说明为什么类似，最多 3 条）
+- ${s.cases.min}–${s.cases.max} 条，每条 ${s.cases.len[0]}–${s.cases.len[1]} 字，必须点名上面给出的真实案例，并写清「你们像在哪、它后来怎么样了」
 ## 行动清单
-- （具体到"今天就能做"的动作，每条不超过 30 字，最多 5 条）`;
+- ${s.actions.min}–${s.actions.max} 条，每条 ${s.actions.len[0]}–${s.actions.len[1]} 字，只写用户单方面能做的动作，带时限（今天 / 3 天内 / 7 天内）与完成标准`;
+}
+
+/** 兼容旧引用：默认按 diagnose 下发 */
+export const STRUCTURED_FORMAT_RULE = structuredFormatRule('diagnose');
 
 /**
  * 调模型并解析三段。模型不可用时返回 `fallback` 标记，由调用方给确定性文案。

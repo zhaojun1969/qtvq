@@ -15,6 +15,7 @@ import { requireAuth, resolveIdentity } from '../middleware/auth.js';
 import { requireAdult } from '../middleware/adult.js';
 import { generateReport, publicProfile } from '../services/report.js';
 import { generateDiagnose, normalizeScenes, DIAGNOSE_SCENES } from '../services/report-diagnose.js';
+import { assessQuality } from '../services/report-quality.js';
 import { generateRetro } from '../services/report-retro.js';
 import { assertSafe } from '../services/content-safety.js';
 import { markText } from '../services/watermark.js';
@@ -97,6 +98,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
       content: g.content,
       sections: g.sections,
       completeness: g.completeness,
+      quality: g.quality || null,
       pitfalls: g.pitfalls,
       retrieval: g.retrieval,
       scenes: g.scenes,
@@ -123,6 +125,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
       content: g.content,
       sections: g.sections,
       completeness: g.completeness,
+      quality: g.quality || null,
       pitfalls: g.pitfalls,
       retrieval: g.retrieval,
       scenes: null,
@@ -142,6 +145,8 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
     myQa,
     taQa,
   });
+  // 配对报告也纳入同一套质量度量（只记录、不重试：它的长度由档位 prompt 控制）
+  const pairQuality = assessQuality({ sku: 'pair', content: generated.content, sections: generated.sections || {} });
   return {
     status: generated.fallback && !generated.content ? REPORT_STATUS.FAILED : REPORT_STATUS.READY,
     overall: generated.overall,
@@ -151,6 +156,7 @@ async function generateForKind({ db, kind, me, ta, tier, question, payload }) {
     content: generated.content,
     sections: null,
     completeness: null,
+    quality: { ...pairQuality, attempts: 1 },
     pitfalls: generated.pitfalls,
     retrieval: generated.retrieval,
     scenes: null,
@@ -213,6 +219,7 @@ function reportResponse(reportId, doc, extra = {}) {
     // 结构化三段（diagnose/retro 有；pair 为 null）
     sections: doc.sections || null,
     completeness: typeof doc.completeness === 'number' ? doc.completeness : null,
+    quality: doc.quality || null,
     pitfalls: doc.pitfalls,
     retrieval: doc.retrieval,
     fallback: doc.fallback,
