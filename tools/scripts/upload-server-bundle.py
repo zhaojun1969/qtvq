@@ -124,6 +124,14 @@ def add_tree(tar: tarfile.TarFile, base: Path, arc_prefix: str) -> None:
             continue
         arcname = f"{arc_prefix}/{rel.as_posix()}"
         info = tar.gettarinfo(str(path), arcname=arcname)
+        # Windows 上 os.stat 的权限位是模拟的：文件落到 666、目录落到 777，
+        # 于是每次部署都在服务器上重新造出 world-writable 的代码目录（实测
+        # /opt/qtvq/server/src 被 chmod 回 777）。这里显式收紧：
+        # 目录 755、脚本 755、其余 644 —— 解包后即正确，不依赖部署脚本二次 chmod。
+        if info.isdir():
+            info.mode = 0o755
+        elif info.isreg():
+            info.mode = 0o755 if path.suffix in (".sh", ".py") or path.name in ("qtvq-blocklist-sync", "qtvq-abuse-report", "qtvq-metrics-aggregate") else 0o644
         if info.isdir():
             tar.addfile(info)
             continue
@@ -152,6 +160,7 @@ def build_bundle() -> Path:
                 add_tree(tar, p, rel)
             elif p.is_file():
                 info = tar.gettarinfo(str(p), arcname=rel)
+                info.mode = 0o644  # 同上：不要让 Windows 的 666 带上服务器
                 raw = p.read_bytes()
                 data = raw.replace(b"\r\n", b"\n") if is_text_like(p) else raw
                 info.size = len(data)
