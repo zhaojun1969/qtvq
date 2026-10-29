@@ -110,6 +110,20 @@ check('邮件已配置', health.mailConfigured === true);
 check('微信支付已配置', health.wechatPayConfigured === true);
 check('微信支付公钥已配置（回调验签）', health.wechatPlatformKeyConfigured === true);
 check('回调地址为自有域名', String(health.wechatNotifyUrl || '').startsWith('https://qtvq.cn/'), health.wechatNotifyUrl || '');
+
+/*
+ * 自建 Node 的回调地址必须指向 /v1/，不能还是 Pages 的 /api/。
+ * 2026-10-29 事故：`WECHAT_PAY_NOTIFY_URL` 一直是 /api/payment/wechat/notify，
+ * 而 nginx 的 /api/ 反代到 Cloudflare Pages —— 微信回调落在 Pages 上，
+ * 自建 Node 永远收不到，用户付了 ¥4.90、订单一直 created，报告不出且无报错。
+ * 上面那条「回调地址为自有域名」在事故期间是绿的（域名确实是我们自己的），
+ * 所以必须再断言"落点是不是 Node"。
+ */
+const nodeHealth = await (await fetch(BASE + '/v1/health?t=' + Date.now())).json();
+const nodeNotify = String(nodeHealth?.data?.wechatPay?.notifyUrl || '');
+check('Node 微信支付已配置', nodeHealth?.data?.wechatPay?.configured === true, JSON.stringify(nodeHealth?.data?.wechatPay || {}));
+check('Node 回调地址落在 /v1/（不是 Pages 的 /api/）', /\/v1\/payment\/wechat\/notify$/.test(nodeNotify), nodeNotify || '(未配置)');
+check('Node 回调验签公钥已配置', nodeHealth?.data?.wechatPay?.platformPublicKeyConfigured === true);
 check('语音服务已配置', health.speechConfigured === true);
 
 /* ────────────────────────────── 三、语音 ────────────────────────────── */

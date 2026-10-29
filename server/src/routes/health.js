@@ -4,6 +4,7 @@ import { providerStatus, env } from '../config/env.js';
 import { getDB } from '../config/db.js';
 import { buildInfo } from '../lib/build-info.js';
 import { chat } from '../services/llm.js';
+import { getWechatPayConfig, isWechatPayConfigured } from '../services/wechat-pay.js';
 import { ok, wrap } from '../lib/http.js';
 
 const router = Router();
@@ -80,6 +81,18 @@ router.get(
       // 路线 B 不需要 Atlas Vector Search：一对一的相似度在进程内计算
       vectorStrategy: 'in-process-cosine',
       models: providerStatus(),
+      /*
+       * 微信支付：只报"是否配置"和**回调地址**，不泄漏任何密钥。
+       *
+       * 为什么要暴露 notifyUrl：2026-10-29 的事故就是回调地址还指着
+       * `https://qtvq.cn/api/payment/wechat/notify`（那是 Pages 的），自建 Node 收不到，
+       * 用户付了钱、订单一直 created。这个字段让"回调地址对不对"可以从外网一眼核。
+       */
+      wechatPay: {
+        configured: isWechatPayConfigured(),
+        notifyUrl: getWechatPayConfig().notifyUrl || null,
+        platformPublicKeyConfigured: /BEGIN (PUBLIC KEY|CERTIFICATE)/.test(getWechatPayConfig().platformPublicKey || ''),
+      },
     });
   }),
 );

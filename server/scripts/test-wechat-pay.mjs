@@ -92,8 +92,15 @@ async function main() {
   const uid = `u_wxtest_${Date.now().toString(36)}`;
   const amountFen = 990; // ¥9.9 diagnose
 
-  /* ① 正常回调入账 */
-  const order = await createOrder({ uid, sku: 'diagnose', amountFen, channel: 'native' });
+  /*
+   * ① 正常回调入账 —— 用**缘值充值单**（topup）验证。
+   *
+   * 2026-10-29 修正：这条用例原来用的 sku 是 diagnose，并断言"钱包余额增加 9.9"。
+   * 那个断言本身就在描述 bug —— 报告单付了钱不该再把钱折回钱包（等于报告免费，
+   * 可以无限刷）。现在只有 topup 单才入账，所以用例必须换成 topup，
+   * 另外补一条"报告单支付后余额不变"的反向断言。
+   */
+  const order = await createOrder({ uid, sku: 'topup', amountFen, channel: 'native' });
   const before = await wallet.getBalance(uid);
   const notify = buildNotify({ outTradeNo: order.orderId, amountFen, transactionId: 'wx_tx_001' });
 
@@ -105,6 +112,17 @@ async function main() {
   check('首次回调入账成功', settled.settled === true && !settled.duplicate);
   const after = await wallet.getBalance(uid);
   check('钱包余额增加 9.9', Math.abs(after - before - 9.9) < 1e-6, `before=${before} after=${after}`);
+
+  /* ①b 报告单：支付成功但**不**折回余额 */
+  const reportOrder = await createOrder({ uid, sku: 'diagnose', amountFen: 490, channel: 'native' });
+  const balBeforeReport = await wallet.getBalance(uid);
+  const reportNotify = buildNotify({ outTradeNo: reportOrder.orderId, amountFen: 490, transactionId: 'wx_tx_report_001' });
+  const vReport = verifyNotify(reportNotify.headers, reportNotify.body);
+  check('报告单回调验签成功', vReport.ok, vReport.error);
+  const reportSettled = await markPaid({ orderId: reportOrder.orderId, transactionId: 'wx_tx_report_001', amountFen: 490 });
+  const balAfterReport = await wallet.getBalance(uid);
+  check('报告单支付成功（订单 paid）', reportSettled.settled === true && (await getOrder(reportOrder.orderId)).status === 'paid');
+  check('报告单支付后余额不变（不折回钱包）', Math.abs(balAfterReport - balBeforeReport) < 1e-6, `${balBeforeReport} → ${balAfterReport}`);
 
   /* ② 重复回调只入账一次 */
   const dup = await markPaid({ orderId: order.orderId, transactionId: v.transactionId, amountFen: v.amountTotal });

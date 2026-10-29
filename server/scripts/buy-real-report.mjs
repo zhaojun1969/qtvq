@@ -103,9 +103,28 @@ async function main() {
           : { targetUid: String((await db.collection('users').findOne({ nickname: { $exists: true } }))?._id || '') }) }),
     });
     const json = await res.json().catch(() => ({}));
-    const reportId = json?.data?.reportId || json?.reportId;
-    if (!res.ok || !reportId) {
-      console.error(`❌ 生成接口失败：HTTP ${res.status} ${JSON.stringify(json).slice(0, 300)}`);
+    let reportId = json?.data?.reportId || json?.reportId;
+
+    /*
+     * 幂等兜底：如果另一路（同时开着的等待任务、或页面自己）已经把这张订单消费掉，
+     * 生成接口会返回 E_ORDER_UNUSABLE。这不是失败，是"别人已经做完了"。
+     * 2026-10-29 实测：两个等待任务盯着同一张单，后到的那个就报了这个错。
+     * 处理：找这张单支付之后创建的同类报告，找到就算成功。
+     */
+    if (!reportId && /E_ORDER_UNUSABLE|订单不可用/.test(JSON.stringify(json))) {
+      const existing = await db
+        .collection('reports')
+        .find({ uid: String(order.uid), kind: order.sku, createdAt: { $gte: new Date(new Date(order.paidAt).getTime() - 1000) } })
+        .sort({ createdAt: -1 })
+        .limit(1)
+        .toArray();
+      if (existing[0]) {
+        reportId = String(existing[0]._id);
+        console.log(`ℹ️  这张订单已被另一路消费，直接复用已生成的报告：${reportId}`);
+      }
+    }
+    if (!reportId) {
+      console.error(`❌ 生成接口没有给出 reportId：HTTP ${res.status} ${JSON.stringify(json).slice(0, 300)}`);
       process.exit(1);
     }
     console.log(`生成中：${reportId}`);
