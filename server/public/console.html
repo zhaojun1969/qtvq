@@ -170,6 +170,7 @@
       <div class="muted" style="margin:-6px 0 10px">柱子=当天生成份数，橙色=其中偏短（quality.low）；折线=当天平均字数。看"最近几天是否变短"比看窗口总数有用。</div>
       <div id="quality-trend" style="min-height:120px"></div>
       <div id="quality-issues" class="muted" style="margin-top:10px;font-size:13px"></div>
+      <div id="refund-issues" class="muted" style="margin-top:8px;font-size:13px"></div>
     </div>
     <div class="panel">
       <h2>逐日</h2>
@@ -442,6 +443,17 @@ function renderQualityIssues(issues){
   }).join("");
 }
 
+/* 异常退款：需要人工看的单子（正常退款由定时对账自动收口） */
+function renderRefundIssues(rows){
+  const box = $("refund-issues");
+  if(!box) return;
+  if(!rows.length){ box.innerHTML = ""; return; }
+  box.innerHTML = "⚠️ 需要人工处理的退款：" + rows.map((r)=>{
+    const day = String(r.refundedAt || "").slice(5, 10);
+    return `<div style="margin-top:4px">· <span class="mono">${esc(day)}</span> ${esc(r.orderId)} ${esc(r.sku||"")} ¥${((r.amountFen||0)/100).toFixed(2)} —— ${esc(r.refundStatus||"")}${r.wxRefundId?" · "+esc(r.wxRefundId):""}</div>`;
+  }).join("");
+}
+
 async function loadMetrics(){
   try{
     const days = Number($('metrics-days').value) || 30;
@@ -492,6 +504,7 @@ async function loadMetrics(){
       </tr>`).join('');
 
     renderQualityTrend(m.qualityTrend || [], m.qualityIssues || []);
+    renderRefundIssues(m.refundIssues || []);
 
     const rows = ch.channels || [];
     if(!rows.length){ $('metrics-channels-body').innerHTML='<tr><td colspan="8" class="empty">暂无归因数据</td></tr>'; }

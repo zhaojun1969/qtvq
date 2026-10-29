@@ -18,6 +18,7 @@
  */
 
 import { Router } from 'express';
+import { getDB } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { ok, wrap, badRequest } from '../lib/http.js';
 import {
@@ -28,6 +29,7 @@ import {
   verifyNotify,
   isWechatPayConfigured,
   notifySuccess,
+  queryRefund,
   notifyFail,
 } from '../services/wechat-pay.js';
 import { SKUS, createOrder, getOrder, markPaid, listOrders, cancelOrder } from '../services/orders.js';
@@ -168,6 +170,35 @@ router.post(
  * 注意：**不挂 requireAuth**，也不走统一错误处理 —— 任何异常都必须回 200+FAIL 或 200+SUCCESS，
  * 否则微信会持续重试。这里自己 try/catch，不用 wrap()。
  */
+/*
+ * 退款回调（2026-10-29）：微信退款到账/失败时会推这里。
+ *
+ * 为什么仍要保留 15 分钟对账任务：回调可能丢（我们刚经历过支付回调丢单），
+ * 回调只是"更快知道"，不是唯一真相。这里验签后直接按 out_refund_no 查一次微信，
+ * 用查询结果写库 —— 不解析 resource 里的字段，避免退款通知结构与支付通知不同导致的解析错。
+ */
+router.post('/wechat/refund-notify', async (req, res) => {
+  try {
+    const raw = req.rawBody || JSON.stringify(req.body || {});
+    const v = verifyNotify(req.headers, raw);
+    if (!v.ok) return res.status(401).json(notifyFail(v.error || '验签失败'));
+    const outRefundNo = String(v.outRefundNo || '');
+    const orderId = outRefundNo.replace(/-r\d+$/, '');
+    if (!orderId) return res.json(notifySuccess());
+    const q = await queryRefund(outRefundNo);
+    await getDB()
+      .collection('orders')
+      .updateOne(
+        { orderId },
+        { $set: { refundStatus: String(q.status || 'UNKNOWN'), wxRefundId: q.refund_id || null, refundCheckedAt: new Date() } },
+      );
+    return res.json(notifySuccess());
+  } catch (err) {
+    console.error('[pay] 退款回调异常：', err?.message || err);
+    return res.status(500).json(notifyFail('处理失败'));
+  }
+});
+
 router.post('/wechat/notify', async (req, res) => {
   try {
     const rawBody = req.rawBody || '';

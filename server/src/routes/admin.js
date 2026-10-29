@@ -988,6 +988,27 @@ router.get(
        * 低质报告明细：只知道「今天偏短 2 份」没法行动，得能看到是哪两份、为什么偏短。
        * 只取最近 5 份，避免列表无限长；完整原因在报告文档的 quality.reasons 里。
        */
+      /*
+       * 异常退款：微信侧 ABNORMAL/CLOSED 或本地标记异常的单子。
+       * 正常退款走定时对账自动收口，这里只列"需要人看"的。
+       */
+      refundIssues: (
+        await getDB()
+          .collection('orders')
+          .find({ status: 'refunded', refundStatus: { $in: ['ABNORMAL', 'CLOSED'] } })
+          .sort({ refundedAt: -1 })
+          .limit(10)
+          .project({ _id: 0, orderId: 1, uid: 1, sku: 1, amountFen: 1, refundStatus: 1, wxRefundId: 1, refundedAt: 1 })
+          .toArray()
+      ).map((r) => ({
+        orderId: r.orderId,
+        uid: r.uid,
+        sku: r.sku || null,
+        amountFen: r.amountFen,
+        refundStatus: r.refundStatus,
+        wxRefundId: r.wxRefundId || null,
+        refundedAt: r.refundedAt,
+      })),
       qualityIssues: (
         await getDB()
           .collection('reports')
