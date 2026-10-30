@@ -21,8 +21,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const SRC = path.join(ROOT, 'desktop', 'release');
-const DEST = path.join(ROOT, 'dist', 'desktop-release');
+/*
+ * 产物可能在两个位置：
+ *   · desktop/release          —— electron-builder 默认输出
+ *   · dist/desktop-release     —— build.directories.output 指到这里的配置（当前采用）
+ * 之所以后者更实用：dist/desktop-release 就是上传脚本读的目录，省一次拷贝；
+ * 另外 desktop/release 曾出现过 app.asar 被句柄锁住、连删都删不掉的情况。
+ */
+const LEGACY = path.join(ROOT, 'desktop', 'release');
+const OUT = path.join(ROOT, 'dist', 'desktop-release');
+const SRC = fs.existsSync(path.join(LEGACY, 'latest.yml')) ? LEGACY : OUT;
+const DEST = OUT;
+const SAME_DIR = path.resolve(SRC) === path.resolve(DEST);
 
 if (!fs.existsSync(SRC)) {
   console.error(`ERROR: 找不到桌面端产物目录 ${path.relative(ROOT, SRC)}`);
@@ -48,7 +58,7 @@ if (missing.length) {
   process.exit(1);
 }
 
-fs.rmSync(DEST, { recursive: true, force: true });
+if (!SAME_DIR) fs.rmSync(DEST, { recursive: true, force: true });
 fs.mkdirSync(DEST, { recursive: true });
 
 // 只搬发布需要的：排除 win-unpacked（几百 MB 目录树）、builder-debug.yml（含本机路径，不该公开）
@@ -59,12 +69,29 @@ for (const name of fs.readdirSync(SRC)) {
   const src = path.join(SRC, name);
   if (!fs.statSync(src).isFile()) continue;
   if (!KEEP.test(name) || SKIP.test(name)) continue;
-  fs.copyFileSync(src, path.join(DEST, name));
+  if (!SAME_DIR) fs.copyFileSync(src, path.join(DEST, name));
   moved.push({ name, size: fs.statSync(src).size });
 }
 
-const total = moved.reduce((s, m) => s + m.size, 0);
-console.log(`>> 待上传目录：${path.relative(ROOT, DEST)}（合计 ${(total / 1024 / 1024).toFixed(1)} MB）`);
+/*
+ * builder-debug.yml 含本机绝对路径（D:\qtvq\desktop\...）与构建机信息，
+ * 不该出现在公网下载目录。2026-10-30 就因为这个文件被一起上传，
+ * https://qtvq.cn/release/desktop/builder-debug.yml 一度可以匿名下载。
+ * SAME_DIR 模式下没有走"清空 DEST"，所以这里要单独兜一次。
+ */
+for (const junk of ['builder-debug.yml']) {
+  const p = path.join(DEST, junk);
+  if (fs.existsSync(p)) {
+    try {
+      fs.unlinkSync(p);
+    } catch {
+      /* 删不掉就报警，但不阻断发布 */
+      console.warn(`WARN: 无法删除 ${junk}，上传前请手动移除（否则本机路径会公开）`);
+    }
+  }
+}
+
+const total = moved.reduce((s, m) => s + m.size, 0);console.log(`>> 待上传目录：${path.relative(ROOT, DEST)}（合计 ${(total / 1024 / 1024).toFixed(1)} MB）`);
 for (const m of moved) console.log(`   ${m.name}  ${(m.size / 1024 / 1024).toFixed(2)} MB`);
 console.log('');
 console.log('   客户端自动更新地址：https://qtvq.cn/release/desktop/latest.yml');

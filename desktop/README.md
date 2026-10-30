@@ -34,13 +34,36 @@ build/               编译期资源（安装包图标），不进包
 ```bash
 npm run check    # 语法检查
 npm run smoke    # 运行时冒烟（需要真实桌面会话，约 10 秒）
-npm run dist     # 打包 nsis + portable
+npm run dist     # 打包 nsis + portable → 输出到 ../dist/desktop-release
 npm run dist:nsis
 ```
+
+打包产物直接落在 `dist/desktop-release/`（`build.directories.output`），因为那正是上传脚本
+读取的目录，省一次拷贝。
+
+> 不要用 `-c.directories.output=...` 从命令行覆盖输出目录：实测这样会连 `productName`
+> 一起丢掉，打出来的 exe 变成 `qtvq-desktop.exe`、安装包变成 `qtvq-desktop Setup 1.0.7.exe`
+> —— 体积和名字都不同，上传时极易传错版本。要改就改 `package.json` 的 `build` 字段。
 
 冒烟若报 `Cannot read properties of undefined (reading 'whenReady')`，
 说明当前 shell 里 `ELECTRON_RUN_AS_NODE=1`（被宿主进程传染），用
 `env -u ELECTRON_RUN_AS_NODE npm run smoke` 跑。
+
+## 怎么验收（重要）
+
+**能从终端验证的**（`npm run smoke`）：
+preload 注入、页面里无 Node 能力、GET/POST 接口可用、壳版本号正确。
+
+**只能双击验收的**：窗口是否真的弹出来。
+用 `Start-Process` / bash 从终端启动 GUI 进程时，实测会出现"进程存活但无窗口、
+不写日志"的现象，而且**连原始 `electron.exe` 的副本也一样** —— 所以这不是包的缺陷，
+是这种无界面启动方式本身不可靠。别在这上面耗时间，直接双击安装包看。
+
+出问题时的取证顺序：
+1. `%APPDATA%\qtvq-desktop\logs\main.log` —— 正常日志（帮助菜单里有"打开日志目录"）
+2. `%TEMP%\qtvq-desktop.bootstrap.log` —— 极早期诊断，能证明主进程跑到哪一步
+   （`module loaded` → `singleInstanceLock` → `app ready` → 各 step ok）。
+   连这一行都没有，说明 Electron 根本没加载到 main.js，问题在 exe 或资源层。
 
 ## 发版流程
 
@@ -54,7 +77,8 @@ npm run dist
 #    node tools/scripts/write-download-config.mjs
 #    node tools/scripts/write-app-releases.mjs && node tools/scripts/write-release-manifest.mjs
 
-# 3. 上传（会校验 latest.yml 引用的包真能下载、长度一致）
+# 3. 校验 + 上传（会校验 latest.yml 引用的包真能下载、长度一致）
+node tools/scripts/publish-desktop-release.mjs
 powershell -File ../tools/scripts/upload-desktop-ssh.ps1
 ```
 
@@ -64,3 +88,7 @@ powershell -File ../tools/scripts/upload-desktop-ssh.ps1
   electron-updater 对它无效。壳里检测 `PORTABLE_EXECUTABLE_DIR` 后直接跳过，并提示去下载页。
 - 安装包**未做代码签名**：Windows SmartScreen 会提示"未知发布者"。要消除需购买
   EV/OV 代码签名证书并配置 `win.certificateFile`。
+- **别在 `desktop/` 目录里执行 `asar extract-file ... package.json`**：它会把 asar 里的
+  精简版 package.json 解到**当前目录**，直接覆盖桌面端的 `package.json`，
+  把 `build` / `scripts` / `devDependencies` 全部冲掉。2026-10-30 踩过一次 ——
+  之后两次打包都用了残缺配置，产物名与体积都变了。要检查 asar 用 `asar extract` 到临时目录。

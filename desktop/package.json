@@ -19,7 +19,7 @@
     "productName": "Q问",
     "copyright": "我心永恒（北京）网络科技有限公司",
     "directories": {
-      "output": "release"
+      "output": "../dist/desktop-release"
     },
     "files": [
       "src/**/*",

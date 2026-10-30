@@ -50,6 +50,39 @@ const {
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
+
+/**
+ * 启动早期诊断（写入临时目录）。
+ *
+ * 为什么需要这么"土"的东西：打包后的 exe 是 GUI 子系统，没有 stdout/stderr；
+ * 如果进程在 initLog 之前就退出（模块加载失败、单实例锁被占），用户看到的只有
+ * "双击没反应"，开发者什么都拿不到。这三行 appendFileSync 不依赖任何初始化，
+ * 是唯一能证明"主进程到底跑到哪一步"的证据。
+ * 正常运行时每次启动写 3 行，可以忽略不计。
+ */
+const BOOT_LOG = path.join(os.tmpdir(), 'qtvq-desktop.bootstrap.log');
+/** 诊断写入的候选位置：临时目录 → 用户数据目录（两者都可能被策略拒绝） */
+const BOOT_LOG_ALT = (() => {
+  try {
+    return path.join(app.getPath('userData'), 'bootstrap.log');
+  } catch {
+    return null;
+  }
+})();
+function bootMark(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  for (const file of [BOOT_LOG, BOOT_LOG_ALT]) {
+    if (!file) continue;
+    try {
+      fs.appendFileSync(file, line);
+      return; // 写成功一处即可
+    } catch {
+      /* 换下一个候选 */
+    }
+  }
+}
+bootMark(`module loaded dirname=${__dirname} version=${process.versions.electron}`);
 
 /* ────────────────────────── 常量 ────────────────────────── */
 
@@ -115,19 +148,43 @@ let updater = null;
  */
 let logStream = null;
 function initLog() {
+  // 主路径：userData/logs（用户机器上便于"帮助 → 打开日志目录"）
+  // 兜底：系统临时目录。用户目录不可写、或打包后路径异常时，日志不能跟着一起丢 ——
+  // 否则客户端"点了没反应"就成了完全无迹可查的黑盒。
+  const candidates = [];
   try {
-    const dir = path.join(app.getPath('userData'), 'logs');
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, 'main.log');
-    if (fs.existsSync(file) && fs.statSync(file).size > 1024 * 1024) {
-      fs.copyFileSync(file, path.join(dir, 'main.1.log'));
-      fs.truncateSync(file, 0);
-    }
-    logStream = fs.createWriteStream(file, { flags: 'a' });
+    candidates.push(path.join(app.getPath('userData'), 'logs', 'main.log'));
   } catch {
-    logStream = null; // 日志不可用不能影响启动
+    /* userData 取不到就只走兜底 */
+  }
+  candidates.push(path.join(os.tmpdir(), 'qtvq-desktop.log'));
+
+  for (const file of candidates) {
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      if (fs.existsSync(file) && fs.statSync(file).size > 1024 * 1024) {
+        try {
+          fs.copyFileSync(file, file + '.1');
+        } catch {
+          /* 轮转失败不阻塞 */
+        }
+        fs.truncateSync(file, 0);
+      }
+      logStream = fs.createWriteStream(file, { flags: 'a' });
+      break;
+    } catch {
+      logStream = null;
+    }
   }
 }
+function safeUserData() {
+  try {
+    return app.getPath('userData');
+  } catch {
+    return '(不可用)';
+  }
+}
+
 function log(...args) {
   const line = `[${new Date().toISOString()}] ${args
     .map((a) => (a instanceof Error ? a.stack || a.message : String(a)))
@@ -699,23 +756,53 @@ function debounce(fn, ms) {
 /* ────────────────────────── 启动 ────────────────────────── */
 
 // 单实例：重复启动时聚焦已有窗口（否则会出现多个托盘图标与多份更新检查）
-if (!app.requestSingleInstanceLock()) {
+const gotSingleLock = app.requestSingleInstanceLock();
+bootMark(`singleInstanceLock=${gotSingleLock}`);
+if (!gotSingleLock) {
+  // 注意：ready 之前 app.quit() 有可能不干净地退出，但这属于正常路径（用户重复双击）
+  bootMark('another instance is running, quit this one');
   app.quit();
 } else {
   app.on('second-instance', () => showWindow());
 
   app.whenReady().then(() => {
+    bootMark('app ready');
     // Windows 必须设，否则通知不显示、任务栏会出现两个图标
-    if (process.platform === 'win32') app.setAppUserModelId('cn.qtvq.desktop');
+    if (process.platform === 'win32') {
+      try {
+        app.setAppUserModelId('cn.qtvq.desktop');
+      } catch (err) {
+        log('[boot] setAppUserModelId 失败（继续）', err);
+      }
+    }
 
     initLog();
-    log(`[boot] Q问 ${SHELL_VERSION} portable=${IS_PORTABLE} electron=${process.versions.electron}`);
+    log(
+      `[boot] Q问 ${SHELL_VERSION} portable=${IS_PORTABLE} electron=${process.versions.electron} ` +
+        `userData=${safeUserData()}`,
+    );
 
-    lockDownPermissions(session.defaultSession);
-    buildMenu();
-    createWindow();
-    setupTray();
-    setupUpdater();
+    /*
+     * 逐步启动并逐步记日志。
+     * 为什么：打包后的 exe 一旦某步抛错，用户看到的是"双击没反应"，
+     * 而没有分步日志就只能靠猜。这里任何一步失败都不再拖垮后续步骤。
+     */
+    const step = (name, fn) => {
+      try {
+        fn();
+        log(`[boot] ${name} ok`);
+        bootMark(`${name} ok`);
+      } catch (err) {
+        log(`[boot] ${name} 失败`, err);
+        bootMark(`${name} 失败: ${err && err.message}`);
+      }
+    };
+
+    step('permissions', () => lockDownPermissions(session.defaultSession));
+    step('menu', buildMenu);
+    step('window', createWindow);
+    step('tray', setupTray);
+    step('updater', setupUpdater);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
