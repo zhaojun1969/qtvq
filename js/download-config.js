@@ -5,7 +5,7 @@
  *   node tools/scripts/write-download-config.mjs && node tools/scripts/write-release-manifest.mjs
  * 这两个脚本读同一份 release-links.json，下载页与 App 自动更新不会分叉。
  *
- * 生成时间: 2026-09-23T11:15:54.416Z
+ * 生成时间: 2026-10-30T02:36:06.656Z
  * App 版本: 1.0.6
  * 留空的入口在页面上显示「即将上线」，但**不再是一个点了没反应的死链**：
  * js/download.js 会把它们渲染成不可点状态并写明原因。
@@ -15,7 +15,7 @@ export const DOWNLOAD_LINKS = {
   "windows": {
     "kind": "app",
     "label": "Windows 桌面版",
-    "href": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
+    "href": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.7.exe",
     "note": "Windows 10/11 · 下载后双击安装",
     "icon": "🖥️"
   },
@@ -108,8 +108,8 @@ export const DOWNLOAD_LINKS = {
     "desc": "快手内搜索「Q问」",
     "href": "",
     "qrcode": "",
-    "appid": "",
-    "note": "待申请小程序账号"
+    "appid": "ks651051624357102489",
+    "note": "已创建小程序，上传二维码后此处显示"
   },
   "jd": {
     "kind": "miniprogram",

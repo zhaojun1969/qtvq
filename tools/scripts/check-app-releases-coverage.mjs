@@ -21,8 +21,11 @@
  *   1. 渠道名必须都在 APP_CHANNELS 里（防手滑写成 `kuaisho`，那种记录永远匹配不上）
  *   2. APP_CHANNELS 里每个渠道：**要么有记录，要么在 `_未发布渠道` 里显式豁免**
  *      —— 新增渠道忘了登记，这条会红
- *   3. 有记录的渠道，version 必须等于 manifest.versionName（统一升级的前提：
- *      一次发版，所有端版本号一起走；某端落后就是"发了一半"）
+ *   3. 有记录的渠道，version 必须等于它**自己的**版本源：
+ *      小程序/H5 类 → `apps/qtvq-uni/src/manifest.json` 的 versionName
+ *      windows（Electron）→ `desktop/package.json` 的 version
+ *      （一次发版，同一类产物版本一起走；某端落后就是"发了一半"。
+ *        桌面端不跟 manifest 走：它是独立打包、独立更新链路的另一个产物）
  *   4. 安装包类渠道（app/desktop）必须有 downloadUrl —— 否则客户端提示有新版却点不动，
  *      那就是一个假更新；小程序/web 允许为空（版本包由平台/静态站托管）
  *
@@ -88,8 +91,19 @@ if (missing.length) {
 }
 
 // ③ 版本号统一
+//
+// 例外：**windows（Electron 桌面端）有自己的版本源 desktop/package.json**。
+// 桌面壳是独立打包、独立更新链路的产物，与小程序/H5 共用的 manifest.versionName
+// 不是同一个东西。硬要求同号会逼出"为了发桌面去改小程序版本号"这种假统一 ——
+// 小程序根本没有对应版本的包，改了反而制造新的不一致。
+// 所以：小程序与 H5 类渠道对 manifest，桌面端对 desktop/package.json。
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const appVersion = String(manifest.versionName || '').trim();
+const desktopPkgPath = path.join(ROOT, 'desktop', 'package.json');
+const desktopVersion = fs.existsSync(desktopPkgPath)
+  ? String(JSON.parse(fs.readFileSync(desktopPkgPath, 'utf8')).version || '').trim()
+  : '';
+
 if (!appVersion) {
   problems.push('apps/qtvq-uni/src/manifest.json 缺少 versionName');
 } else {
@@ -100,10 +114,19 @@ if (!appVersion) {
       problems.push(`${channel}.version 非法（"${v}"），应为 1~4 段纯数字`);
       continue;
     }
-    if (v !== appVersion) {
+    const isDesktop = channel === 'windows';
+    const expected = isDesktop && desktopVersion ? desktopVersion : appVersion;
+    const source = isDesktop && desktopVersion ? 'desktop/package.json' : 'manifest.versionName';
+    if (desktopVersion === '' && isDesktop) {
+      problems.push('desktop/package.json 不存在或没有 version，无法核对桌面端版本号');
+      continue;
+    }
+    if (v !== expected) {
       problems.push(
-        `${channel}.version=${v} 与 manifest.versionName=${appVersion} 不一致 —— ` +
-          '统一升级要求各端同一次发版用同一个版本号，落后就是"发了一半"',
+        `${channel}.version=${v} 与 ${source}=${expected} 不一致 —— ` +
+          (isDesktop
+            ? '桌面端必须与安装包版本同号，否则"清单说有新版、包却是旧的"'
+            : '统一升级要求各端同一次发版用同一个版本号，落后就是"发了一半"'),
       );
     }
   }
@@ -147,7 +170,9 @@ if (problems.length === 0) {
   const covered = Object.keys(records).filter((k) => APP_CHANNELS.includes(k)).length;
   console.log(
     `[check-app-releases-coverage] ✅ ${covered}/${APP_CHANNELS.length} 渠道有记录，` +
-      `版本统一 ${appVersion}，安装包渠道均有真实地址`,
+      `小程序/H5 统一 ${appVersion}` +
+        (desktopVersion ? ` · 桌面端 ${desktopVersion}` : '') +
+        '，安装包渠道均有真实地址',
   );
   for (const n of notes) console.log('  · ' + n);
   process.exit(0);

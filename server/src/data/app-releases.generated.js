@@ -2,7 +2,7 @@
  * ⚠️ 本文件由 tools/scripts/write-app-releases.mjs 生成，请勿手改。
  * 唯一数据源：app-releases.json（仓库根）
  * 用途：自建 Node（迁移后的 `/api/app/bootstrap`）
- * 生成时间：2026-10-28T08:05:59.605Z
+ * 生成时间：2026-10-30T02:36:07.056Z
  *
  * 各端发布记录 —— 版本/更新的唯一数据源。JSON 不能带注释，说明写在这里。
  * 谁在用它：① Node 服务 GET /v1/app/bootstrap?channel=&version=（各端专用端口）；
@@ -17,16 +17,16 @@
  * 改完必须重启服务（nginx 反代到 /v1/，无热重载）：sudo systemctl restart qtvq-report
  */
 
-export const GENERATED_AT = "2026-10-28T08:05:59.605Z";
+export const GENERATED_AT = "2026-10-30T02:36:07.056Z";
 
 export const APP_RELEASES_GENERATED = {
   "windows": {
-    "version": "1.0.6",
+    "version": "1.0.7",
     "minVersion": "1.0.0",
     "mode": "prompt",
-    "notes": "Windows 桌面客户端首个版本",
-    "downloadUrl": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
-    "publishedAt": "2026-09-21T07:42:00.000Z"
+    "notes": "界面改为直连主站（不再内嵌随包固化的旧界面）；修复托盘图标从未被打包、壳版本号显示成 Electron 版本、导航校验可被 qtvq.cn.evil.com 绕过；免安装版不再误报可更新",
+    "downloadUrl": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.7.exe",
+    "publishedAt": "2026-10-30T02:26:24.736Z"
   },
   "wechat": {
     "version": "1.0.6",

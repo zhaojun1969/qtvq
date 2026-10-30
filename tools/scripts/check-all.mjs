@@ -33,6 +33,8 @@ const LOCAL = [
   ['发布记录覆盖度（14 渠道是否都有版本/豁免，版本号是否统一）', 'tools/scripts/check-app-releases-coverage.mjs'],
   ['渠道名契约（客户端 runtimeTag 与服务端 APP_CHANNELS 同名）', 'tools/scripts/check-channel-contract.mjs'],
   ['桌面发布包自洽（latest.yml ↔ 安装包 ↔ 下载页）', 'tools/scripts/check-desktop-release.mjs'],
+  ['桌面壳（沙箱/暴露面/托盘图标/导航精确匹配/免安装版）', 'tools/scripts/check-desktop-shell.mjs'],
+  ['上架材料体检（类目/算法备案/安全评估/私钥/小程序码/页脚一致）', 'tools/scripts/check-mp-materials.mjs'],
   ['静态站死胡同（链接/锚点/按钮/导航）', 'tools/scripts/audit-dead-ends.mjs'],
   ['内容安全词表（绕过手法 + 误伤 + 复核级类别）', 'tools/scripts/check-content-safety.mjs'],
   ['文本水印（往返/截断可溯源/不误伤/不影响阅读）', 'tools/scripts/check-watermark.mjs'],

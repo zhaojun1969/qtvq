@@ -84,7 +84,10 @@
     "check:channel": "node tools/scripts/check-channel-contract.mjs",
     "check:desktop-release": "node tools/scripts/check-desktop-release.mjs",
     "build:h5": "cd apps/qtvq-uni && npm run build:h5",
-    "uni:build:h5": "npm run build:h5"
+    "uni:build:h5": "npm run build:h5",
+    "check:desktop-shell": "node tools/scripts/check-desktop-shell.mjs",
+    "check:mp-materials": "node tools/scripts/check-mp-materials.mjs",
+    "mp:qrcode": "node tools/scripts/apply-mp-qrcode.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

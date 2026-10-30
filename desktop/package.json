@@ -1,14 +1,18 @@
 {
   "name": "qtvq-desktop",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "我心永恒 Q问 · Windows 桌面客户端",
   "private": true,
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "check": "node --check src/main.js && node --check preload/index.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win nsis portable",
-    "dist:all": "electron-builder --win nsis portable --publish never"
+    "dist:nsis": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "dist:all": "electron-builder --win nsis portable --publish never",
+    "smoke": "electron scripts/smoke.js"
   },
   "build": {
     "appId": "cn.qtvq.desktop",
@@ -20,7 +24,6 @@
     "files": [
       "src/**/*",
       "preload/**/*",
-      "web/**/*",
       "package.json"
     ],
     "extraMetadata": {
@@ -28,10 +31,20 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon-512.png"
     },
     "nsis": {
       "oneClick": false,

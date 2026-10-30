@@ -72,7 +72,33 @@ for (const ch of channels) {
         if (IGNORE.has(k)) continue;
         if (JSON.stringify(p.json?.[k]) !== JSON.stringify(n.json?.[k])) diffs.push(k);
       }
+      /*
+       * 只报"差异字段: capabilities"没有可操作性 —— 看到这句话的人还得自己去 curl 两端比对。
+       * 这里下钻到叶子：直接说 `capabilities.pay.wechat  Pages=true  Node=false`，
+       * 才能一眼定位到环境变量（两端判定逻辑相同，差异只可能来自配置）。
+       */
+      const leaf = [];
+      const walk = (a, b, prefix) => {
+        if (leaf.length >= 8) return;
+        const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+        if (isObj(a) && isObj(b)) {
+          for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+            if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) walk(a[k], b[k], prefix ? `${prefix}.${k}` : k);
+          }
+          return;
+        }
+        leaf.push(`${prefix}  Pages=${JSON.stringify(a)}  Node=${JSON.stringify(b)}`);
+        if (prefix.includes('pay.')) {
+          // 支付能力差异几乎总是环境变量：两端判定代码一模一样（六项齐全才为 true）
+          leaf.push(
+            '两端判定代码完全相同（六项齐全才为 true）：检查 WECHAT_APP_ID / WECHAT_MCH_ID / ' +
+              'WECHAT_API_V3_KEY / WECHAT_MCH_PRIVATE_KEY / WECHAT_MCH_SERIAL / WECHAT_PAY_NOTIFY_URL 是否都配了值',
+          );
+        }
+      };
+      for (const k of diffs) walk(p.json?.[k], n.json?.[k], k);
       check(`${ch}${ver ? '@' + ver : ''} 逐字段一致`, false, '差异字段: ' + diffs.join(', '));
+      for (const line of leaf) console.log(`       ↳ ${line}`);
     } else {
       check(`${ch}${ver ? '@' + ver : ''} 逐字段一致`, true);
     }

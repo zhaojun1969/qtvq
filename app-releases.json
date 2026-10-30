@@ -12,7 +12,6 @@
     "  服务端再弹一次就是双弹窗。这里记录的作用是『版本与能力清单可查』，不是催更。",
     "改完必须重启服务（nginx 反代到 /v1/，无热重载）：sudo systemctl restart qtvq-report"
   ],
-
   "_未发布渠道": [
     "android —— 无 APK/AAB：应用宝 / 华为 / 小米 / OPPO / vivo 均未上架，downloadUrl 无真实地址。",
     "ios —— 无 iOS 包：需 Apple 开发者账号（¥688/年）+ 审核，downloadUrl 无真实地址。",
@@ -21,16 +20,14 @@
     "等于制造一个『提示有新版但下不了』的空链接。等真实安装包产出后再补，同时必须通过",
     "tools/scripts/check-app-releases-coverage.mjs 的『无记录必须有豁免说明』断言。"
   ],
-
   "windows": {
-    "version": "1.0.6",
+    "version": "1.0.7",
     "minVersion": "1.0.0",
     "mode": "prompt",
-    "notes": "Windows 桌面客户端首个版本",
-    "downloadUrl": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
-    "publishedAt": "2026-09-21T07:42:00.000Z"
+    "notes": "界面改为直连主站（不再内嵌随包固化的旧界面）；修复托盘图标从未被打包、壳版本号显示成 Electron 版本、导航校验可被 qtvq.cn.evil.com 绕过；免安装版不再误报可更新",
+    "downloadUrl": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.7.exe",
+    "publishedAt": "2026-10-30T02:26:24.736Z"
   },
-
   "wechat": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -39,7 +36,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-09-18T00:00:00.000Z"
   },
-
   "web": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -48,7 +44,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-09-20T00:00:00.000Z"
   },
-
   "alipay": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -57,7 +52,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "douyin": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -66,7 +60,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "xhs": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -75,7 +68,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "kuaishou": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -84,7 +76,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "jd": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -93,7 +84,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "qq": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -102,7 +92,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "baidu": {
     "version": "1.0.6",
     "minVersion": "1.0.0",
@@ -111,7 +100,6 @@
     "downloadUrl": null,
     "publishedAt": "2026-10-28T00:00:00.000Z"
   },
-
   "mp360": {
     "version": "1.0.6",
     "minVersion": "1.0.0",

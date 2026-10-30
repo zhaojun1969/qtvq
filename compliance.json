@@ -1,0 +1,26 @@
+{
+  "_说明": [
+    "微信小程序上架相关的『人工材料』唯一记录处 —— 代码替不了，只能人补。",
+    "改完运行：node tools/scripts/check-mp-materials.mjs 查看还缺什么。",
+    "提审前用 --strict 当门禁：node tools/scripts/check-mp-materials.mjs --strict",
+    "algorithmFiling.number 填了之后，必须同时出现在 privacy.html 与 terms.html（算法备案要求公示），检查器会核对。",
+    "securityAssessment 填报告编号与出具日期（YYYY-MM-DD），没有编号就只填 date。",
+    "mpCategory.status 用于记录进度：pending=未申请 / submitted=已提交 / approved=已通过。"
+  ],
+  "mpCategory": {
+    "name": "",
+    "status": "pending",
+    "note": "微信侧类目：深度合成-AI问答（需企业主体 + 算法备案 + 安全评估）"
+  },
+  "algorithmFiling": {
+    "number": "",
+    "name": "",
+    "date": ""
+  },
+  "securityAssessment": {
+    "reportNo": "",
+    "date": "",
+    "status": "pending"
+  },
+  "icp": "京ICP备：19045082号"
+}

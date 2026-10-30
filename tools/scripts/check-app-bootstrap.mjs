@@ -122,11 +122,33 @@ if (!offline) {
   if (unknown.status === 400 && unknown.json?.code === 'E_UNKNOWN_CHANNEL') good('未知渠道被拒并返回可选渠道列表');
   else bad(`未知渠道未被正确拒绝：HTTP ${unknown.status}`);
 
-  // 各端真实结论
+  /*
+   * 各端真实结论。
+   *
+   * "当前版本"必须从**版本源**动态取，不能写死 —— 以前这里硬编码 windows@1.0.6，
+   * 桌面端一升到 1.0.7，这条就变成"期望不更新、实际要求更新"的假失败，
+   * 而它恰好是发布后最该看的那条绿灯。写死版本号的断言 = 定时炸弹。
+   */
+  const releasesSrc = (() => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(ROOT, 'app-releases.json'), 'utf8'));
+    } catch {
+      return {};
+    }
+  })();
+  const wxCurrent = String(releasesSrc.wechat?.version || '1.0.6');
+  const winCurrent = (() => {
+    try {
+      return String(JSON.parse(fs.readFileSync(path.join(ROOT, 'desktop', 'package.json'), 'utf8')).version);
+    } catch {
+      return String(releasesSrc.windows?.version || '1.0.6');
+    }
+  })();
+
   for (const [channel, version, expect] of [
-    ['wechat', '1.0.6', 'needsUpdate=false'],
+    ['wechat', wxCurrent, 'needsUpdate=false'],
     ['wechat', '0.9.0', 'needsUpdate=true'],
-    ['windows', '1.0.6', 'needsUpdate=false'],
+    ['windows', winCurrent, 'needsUpdate=false'],
     ['windows', '1.0.0', 'needsUpdate=true'],
     ['android', '1.0.0', 'needsUpdate=false（未发布→基线）'],
   ]) {

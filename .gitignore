@@ -47,7 +47,6 @@ __pycache__/
 # web/ 是打包好的 H5（带哈希文件名）。两者都能由源码重新生成，
 # 发版靠 app-releases.json 指路，不该进 Git 历史。
 desktop/release/
-desktop/web/
 
 # 分享卡走查的截图产物（每次 run.mjs 重新生成，只用于人眼复核）
 tools/card-walkthrough/out/
@@ -58,3 +57,4 @@ tools/card-walkthrough/out/
 private.*.key
 private.key
 uploads.key
+backup/desktop-web-legacy-*/

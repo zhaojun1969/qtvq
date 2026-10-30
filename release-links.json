@@ -22,8 +22,8 @@
     "wgtCompatible": true
   },
   "windows": {
-    "version": "1.0.6",
-    "url": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.6.exe",
+    "version": "1.0.7",
+    "url": "https://qtvq.cn/release/desktop/qtvq-desktop-Setup-1.0.7.exe",
     "note": "Windows 10/11 安装版（另有免安装版，见发布目录）"
   },
   "weixin": {
