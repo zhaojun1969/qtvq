@@ -126,6 +126,15 @@ Write-Host "  本地代码指纹 : $localSha"
 if ($remoteSha -and $remoteSha -eq $localSha) {
     Write-Host ""
     Write-Host "✅ 部署成功：线上跑的就是本地这份代码" -ForegroundColor Green
+
+    # E.88：部署后 POST+GET 双面冒烟——E.86 事故（POST 路由崩循环、/v1/health 依旧绿）
+    # 的对策。冒烟失败 = 禁止放行（exit 1），运维立刻回滚或修复。
+    Write-Host "=== 部署冒烟（GET+POST 双面）===" -ForegroundColor Cyan
+    & node (Join-Path $Root "tools\scripts\deploy-smoke.mjs")
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ 冒烟未过：本次部署禁止放行——回滚或修复后重试。" -ForegroundColor Red
+        exit 1
+    }
     Write-Host "   下一步可跑：node tools/scripts/server-build-sha.mjs --check   # 从外网复核" -ForegroundColor Gray
     exit 0
 }

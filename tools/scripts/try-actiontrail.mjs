@@ -3,6 +3,9 @@
  * 若都没有 actiontrail:LookupEvents 权限，就明确说"我没有权限"，而不是让你白等。
  */
 import fs from 'node:fs';
+
+const TARGET = process.env.QTVQ_AUDIT_AK_ID;
+if (!TARGET) { console.error('缺环境变量 QTVQ_AUDIT_AK_ID'); process.exit(1); }
 import crypto from 'node:crypto';
 
 const pe = (s) => encodeURIComponent(String(s)).replace(/\+/g, '%20').replace(/\*/g, '%2A').replace(/%7E/g, '~');
@@ -54,7 +57,7 @@ for (const cred of creds) {
   const r = await rpc('https://actiontrail.cn-hangzhou.aliyuncs.com/', 'LookupEvents', '2020-07-06', cred, {
     MaxResults: '30',
     'LookupAttribute.1.Key': 'AccessKeyId',
-    'LookupAttribute.1.Value': 'LTAI5t7RccCgS8TCrsovav42',
+    'LookupAttribute.1.Value': process.env.QTVQ_AUDIT_AK_ID,
     StartTime: '2026-09-05T00:00:00Z',
     EndTime: '2026-09-11T00:00:00Z',
   }).catch((e) => ({ Code: 'FETCH_ERROR', Message: e.message }));

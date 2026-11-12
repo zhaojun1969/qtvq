@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const TARGET = 'LTAI5t7RccCgS8TCrsovav42';
+const TARGET = process.env.QTVQ_AUDIT_AK_ID;
+if (!TARGET) { console.error('缺环境变量 QTVQ_AUDIT_AK_ID（审计目标 AccessKey ID，从 env 注入，不写入源码）'); process.exit(1); }
 
 const files = [
   '.dev.vars',

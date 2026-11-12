@@ -99,12 +99,17 @@ export async function agreeAdult(uid, { birthYear }) {
   if (currentYearCN(now) - y < 18) {
     return { ok: false, code: 'E_UNDERAGE', message: '本产品仅面向 18 岁以上成年人' };
   }
+  /* E.93 修复：upsert:false 在 users 文档不存在时（只注册、还没 PATCH 过资料的新号）
+   * 会**静默无效**——POST /adult 返回 ok:true 但 birthYear 根本没落库，
+   * 之后所有 requireAdult 入口（付费转盘/报告）误报 E_NEED_BIRTHYEAR
+   * （2026-11-12 转盘线上实测抓到）。改 upsert:true，_id=uid 字符串与
+   * profile PATCH 的键型一致。 */
   await getDB()
     .collection('users')
     .updateOne(
       { _id: uid },
       { $set: { birthYear: y, adultAgreedAt: now, adultAgreementVer: ADULT_AGREEMENT_VER, updatedAt: now } },
-      { upsert: false },
+      { upsert: true },
     );
   return { ok: true, birthYear: y, age: currentYearCN(now) - y, agreementVer: ADULT_AGREEMENT_VER };
 }

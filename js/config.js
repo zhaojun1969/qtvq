@@ -101,5 +101,10 @@ export function imgUrl(path) {
 /** @param {string} path 以 / 开头的路径，如 /api/chat */
 export function apiUrl(path) {
   const p = path.startsWith('/') ? path : `/${path}`;
+  /* E.82：/v1/* 只存在于 qtvq.cn（nginx 反代到境内 Node）——api.qtvq.cn 与
+   * pages.dev 都是 Pages 域，没有 /v1 路由。直连加速只属于 /api/*，
+   * /v1 一律走同源，否则钱包/报告等在直连模式下全是 404"网络错误"
+   * （2026-11-04 UI 实测：缘值余额读取失败即此根因）。 */
+  if (p.startsWith('/v1/') || p === '/v1') return p;
   return `${API_ORIGIN}${p}`;
 }

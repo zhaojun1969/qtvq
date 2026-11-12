@@ -32,7 +32,7 @@ import {
   queryRefund,
   notifyFail,
 } from '../services/wechat-pay.js';
-import { SKUS, createOrder, getOrder, markPaid, listOrders, cancelOrder } from '../services/orders.js';
+import { SKUS, createOrder, getOrder, getOrderOwned, markPaid, listOrders, cancelOrder } from '../services/orders.js';
 import { priceFenFor } from '../services/report-credits.js';
 import { priceWithCoupon, lockCoupon, consumeCoupon } from '../services/coupons.js';
 import { REPORT_SKUS } from '../constants.js';
@@ -242,9 +242,9 @@ router.get(
   '/wechat/query/:orderId',
   requireAuth,
   wrap(async (req, res) => {
-    const order = await getOrder(req.params.orderId);
-    if (!order) throw badRequest('订单不存在', 'E_NO_ORDER');
-    if (String(order.uid) !== String(req.uid)) throw badRequest('无权查看该订单', 'E_FORBIDDEN');
+    /* E.81 属主限定查询：订单不存在与他人订单统一 400，不泄漏存在性 */
+    const order = await getOrderOwned(req.params.orderId, req.uid);
+    if (!order) throw badRequest('订单不存在或无权查看', 'E_NO_ORDER');
 
     // 本地是终态就不必再问微信
     if (order.status === 'paid' || order.status === 'consumed' || order.status === 'refunded') {

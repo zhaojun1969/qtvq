@@ -2,7 +2,7 @@
  * ⚠️ 本文件由 tools/scripts/write-app-releases.mjs 生成，请勿手改。
  * 唯一数据源：app-releases.json（仓库根）
  * 用途：Cloudflare Pages（`/api/app/bootstrap`）
- * 生成时间：2026-10-30T02:36:07.056Z
+ * 生成时间：2026-11-11T23:03:40.595Z
  *
  * 各端发布记录 —— 版本/更新的唯一数据源。JSON 不能带注释，说明写在这里。
  * 谁在用它：① Node 服务 GET /v1/app/bootstrap?channel=&version=（各端专用端口）；
@@ -17,7 +17,7 @@
  * 改完必须重启服务（nginx 反代到 /v1/，无热重载）：sudo systemctl restart qtvq-report
  */
 
-export const GENERATED_AT = "2026-10-30T02:36:07.056Z";
+export const GENERATED_AT = "2026-11-11T23:03:40.595Z";
 
 export const APP_RELEASES_GENERATED = {
   "windows": {

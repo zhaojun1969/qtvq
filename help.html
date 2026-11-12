@@ -56,7 +56,7 @@
           <li><a href="#download">客户端下载</a></li>
           <li><a href="#404">找不到页面</a></li>
         </ul>
-        <p class="help-toc-foot"><a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a></p>
+        <p class="help-toc-foot"><span class="link-btn" data-open-contact style="cursor:pointer">客户留言（邮箱登录后可见）</span></p>
       </aside>
 
       <div class="help-content">
@@ -198,7 +198,7 @@
               <li><strong>缘值充值</strong>：只加余额，用于 <strong>转盘每次 ¥1</strong> 与 <strong>配对报告按次扣费</strong>，<strong>不能当会员费用</strong>。</li>
               <li>两笔钱分别记账、分别到账，谁也不顶替谁。</li>
             </ul>
-            <p>汇款疑问可 <a href="mailto:qtvq@qtvq.cn" class="link-btn" data-open-contact>联系客服 qtvq@qtvq.cn</a>。</p>
+            <p>汇款疑问可通过上方留言窗口联系客服，完整邮箱<strong>登录后</strong>在「联系客服」区点击查看。</p>
           </div>
           <p class="help-nav-row">
             <a href="#profile" class="btn btn-secondary btn-sm">上一节</a>
@@ -220,7 +220,7 @@
             <ul>
               <li><strong>短信验证码找回（推荐）</strong>：账户页 →「忘记密码」→ 填注册手机号 → 获取验证码（5 分钟内有效，同一号码 60 秒只能获取一次、每天最多 10 条）→ 填验证码与新密码。</li>
               <li><strong>微信扫码找回</strong>：适合已绑定微信的账号，扫码验证后重置。</li>
-              <li>两者都不行：邮件 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a> 联系客服。</li>
+              <li>两者都不行：完整邮箱已登录后可在本页「联系客服」区查看，或使用留言窗口。</li>
             </ul>
             <h3>③ 语音输入</h3>
             <ul>
@@ -246,10 +246,10 @@
         <section id="contact" class="help-section">
           <h2>联系客服</h2>
           <div class="help-card">
-            <p>邮箱：<strong>qtvq@qtvq.cn</strong></p>
+            <p>邮箱：<strong id="contact-email-masked">qtvq●●●@qtvq.cn</strong>（登录后点击下方按钮查看完整地址）</p>
             <ul>
               <li>任意页脚点 <strong>客户留言：</strong>，可写文字并上传最多 4 张截图。</li>
-              <li>也可直接发邮件至 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>，邮件客户端可附图片。</li>
+              <li id="contact-email-slot">完整客服邮箱：<strong>登录后点击查看</strong>（每日限 5 次，防爬虫收割）。<button type="button" class="btn btn-secondary btn-sm" id="btn-reveal-email">点击查看完整邮箱</button> <span id="revealed-email" style="display:none"></span></li>
               <li>建议留下回复邮箱；勿发送银行卡密码、验证码等敏感信息。</li>
             </ul>
             <button type="button" class="btn btn-primary" data-open-contact>打开留言窗口</button>
@@ -267,7 +267,7 @@
             <ul>
               <li>本产品以匿名设备编号（clientId）识别额度，<strong>不要求</strong>注册手机号或身份证。</li>
               <li>提问内容用于 AI 答复；请勿在对话中填写银行卡密码、验证码等敏感信息。</li>
-              <li>行使查阅、删除、注销等权利，请发邮件至 <a href="mailto:qtvq@qtvq.cn">qtvq@qtvq.cn</a>。</li>
+              <li>行使查阅、删除、注销等权利：登录后点击上方「点击查看完整邮箱」，或使用留言窗口。</li>
             </ul>
             <a href="privacy.html" class="btn btn-primary btn-sm">阅读完整隐私政策</a>
           </div>
@@ -317,7 +317,7 @@
     </p>
         <p class="footer-copyright">我心永恒（北京）网络科技有限公司版权所有</p>
 <p class="footer-support">
-      <a href="mailto:qtvq@qtvq.cn" class="footer-link-btn" data-open-contact>客户留言：qtvq@qtvq.cn</a>
+      <span class="footer-link-btn" data-open-contact style="cursor:pointer">客户留言（邮箱登录后可见）</span>
       · <a href="help.html">使用帮助</a>
       · <a href="privacy.html">隐私说明</a>
       · <a href="download.html">客户端下载</a>
@@ -326,5 +326,50 @@
 
   <script type="module" src="js/layout.js"></script>
   <script type="module" src="js/help.js"></script>
+<!-- crawler honeypot (E.78)：本地址仅存在于本页源码，正常用户不可见；收到发往该地址的邮件即证明爬虫收割，可定位泄漏页面 -->
+<span data-honeypot="trap-help@qtvq.cn" style="position:absolute;left:-9999px" aria-hidden="true">trap-help@qtvq.cn</span>
+<script>
+/* E.78 联系方式二次限流：登录后查看完整邮箱，每日 5 次/账号，服务端审计留痕 */
+(function () {
+  const btn = document.getElementById('btn-reveal-email');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const tokenKey = 'qtvq_auth_token';
+    const token = localStorage.getItem(tokenKey);
+    const slot = document.getElementById('revealed-email');
+    if (!token) {
+      location.href = 'account.html?next=help.html%23contact';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '获取中…';
+    try {
+      const res = await fetch('/v1/contact/reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({}),
+      });
+      const j = await res.json();
+      const d = j.data || j;
+      if (res.status === 200 && d.email) {
+        slot.style.display = 'inline';
+        slot.innerHTML = '<strong>' + d.email + '</strong>（剩余今日次数：' + d.remaining + '）';
+        btn.textContent = '已显示';
+      } else if (res.status === 429) {
+        btn.textContent = '今日次数已用完';
+        slot.style.display = 'inline';
+        slot.textContent = '（每日查看上限 5 次，明天再来）';
+      } else if (res.status === 401) {
+        location.href = 'account.html?next=help.html%23contact';
+      } else {
+        btn.textContent = '查看失败，稍后再试';
+      }
+    } catch (e) {
+      btn.textContent = '网络异常，稍后再试';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
 </body>
 </html>

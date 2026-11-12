@@ -82,6 +82,16 @@ export async function getOrder(orderId) {
 }
 
 /**
+ * 属主限定查询（E.81 防御纵深）：属主约束放进查询本身，
+ * 后续任何代码路径都不可能读到他人订单（原先"先查后判"依赖调用方记得判 uid）。
+ */
+export async function getOrderOwned(orderId, uid) {
+  return getDB()
+    .collection(COL)
+    .findOne({ orderId: String(orderId), uid: String(uid) });
+}
+
+/**
  * 标记已支付（幂等）。
  *
  * @returns {{settled:boolean, duplicate:boolean, order:object|null, credited?:number, mismatch?:boolean}}

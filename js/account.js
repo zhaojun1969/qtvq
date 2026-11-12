@@ -275,6 +275,9 @@ async function loadDashboard() {
   try {
     const data = await fetchAccountMe();
     renderDashboard(data);
+    /* E.82：首屏立即渲染缘值余额/明细。此前 refreshWallet 只挂在 30s 轮询与
+     * 支付回调上——首次打开要等最多半分钟才出数，期间一直是占位符 ¥—。 */
+    refreshWallet().catch(() => {});
   } catch (e) {
     // 登录态失效要**明确说出来**：以前只弹一个短暂 toast，页面随后显示访客面板，
     // 用户会以为自己已经登录却"看不到任何信息"（2026-09-16 业务方反馈）。
@@ -692,6 +695,10 @@ document.getElementById('btn-logout')?.addEventListener('click', async () => {
   if (guestPanel) guestPanel.hidden = false;
   if (userPanel) userPanel.hidden = true;
   refreshAuthNav();
+  /* E.82：退出后同步重置状态条与顶部统计（此前只切面板，
+   * 状态条仍显示"已登录：手机号…"，直到手动刷新才消失） */
+  setAccountStatus('', '当前未登录 · 请用下方任一方式登录或注册');
+  try { refreshStatUI(); } catch { /* 顶部统计在无数据时自行兜底 */ }
 });
 
 document.getElementById('btn-subscribe')?.addEventListener('click', () => {

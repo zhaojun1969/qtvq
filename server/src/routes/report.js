@@ -1051,9 +1051,9 @@ router.post(
   wrap(async (req, res) => {
     const db = getDB();
     const _id = parseObjectId(req.params.id);
-    const report = await db.collection('reports').findOne({ _id });
-    if (!report) throw notFound('报告不存在');
-    if (report.uid !== req.uid) throw unauthorized('无权分享该报告');
+    /* E.81 属主限定查询：不存在与无权统一 401，不泄漏报告存在性 */
+    const report = await db.collection('reports').findOne({ _id, uid: req.uid });
+    if (!report) throw unauthorized('报告不存在或无权分享');
 
     const token = report.shareToken || newShareToken();
     const expiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400000);
@@ -1162,12 +1162,12 @@ if (String(process.env.REPORT_STREAM || '') === '1') {
  * 短码反查（公开）：落地页/小程序把 t=<code> 换成 uid，再走既有归因。
  * 只返回 uid，不返回任何资料字段 —— 短码不是凭证，不能换出用户信息。
  */
-router.get('/shortcode/:code', async (req, res) => {
+router.get('/shortcode/:code', wrap(async (req, res) => {
   const { resolveShortCode } = await import('../services/shortcodes.js');
   const uid = await resolveShortCode(req.params.code);
   if (!uid) return res.status(404).json({ code: 'E_SHORTCODE_NOT_FOUND', error: '短码不存在' });
   return res.json({ uid });
-});
+}));
 
 /*
  * 当前用户的小程序码（分享卡用）：直接回图片字节，前端 canvas 当图片画。
@@ -1177,18 +1177,20 @@ router.get('/shortcode/:code', async (req, res) => {
  * 拿不到（未配置/接口失败）返回 503，前端据此退回 H5 短链二维码 —— 分享卡不能因为
  * 小程序码挂掉而整体出不了图。
  */
-router.get('/minicode/card.png', requireAuth, async (req, res) => {
+router.get('/minicode/card.png', requireAuth, wrap(async (req, res) => {
   const channel = String(req.query.ch || '').slice(0, 8);
   const { ensureShortCode } = await import('../services/shortcodes.js');
   const { getMiniProgramCode } = await import('../services/wechat-pay.js');
   const code = await ensureShortCode(req.uid);
-  const r = await getMiniProgramCode({ shortCode: code, channel });
+  /* E.92：env_version 可用 ?env=trial|develop 指定（真机归因验证扫体验版码） */
+  const envVersion = String(req.query.env || 'release');
+  const r = await getMiniProgramCode({ shortCode: code, channel, envVersion });
   if (!r.ok) return res.status(503).json({ code: 'E_MINICODE_UNAVAILABLE', error: r.error || '小程序码不可用' });
   res.set({
     'Content-Type': r.mime || 'image/jpeg',
     'Cache-Control': 'private, max-age=3600',
   });
   return res.end(r.buffer);
-});
+}));
 
 export default router;

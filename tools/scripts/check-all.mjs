@@ -36,6 +36,8 @@ const LOCAL = [
   ['桌面壳（沙箱/暴露面/托盘图标/导航精确匹配/免安装版）', 'tools/scripts/check-desktop-shell.mjs'],
   ['上架材料体检（类目/算法备案/安全评估/私钥/小程序码/页脚一致）', 'tools/scripts/check-mp-materials.mjs'],
   ['静态站死胡同（链接/锚点/按钮/导航）', 'tools/scripts/audit-dead-ends.mjs'],
+  ['上架前静态扫描（客户端API对账/死循环/硬编码密钥/升级通道）', 'tools/scripts/check-prelaunch-static.mjs'],
+  ['crash-surface（裸 async 无守卫=崩溃地雷）', 'tools/scripts/check-crash-surface.mjs'],
   ['内容安全词表（绕过手法 + 误伤 + 复核级类别）', 'tools/scripts/check-content-safety.mjs'],
   ['文本水印（往返/截断可溯源/不误伤/不影响阅读）', 'tools/scripts/check-watermark.mjs'],
   ['设计令牌（packages/tokens 与两端产物是否漂移）', 'tools/scripts/gen-tokens.mjs', ['--check']],
@@ -62,6 +64,8 @@ const LOCAL = [
 /** 需要网络或密钥 */
 const ONLINE = [
   ['测试套件 43 项（接口/支付/账号/内容安全/静态页）', 'tools/scripts/test-suite.mjs'],
+  ['跨端 API 审计（七端引用对账 + CORS + 连通性）', 'tools/scripts/audit-cross-platform-api.mjs'],
+  ['部署冒烟（GET+POST 双面，防崩循环无声放行）', 'tools/scripts/deploy-smoke.mjs'],
   ['各端专用端口（线上实测：渠道/更新结论/能力清单）', 'tools/scripts/check-app-bootstrap.mjs'],
   ['各端专用端口·双端闸门（Pages vs 自建 Node 逐字段）', 'tools/scripts/check-app-bootstrap-gate.mjs'],
   ['模型链路（Pages + Node 两侧真实探测）', 'tools/scripts/check-llm.mjs'],

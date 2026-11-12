@@ -77,6 +77,7 @@ defineProps({
   font-weight: 700;
   color: $color-text;
   line-height: 1.2;
+  white-space: nowrap; /* E.80 与主站同规：品牌两行结构各自单行 */
 }
 
 .brand-sub {
@@ -84,5 +85,6 @@ defineProps({
   color: $color-text-muted;
   line-height: 1.2;
   margin-top: 2rpx;
+  white-space: nowrap;
 }
 </style>

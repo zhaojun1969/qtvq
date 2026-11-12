@@ -422,6 +422,10 @@ router.post(
   wrap(async (req, res) => {
     const record = normalizeContactRecord(req.body);
     if (!record) throw badRequest('留言记录无效（至少需要 id 与 message）', 'E_CONTACT_INVALID');
+    // 内容安全（E.77）：这里是 CF functions 转发与内部投递的**汇合点**，
+    // 与公开路由 /api/contact 同一条审核线，双入口全覆盖。
+    const { assertSafe } = await import('../services/content-safety.js');
+    await assertSafe(String(record.message || ''), { field: 'contact', label: '客服留言' });
     const db = getDB();
     await ensureContactIndex(db);
     const now = new Date();
@@ -934,6 +938,85 @@ router.delete(
   wrap(async (req, res) => {
     const { adminDeleteSession } = await import('../services/auth-store.js');
     return ok(res, { deleted: await adminDeleteSession(req.params.hashId) });
+  }),
+);
+
+/*
+ * 境内用户账号桥（CF Pages 的 loadUser / 注销用）—— **独立路径**，不与
+ * `/auth-users/:userId`（auth_users 身份镜像）撞车：Express 按注册顺序匹配，
+ * 同路径的镜像 GET 会把本路由整个遮蔽（2026-11-04 端到端实测踩到的坑）。
+ *
+ * 语义：读/删 Mongo `users` 集合的**账号本体**（境内注册的用户全量在这里，
+ * CF KV 没有它们的记录）。镜像集合 auth_users 只服务"CF 注册用户的身份字段"。
+ *
+ * 安全边界：只回传 KV 形状的字段投影；手机号/微信 openid 等**可识别字段不出境**
+ * passwordHash/passwordSalt 必须回传 —— CF 侧注销的密码二次确认要本地验签，
+ * 这两个字段对 CF 注册用户本就存在其 KV 中，出境与否不改变数据分布。
+ */
+router.get(
+  '/auth-accounts/:userId',
+  wrap(async (req, res) => {
+    const db = getDB();
+    /*
+     * 境内账号数据是**双源**的（2026-11-04 实测确认的真实数据模型）：
+     *   · `auth_users` —— 注册/登录的凭证与身份文档（userId 字段为键，含 phone/passwordHash）
+     *   · `users`     —— 资料文档（_id 即 uid 字符串，首次 PATCH 资料时才创建）
+     * CF loadUser 需要两者合一：凭证（验密）+ 资料（展示）。任一缺失都允许。
+     */
+    const uid = String(req.params.userId);
+    const [cred, prof] = await Promise.all([
+      db.collection('auth_users').findOne({ userId: uid }),
+      db.collection('users').findOne({ _id: uid }),
+    ]);
+    if (!cred && !prof) return ok(res, null);
+    const ts = (v) => (v instanceof Date ? v.getTime() : Number(v) || null);
+    return ok(res, {
+      id: uid,
+      clientId: cred?.clientId || prof?.clientId || null,
+      nickname: prof?.nickname || null,
+      gender: prof?.gender || null,
+      city: prof?.city || null,
+      job: prof?.job || null,
+      height: prof?.height || null,
+      tags: Array.isArray(prof?.tags) ? prof.tags : [],
+      intro: prof?.intro || '',
+      passwordHash: cred?.passwordHash || null,
+      passwordSalt: cred?.passwordSalt || null,
+      status: prof?.status || 'active',
+      birthYear: prof?.birthYear || null,
+      createdAt: ts(cred?.createdAt) || ts(prof?.createdAt) || null,
+    });
+  }),
+);
+
+/** 注销桥（CF deleteUserAccount 调用）：凭证/镜像 + 资料 + 全部境内会话，一次删干净 */
+router.delete(
+  '/auth-accounts/:userId',
+  wrap(async (req, res) => {
+    const db = getDB();
+    const uid = String(req.params.userId);
+    const [mirror, prof, sessions] = await Promise.all([
+      db.collection('auth_users').deleteOne({ userId: uid }),
+      db.collection('users').deleteOne({ _id: uid }).catch(() => ({ deletedCount: 0 })),
+      db.collection('auth_sessions').deleteMany({ userId: uid }).catch(() => ({ deletedCount: 0 })),
+    ]);
+    return ok(res, {
+      userId: uid,
+      deleted: (mirror.deletedCount || 0) + (prof.deletedCount || 0),
+      sessionsRevoked: sessions.deletedCount || 0,
+    });
+  }),
+);
+
+/** 登录桥（CF findUserIdByPhone 回源）：手机号 → userId。手机号不出请求日志（path 为哈希前不可见的原值，仅 admin key 保护） */
+router.get(
+  '/auth-phone/:phone',
+  wrap(async (req, res) => {
+    const db = getDB();
+    const rec = await db.collection('auth_users')
+      .findOne({ phone: String(req.params.phone) }, { projection: { userId: 1, clientId: 1 } });
+    if (!rec) return ok(res, null);
+    return ok(res, { userId: rec.userId, clientId: rec.clientId || null });
   }),
 );
 // ---------------------------------------------------------------- 指标看板（P4）

@@ -20,19 +20,22 @@
 
 import { Router } from 'express';
 import { getQuota, recordAsk, validClientId } from '../services/quota-store.js';
+import { wrap } from '../lib/http.js';
+/* E.87：处理器全部套 wrap —— getQuota/recordAsk 走 Mongo，异常未捕获会崩进程
+ * （Express 4 不捕获 async rejection；本文件在每问热路径上，Mongo 抖动=整站崩）。 */
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', wrap(async (req, res) => {
   const clientId = String(req.query.clientId || '');
   if (!clientId) return res.status(400).json({ error: '缺少 clientId' });
   if (!validClientId(clientId)) return res.status(400).json({ error: '无效 clientId' });
   const quota = await getQuota(clientId);
   if (!quota) return res.status(400).json({ error: '无效 clientId' });
   return res.json(quota);
-});
+}));
 
-router.post('/', async (req, res) => {
+router.post('/', wrap(async (req, res) => {
   const body = req.body || {};
   const clientId = String(req.query.clientId || body.clientId || '');
   if (!clientId) return res.status(400).json({ error: '缺少 clientId' });
@@ -43,6 +46,6 @@ router.post('/', async (req, res) => {
     return res.json(await getQuota(clientId));
   }
   return res.status(400).json({ error: '未知操作' });
-});
+}));
 
 export default router;

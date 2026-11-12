@@ -354,16 +354,22 @@ async function miniAccessToken() {
 }
 
 /** 生成小程序码 PNG（Buffer）；失败返回 null，调用方退回 H5 二维码 */
-export async function getMiniProgramCode({ shortCode = '', inviterUid = '', channel = '', page = 'pages/land/land', width = 280 } = {}) {
+export async function getMiniProgramCode({ shortCode = '', inviterUid = '', channel = '', page = 'pages/index/index', width = 280, envVersion = 'release' } = {}) {
   try {
     const token = await miniAccessToken();
     // 优先用 8 字符短码（t=），退而用 uid（i=，会被截断、仅调试用）
     const id = shortCode ? `t=${String(shortCode).toUpperCase().slice(0, 8)}` : `i=${String(inviterUid).slice(0, 16)}`;
     const scene = [id, channel ? `c=${String(channel).slice(0, 8)}` : ''].filter(Boolean).join('&').slice(0, 32);
+    /* E.92 两处修正：
+     * ① page 默认改 pages/index/index —— 旧值 pages/land/land 在小程序里不存在，
+     *    扫码直接「页面不存在」，永远走不到 App.vue 的 scene 归因（真机验证会必挂）。
+     * ② env_version 支持 trial/develop —— 真机归因验证必须扫「体验版」码
+     *    （线上版还没有归因代码）。release 保持默认不受影响。 */
+    const env = ['release', 'trial', 'develop'].includes(envVersion) ? envVersion : 'release';
     const res = await fetch(`https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scene, page, width, check_path: false }),
+      body: JSON.stringify({ scene, page, width, check_path: false, env_version: env }),
     });
     const buf = Buffer.from(await res.arrayBuffer());
     // 成功是 PNG（89504e47），失败是 JSON：{errcode, errmsg}

@@ -2,6 +2,7 @@
 /* 由 tools/scripts/gen-tokens.mjs 从 packages/tokens 生成，请勿手改 */
 :root {
   --pink: #ff6b81;
+  --pink-action: #cc4560;
   --pink-light: #ff8fa3;
   --pink-soft: #ff9db0;
   --purple: #6c5ce7;
@@ -38,7 +39,7 @@
   --space-lg: 16px;
   --space-xl: 24px;
   --space-xxl: 32px;
-  --gradient: linear-gradient(135deg, #ff6b81 0%, #6c5ce7 100%);
+  --gradient: linear-gradient(135deg, #cc4560 0%, #6c5ce7 100%);
   --shadow: 0 8px 32px rgba(108, 92, 231, 0.25);
   --font: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
@@ -98,6 +99,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 1.33rem;
+  flex-shrink: 0; /* E.80：窄视口下头部换行时 logo 整块不被压缩 → 六字不会被迫折行 */
   color: var(--text);
   font-weight: 700;
   font-size: 2.05rem;
@@ -221,7 +223,16 @@ a:hover {
    * 这里**不设 color / font-size** —— 标题沿用页头原本的颜色与字号。
    */
   letter-spacing: 1em;
+  /*
+   * E.82 修正 E.80 的校准错误：letter-spacing 会在**末字之后**补一份不可见间距，
+   * 盒中心（getBoundingClientRect）≠ 字形视觉中心。E.80 用盒量测把补偿归零，
+   * 结果「Q问」字形整体偏左半字——业务方一眼看出。恢复 -1em（抵消末字那份间距），
+   * 使字形视觉中心与六字行水平中线重合（=业务方确认过的原始方案）。
+   * 验证口径改为视觉中心：rect.left + (rect.width − 末字间距)/2。
+   */
   margin-right: -1em;
+  /* E.80 各端始终保持一行：两字永不折行（与副标题两行平行结构锁定） */
+  white-space: nowrap;
 }
 
 /* 副标题：小字号、灰色，保持不受标题字间距影响 */
@@ -231,6 +242,8 @@ a:hover {
   font-weight: 400;
   color: var(--text-muted);
   letter-spacing: 0.05em;
+  /* E.80：六字始终一行（任何视口不折行）。0.05em 末字间距≈1px，视觉影响可忽略，不加补偿 */
+  white-space: nowrap;
 }
 
 /*

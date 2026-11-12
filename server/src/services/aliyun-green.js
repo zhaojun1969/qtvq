@@ -232,8 +232,38 @@ export async function greenImageCheckByUrl(imageUrl) {
  * 注意：base64 会让请求体膨胀 4/3，接口对体积有限制，所以这里先用 OSS 中转更稳 ——
  * 因此本函数**先抛错要求改用 URL 版**，而不是写一个"看着能用但一传大图就失败"的实现。
  */
-export async function greenImageCheckByBase64(_base64) {
-  throw new Error(
-    'base64 图片审核尚未接入：请先把图片上传到 OSS 拿到 URL，再用 greenImageCheckByUrl（避免大图请求体超限）',
-  );
+export async function greenImageCheckByBase64(dataUri) {
+  /*
+   * E.89：留言图片（data URI，≤400KB/张）直传内容安全审核。
+   * 阿里云 CIP ImageModeration 的 imageUrl 字段同时接受公网 URL 与 base64 编码内容，
+   * 因此不再走"先传 OSS 再审 URL"的老方案——少一次上传副作用，被拒内容也无需清理。
+   * 失败语义与文字层一致：调用方（contact 路由）捕获后降级为「待复核」，不阻塞留言。
+   */
+  const c = cfg();
+  if (!dataUri) throw new Error('缺少图片 data URI');
+  const payload = {
+    Service: c.imageService,
+    ServiceParameters: JSON.stringify({
+      imageUrl: String(dataUri).slice(0, 2_000_000),
+      dataId: crypto.randomUUID(),
+    }),
+  };
+  const json = await rpc('ImageModeration', payload);
+
+  const data = json?.Data || {};
+  const results = Array.isArray(data.Result) ? data.Result : [];
+  const labels = results.map((r) => String(r.Label || '')).filter(Boolean);
+  const riskLevel = String(data.riskLevel || json?.riskLevel || 'none');
+  const categories = labels.map((l) => l.split('_')[0]).filter(Boolean);
+
+  const blocked = riskLevel === 'high' || labels.some((l) => /porn|polity|abuse|violent/i.test(l));
+  return {
+    clean: !blocked,
+    blocked,
+    categories,
+    labels,
+    riskLevel,
+    provider: 'aliyun-green',
+    raw: { data, code: json?.Code },
+  };
 }

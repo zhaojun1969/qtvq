@@ -58,3 +58,10 @@ private.*.key
 private.key
 uploads.key
 backup/desktop-web-legacy-*/
+
+# 工具运行态（E.76+）：安全扫描缓存与文档流水线状态，不入库
+.mimosa/
+output/
+
+# 服务器快照备份与遗留产物：非源码，不入库也不进扫描范围（E.81）
+backup/

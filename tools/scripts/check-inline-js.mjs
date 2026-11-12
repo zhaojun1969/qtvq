@@ -45,6 +45,20 @@ function checkFile(file) {
   while ((m = re.exec(html))) {
     const attrs = m[1] || '';
     if (/\bsrc\s*=/.test(attrs)) continue;
+    /* 数据型 script 不是可执行 JavaScript。
+     * 例如首页 SEO 的 application/ld+json，按 JS 编译会误报 `Unexpected token ':'`。
+     * 这里只跳过明确声明的非 JS 类型，普通内联脚本仍按原规则检查。 */
+    const typeMatch = attrs.match(/\btype\s*=\s*["']?([^\s"'>]+)/i);
+    const scriptType = typeMatch ? typeMatch[1].toLowerCase() : '';
+    const executableTypes = new Set([
+      '',
+      'module',
+      'text/javascript',
+      'application/javascript',
+      'application/ecmascript',
+      'text/ecmascript',
+    ]);
+    if (!executableTypes.has(scriptType)) continue;
     const code = m[2];
     if (!code.trim()) continue;
     total++;

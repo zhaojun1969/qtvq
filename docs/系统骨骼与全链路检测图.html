@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>系统骨骼与全链路检测图 · 我心永恒 Q问</title>
+<title>系统骨骼与全链路检测图 v2 · 我心永恒 Q问</title>
 <style>
   :root{
     --pink:#ff6b81; --pink-light:#ff8fa3; --purple:#6c5ce7; --purple-light:#8b7cf0;
@@ -57,17 +57,17 @@
 <div class="wrap">
 
 <header>
-  <div class="kicker">System Skeleton &amp; Route Audit</div>
+  <div class="kicker">System Skeleton &amp; Route Audit · v2</div>
   <h1>系统骨骼与全链路检测图</h1>
-  <p class="sub">我心永恒 · Q问 ｜ 体检时间 2026-10-28 ｜ 检查门 <code>npm run check:all</code> —— 39 项（31 本地 + 8 在线）全绿</p>
+  <p class="sub">我心永恒 · Q问 ｜ 体检时间 2026-10-31 ｜ 本地检查门 <code>check-all --local</code> 35/35 全绿 ＋ 服务器端验收扫描 <code>acceptance-sweep</code> 16/16 ｜ 在线套件本轮<b>刻意跳过</b>：防止测试账号重新污染刚清理的 90 天基线（v1 见 git 历史 E.47，2026-10-28）</p>
 </header>
 
 <div class="summary">
-  <div class="stat ok"><b>39 / 39</b><span>检查门通过（0 失败）</span></div>
-  <div class="stat fix"><b>5</b><span>本次修掉的硬伤</span></div>
-  <div class="stat ok"><b>11 / 14</b><span>渠道有发布记录（其余 3 端无包·已豁免）</span></div>
-  <div class="stat ok"><b>0</b><span>小程序/鸿蒙端令牌外色值</span></div>
-  <div class="stat warn"><b>3</b><span>仍缺材料的端（Android/iOS/鸿蒙）</span></div>
+  <div class="stat ok"><b>35 / 35</b><span>本地检查门通过（含新增上架前静态扫描）</span></div>
+  <div class="stat ok"><b>16 / 16</b><span>服务器端验收断点（生产实测）</span></div>
+  <div class="stat fix"><b>3</b><span>本次修掉的泄露面（AK ID 硬编码 → env）</span></div>
+  <div class="stat fix"><b>8</b><span>测试脏文档清理（基线 10-31 干净起算）</span></div>
+  <div class="stat warn"><b>1</b><span>待补缺口：内容安全 408 No permissions</span></div>
 </div>
 
 <h2>一、骨骼图（一份源码 → 五种分发）</h2>
@@ -87,13 +87,11 @@
     </style>
   </defs>
 
-  <!-- 层标签 -->
   <text class="band" x="14" y="24">L1 客户端</text>
   <text class="band" x="14" y="150">L2 接入 / 分发</text>
   <text class="band" x="14" y="286">L3 服务</text>
   <text class="band" x="14" y="404">L4 数据 / 外部</text>
 
-  <!-- L1 客户端 -->
   <rect class="bx" x="120" y="40" width="168" height="62" rx="10"/>
   <text class="lb" x="132" y="64">主站静态页（15 页）</text>
   <text class="sm" x="132" y="84">html + css + js（无构建）</text>
@@ -114,7 +112,6 @@
   <text class="lb" x="810" y="64">鸿蒙 / Android</text>
   <text class="sm" x="810" y="84">uni-app x 工程</text>
 
-  <!-- L2 -->
   <rect class="bx" x="120" y="168" width="250" height="66" rx="10"/>
   <text class="lb" x="132" y="192">nginx（阿里云 ECS 源站）</text>
   <text class="sm" x="132" y="212">qtvq.cn · 静态 + 反代 · 指纹 ?v=</text>
@@ -127,11 +124,10 @@
   <text class="lb" x="664" y="192">平台托管（微信/快手/支付宝…）</text>
   <text class="sm" x="664" y="212">版本包 + 小程序码 + getUpdateManager</text>
 
-  <!-- L3 -->
   <rect class="bx" x="120" y="304" width="240" height="72" rx="10"/>
   <text class="lb" x="132" y="328">Node 服务（qtvq-report）</text>
   <text class="sm" x="132" y="348">/v1/* · /api/chat · /api/auth</text>
-  <text class="sm" x="132" y="364">18 个路由模块 · 境内直连</text>
+  <text class="sm" x="132" y="364">退款·SSE·小程序码短码·简报定时器</text>
 
   <rect class="bx" x="376" y="304" width="240" height="72" rx="10"/>
   <text class="lb" x="388" y="328">Pages Functions</text>
@@ -143,9 +139,8 @@
   <text class="sm" x="644" y="348">tokens（27 色）· safety（危机/痛苦）· i18n</text>
   <text class="sm" x="644" y="364">三端引用，禁平台 API</text>
 
-  <!-- L4 -->
   <rect class="bx" x="120" y="418" width="200" height="40" rx="10"/>
-  <text class="lb" x="132" y="443">MongoDB</text>
+  <text class="lb" x="132" y="443">MongoDB（账本/报告/埋点）</text>
 
   <rect class="bx" x="336" y="418" width="200" height="40" rx="10"/>
   <text class="lb" x="348" y="443">LLM / RAG / 语音</text>
@@ -154,19 +149,16 @@
   <text class="lb" x="564" y="443">支付（微信/聚合码）</text>
 
   <rect class="bx" x="748" y="418" width="200" height="40" rx="10"/>
-  <text class="lb" x="760" y="443">SMTP / 短信 / OSS</text>
+  <text class="lb" x="760" y="443">SMTP / 短信 / OSS / 绿网</text>
 
-  <!-- 连线：客户端 → 接入 -->
   <path class="ln" d="M204,102 L220,166"/>
   <path class="ln" d="M370,102 L370,120 L300,120 L300,166"/>
   <path class="ln" d="M527,102 L527,166"/>
   <path class="ln" d="M700,102 L700,130 L520,130 L520,166"/>
   <path class="hot" d="M760,102 L760,166"/>
-  <!-- 接入 → 服务 -->
   <path class="ln" d="M240,234 L240,302"/>
   <path class="hot" d="M470,234 L470,302"/>
   <path class="ln" d="M300,234 L300,270 L180,270 L180,302"/>
-  <!-- 服务 → 数据 -->
   <path class="ln" d="M200,376 L200,416"/>
   <path class="ln" d="M430,376 L430,416"/>
   <path class="ln" d="M520,376 L560,416"/>
@@ -174,14 +166,14 @@
 </svg>
 
 <div class="legend">
-  <span><i style="background:#ff6b81"></i>本次修复涉及的链路</span>
+  <span><i style="background:#ff6b81"></i>重点链路（支付/小程序）</span>
   <span><i style="background:#b9b6ca"></i>既有链路</span>
   <span>注：小程序 8 端不经 Cloudflare，直连 qtvq.cn（备案域名白名单）</span>
 </div>
 
 <h2>二、分支路线检测图</h2>
 
-<p class="note">每条链路按「入口 → 传输 → 服务 → 落地」四段验证。状态以 <b>线上实测</b> 为准，不只看代码。</p>
+<p class="note">每条链路按「入口 → 传输 → 服务 → 落地」四段验证。状态以 <b>线上实测</b> 为准，不只看代码。v1 的 16 条路线结论继续有效（见 git 历史），下表列出 v2 新增/变化的 8 条。</p>
 
 <div class="card flat scroll">
 <table>
@@ -190,100 +182,52 @@
   </thead>
   <tbody>
     <tr>
-      <td><b>主站页面</b></td>
-      <td class="route">浏览器 → nginx → <em>15 个 html</em> → css/js?v=6721e221</td>
+      <td><b>报告进度（SSE）</b></td>
+      <td class="route">前端 waitForReportStream → SSE <em>/v1/report/:id/stream</em>（REPORT_STREAM 开关）</td>
       <td><span class="pill p-ok">通</span></td>
-      <td>32 个内链全在本地；线上指纹与长缓存已生效</td>
+      <td>E.64–66；失败自动回退轮询，等待上限 180s</td>
     </tr>
     <tr>
-      <td><b>主站问答</b></td>
-      <td class="route">js/chat.js → POST /api/chat → Node → LLM</td>
+      <td><b>真实退款</b></td>
+      <td class="route">运营台 → 微信 <em>/v3/refund</em> → 退款回调端点 → 对账定时器</td>
       <td><span class="pill p-ok">通</span></td>
-      <td>实测 200，返回 reply/quota/rag 字段</td>
+      <td>E.60–62；异常退款进运营台 + 邮件告警</td>
     </tr>
     <tr>
-      <td><b>小程序问答</b></td>
-      <td class="route">api/chat.js → <em>https://qtvq.cn/api/chat</em> → Node</td>
+      <td><b>小程序码归因</b></td>
+      <td class="route">分享卡二维码 → wxacode.getUnlimited + <em>8 位短码</em> → /v1/report/shortcode/:code → 小程序 scene 反查邀人</td>
+      <td><span class="pill p-ok">通</span><br><span class="pill p-warn">待真机</span></td>
+      <td>E.67–72 代码侧闭环；真机扫小程序码进场景待验证</td>
+    </tr>
+    <tr>
+      <td><b>每日运营简报</b></td>
+      <td class="route">cron 09:00 → 营收/质量/退款/验收门 → <em>邮件</em></td>
       <td><span class="pill p-ok">通</span></td>
-      <td>实测 200（与 /v1/chat 同契约）</td>
-    </tr>
-    <tr>
-      <td><b>账号 / 登录</b></td>
-      <td class="route">/api/auth·/v1/auth → Node；/api/auth/sms → Pages</td>
-      <td><span class="pill p-ok">通</span></td>
-      <td>未登录 401（而非 404/500）；43 项接口测试通过</td>
-    </tr>
-    <tr>
-      <td><b>数据导出</b></td>
-      <td class="route">/v1/me/export → 白名单 7 集合 → JSON</td>
-      <td><span class="pill p-ok">通</span></td>
-      <td>未登录 401；47 项断言 + 10 条变异通过</td>
-    </tr>
-    <tr>
-      <td><b>H5 应用</b></td>
-      <td class="route">qtvq.cn/h5/ → 55 文件 → /api/*</td>
-      <td><span class="pill p-ok">通</span></td>
-      <td>线上 assets 已更新；本次才纳入自动发布</td>
-    </tr>
-    <tr>
-      <td><b>桌面客户端</b></td>
-      <td class="route">exe → 加载 qtvq.cn → electron-updater 读 latest.yml</td>
-      <td><span class="pill p-ok">通</span></td>
-      <td>清单指向的包公网 200，长度 82788547 一致</td>
-    </tr>
-    <tr>
-      <td><b>桌面自动更新</b></td>
-      <td class="route">latest.yml → qtvq-desktop-Setup-1.0.6.exe</td>
-      <td><span class="pill p-ok">通</span><br><span class="pill p-bad">修复前：404</span></td>
-      <td>修复前清单写的是 Q问-Setup-1.0.6.exe（不存在）</td>
-    </tr>
-    <tr>
-      <td><b>小程序热更新</b></td>
-      <td class="route">uni.getUpdateManager → 平台下载 → 提示重启</td>
-      <td><span class="pill p-ok">通</span></td>
-      <td>产物内实测存在 getUpdateManager 调用</td>
-    </tr>
-    <tr>
-      <td><b>版本 / 能力端口</b></td>
-      <td class="route">/api/app/bootstrap?channel=<em>wechat</em>&amp;version=1.0.6</td>
-      <td><span class="pill p-ok">通</span><br><span class="pill p-bad">修复前：400</span></td>
-      <td>14 渠道目录；Pages 与 Node 逐字段一致</td>
-    </tr>
-    <tr>
-      <td><b>发布记录覆盖</b></td>
-      <td class="route">app-releases.json → 11 渠道 → 两侧 generated</td>
-      <td><span class="pill p-ok">通</span><br><span class="pill p-warn">修复前：3/14</span></td>
-      <td>4 渠道实测 latest=1.0.6 / up_to_date</td>
-    </tr>
-    <tr>
-      <td><b>微信小程序</b></td>
-      <td class="route">wx 包 → 平台审核 → 虚拟支付（iOS 禁用）</td>
-      <td><span class="pill p-warn">待上传</span></td>
-      <td>产物已重建；上传私钥需人工生成</td>
+      <td>E.63；daily-digest 定时器 active</td>
     </tr>
     <tr>
       <td><b>快手小程序</b></td>
-      <td class="route">ks 包（ks651051624357102489）→ 快手审核</td>
+      <td class="route">ks 包（appid 已落地）→ 非微信端付费区整块禁用</td>
       <td><span class="pill p-warn">待上传</span></td>
-      <td>产物已重建；限入类目需申请</td>
+      <td>E.45–46；审核检查器 68 项 / 22 条变异</td>
     </tr>
     <tr>
-      <td><b>Android / iOS</b></td>
-      <td class="route">— 无安装包 —</td>
-      <td><span class="pill p-bad">未开通</span></td>
-      <td>无 APK/AAB/IPA，故不给发布记录（避免假更新）</td>
+      <td><b>脏数据基线</b></td>
+      <td class="route">归档 → 删除 4 用户+2 订单+2 报告 → 清空 events/metrics_daily</td>
+      <td><span class="pill p-ok">完成</span></td>
+      <td>残留复核 0；90 天窗口自 2026-10-31 干净起算</td>
     </tr>
     <tr>
-      <td><b>鸿蒙</b></td>
-      <td class="route">uni-app x 工程 → HAP → 华为审核</td>
-      <td><span class="pill p-bad">未打包</span></td>
-      <td>工程与路由检查通过；缺开发者账号与真机编译</td>
-    </tr>
-    <tr>
-      <td><b>配色一致</b></td>
-      <td class="route">packages/tokens → css:root + uni.scss + uvue 字面量</td>
+      <td><b>密钥泄露面</b></td>
+      <td class="route">新扫描器 <em>check-prelaunch-static</em> → 3 处 AK ID 硬编码 → env 化</td>
       <td><span class="pill p-ok">通</span></td>
-      <td>29 文件 139 处色值全部可溯源到 27 个令牌</td>
+      <td>复扫 0 问题；12 条复核项均人工确认有护栏</td>
+    </tr>
+    <tr>
+      <td><b>内容安全（生产）</b></td>
+      <td class="route">assertSafe → 阿里云绿网 TextModeration → <em>408 No permissions</em></td>
+      <td><span class="pill p-bad">权限缺失</span></td>
+      <td>验收扫描暴露；当前降级为「待复核」运行，上线前必须开通</td>
     </tr>
   </tbody>
 </table>
@@ -294,12 +238,12 @@
 <div class="card flat scroll">
 <table>
   <thead>
-    <tr><th>端</th><th>入口</th><th>API 基址</th><th>版本来源</th><th>本次结论</th></tr>
+    <tr><th>端</th><th>入口</th><th>API 基址</th><th>版本来源</th><th>v2 结论</th></tr>
   </thead>
   <tbody>
     <tr><td>主站</td><td>qtvq.cn</td><td>同源 + api.qtvq.cn 竞速</td><td>release/version.json</td><td><span class="pill p-ok">正常</span></td></tr>
-    <tr><td>H5</td><td>qtvq.cn/h5/</td><td>https://qtvq.cn</td><td>version.json 的 web.build</td><td><span class="pill p-ok">正常</span>（本次起自动发布）</td></tr>
-    <tr><td>Windows</td><td>release/desktop/</td><td>继承页面</td><td>latest.yml（electron-updater）</td><td><span class="pill p-ok">正常</span>（清单已修）</td></tr>
+    <tr><td>H5</td><td>qtvq.cn/h5/</td><td>https://qtvq.cn</td><td>version.json 的 web.build</td><td><span class="pill p-ok">正常</span></td></tr>
+    <tr><td>Windows</td><td>release/desktop/</td><td>继承页面</td><td>latest.yml（electron-updater）</td><td><span class="pill p-ok">正常</span></td></tr>
     <tr><td>微信小程序</td><td>wx489fbca28401e4e0</td><td>https://qtvq.cn</td><td>平台托管 + 1.0.6</td><td><span class="pill p-warn">待上传</span></td></tr>
     <tr><td>快手小程序</td><td>ks651051624357102489</td><td>https://qtvq.cn</td><td>平台托管 + 1.0.6</td><td><span class="pill p-warn">待上传</span></td></tr>
     <tr><td>支付宝/抖音/小红书/QQ/百度/京东</td><td>未申请 appid</td><td>—</td><td>1.0.6（已登记）</td><td><span class="pill p-skip">缺账号</span></td></tr>
@@ -310,49 +254,23 @@
 </table>
 </div>
 
-<h2>四、本次修掉的 5 个硬伤（含"为什么一直没被发现"）</h2>
+<h2>四、v2 修掉的泄露面 + 发现的缺口</h2>
 
 <div class="card">
-  <h3>① 渠道名对不上 —— 能力清单与更新结论从未生效</h3>
-  <p>客户端 <code>runtimeTag()</code> 返回 <code>mp-weixin</code> / <code>h5</code> / <code>app</code>，服务端 <code>APP_CHANNELS</code> 只认 <code>wechat</code> / <code>web</code> / <code>android|ios</code>。线上 <code>?channel=mp-weixin</code> 直接 <b>400 E_UNKNOWN_CHANNEL</b>，客户端见 <code>ok:false</code> 就返回 null，静默退回静态清单。</p>
-  <p class="note"><b>为什么没被发现：</b>接口能连通、客户端设计成"拿不到就兜底"、功能表面正常 —— 两端各说各的名字，人工点不出来，只能靠断言。现由 <code>check-channel-contract.mjs</code> 守住。</p>
+  <h3>① 真实格式阿里云 AK ID 硬编码 ×3（本次修复）</h3>
+  <p><code>find-ak-usage.mjs</code> / <code>audit-local-credentials.mjs</code> / <code>try-actiontrail.mjs</code> 三个审计脚本把同一个 24 位 <code>LTAI…</code> AccessKey ID 写死在源码里并入库。</p>
+  <p class="note"><b>为什么一直没被发现：</b>这些脚本本身就是"查密钥用"的工具，写死审计目标 ID 看起来天经地义——而它们自己就是泄露面。v2 已全部改为 <code>process.env.QTVQ_AUDIT_AK_ID</code> 注入，复扫为 0。由新增检查门 <code>check-prelaunch-static.mjs</code> 守住（含 PEM「带密钥体才算」、注释内 markdown 加粗不误报两条降噪规则）。</p>
 
-  <h3>② 缓存指纹从来没进过线上</h3>
-  <p>指纹注入只写在 <code>package-static.ps1</code>（打 ZIP 用），而线上真跑的是 <code>sync-static-from-windows.ps1</code>（scp 到源站）—— 那条路没有注入。于是线上首页从来没有 <code>?v=</code>，CSS/JS 无法长缓存。</p>
-  <p class="note"><b>为什么没被发现：</b>检查器 <code>check-cache-policy</code> 一直在报红，但它是"在线检查"的最后一项，容易被当成环境问题跳过。修法是抽出 <code>inject-asset-version.ps1</code> 让两条通道共用，并在远端 <code>grep</code> 断言 <code>?v=</code> 存在。</p>
+  <h3>② 阿里云内容安全 408 No permissions（本次发现，未修——需控制台开通）</h3>
+  <p>服务器验收扫描实测：生产 <code>assertSafe → TextModeration</code> 返回 408，内容安全按设计降级为「标记待复核」运行。<b>社交-交友类目的上架审核把内容安全当硬要求</b>，降级状态不能带进上架。</p>
+  <p class="note">修法在阿里云控制台（给 RAM 账号开通内容安全 TextModeration 权限或续费购买），不是代码问题。开通后跑一次验收扫描即转绿。</p>
 
-  <h3>③ 桌面自动更新指向一个不存在的文件</h3>
-  <p>线上 <code>latest.yml</code> 写的是 <code>Q问-Setup-1.0.6.exe</code>（公网 404），真实包是 <code>qtvq-desktop-Setup-1.0.6.exe</code>；连 size 都差 8 字节（82788539 vs 82788547），sha512 也对不上。</p>
-  <p class="note"><b>为什么没被发现：</b>下载页读的是另一份配置（download-config.js），手动下载一切正常；只有客户端自动更新会失败，而失败是静默的。上传脚本原来只校验"文件能下载、大小对得上"，没校验"清单里引用的那个文件是否存在"。</p>
-
-  <h3>④ 统一升级只有 3/14 渠道有记录</h3>
-  <p>其余 11 个渠道走兜底 <code>latest: 1.0.0</code> —— 比客户端真实的 1.0.6 还低。发版时这些端拿到的仍是"已最新"，<b>等于没发</b>。</p>
-  <p class="note">补齐 11 条（8 小程序 + web + 已有 windows/wechat）。Android/iOS/鸿蒙没有安装包，<b>刻意不给记录</b>：给了 version 就必须给 downloadUrl，否则就是"提示有新版但点不动"的假更新。豁免理由写进 JSON 的 <code>_未发布渠道</code>，由检查器核对。</p>
-
-  <h3>⑤ H5 产物不在发布流水线里</h3>
-  <p>改了源码、重建了 H5，但没有任何脚本负责上传，线上 <code>/h5/</code> 停在 9 月那一版 —— 手机上打开网页版，看到的界面与小程序不一致。</p>
-  <p class="note">现在 <code>sync-static</code> 会把 <code>dist/build/h5</code> 一并发布（含远端 <code>test -f h5/index.html</code> 断言）；产物不存在时明确告警而不是静默跳过。</p>
+  <h3>③ 生产库测试脏数据清零（本次完成）</h3>
+  <p>归档至服务器 <code>/opt/qtvq/backups/testdata-cleanup-2026-10-31.json</code>（50KB，权限 600）后删除：4 个测试账号（u_rptprobe / u_sweep / u_topup_probe / u_e2e 前缀）、2 笔已退款测试订单（¥14.80）、2 份探测报告；events 与 metrics_daily 派生层整层清空。</p>
+  <p class="note"><b>为什么重要：</b>这些文档让 10-27 的看板出现过一次"报告单 2 / 付费 1"的假增长，且会永久污染 90 天验收门基线。清理后残留复核全 0，每日 09:00 聚合定时器从 10-31 起只写真实信号。</p>
 </div>
 
-<h2>五、配色一致性（各端是否同一套视觉）</h2>
-
-<div class="card">
-  <p>唯一来源 <code>packages/tokens/src/index.js</code>（27 色）→ 生成 <code>css/styles.css</code> 的 <code>:root</code> 与 <code>apps/qtvq-uni/src/uni.scss</code>。鸿蒙 uvue 不支持变量注入，只能写字面量，因此对"值必须等于令牌"单独断言。</p>
-  <div class="scroll">
-  <table>
-    <thead><tr><th>端</th><th>用法</th><th>实测</th></tr></thead>
-    <tbody>
-      <tr><td>主站</td><td><code>var(--pink)</code> 等 CSS 变量</td><td><span class="pill p-ok">同源</span></td></tr>
-      <tr><td>小程序 8 端</td><td><code>$color-pink</code> 等 SCSS 变量</td><td><span class="pill p-ok">29 文件 / 139 处，0 野色</span></td></tr>
-      <tr><td>H5</td><td>同小程序源码</td><td><span class="pill p-ok">同源（产物已含新色）</span></td></tr>
-      <tr><td>鸿蒙</td><td>uvue 字面量</td><td><span class="pill p-ok">值全部命中令牌</span></td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="note">本次收敛了 10 个"主站根本不存在"的色值（<code>#8b8aa0</code> <code>#9090a8</code> <code>#2a2a3d</code> <code>#232333</code> <code>#e74c3c</code> <code>#ff7675</code> <code>#9b8cff</code> <code>#c0392b</code> …）。其中 account.vue 一个文件发明了 <b>3 档不同的"危险红"</b>，而主站只有一档 —— 这正是"小程序像另一个产品"的来源。为此 tokens 升格了 <code>brandWechat</code> / <code>danger</code> / <code>dangerText</code>。</p>
-</div>
-
-<h2>六、死循环 / 空链接 / 漏洞排查结果</h2>
+<h2>五、死循环 / 空链接 / 泄露面排查结果（v2 复扫）</h2>
 
 <div class="card flat scroll">
 <table>
@@ -360,122 +278,66 @@
   <tbody>
     <tr>
       <td><b>死循环</b></td>
-      <td>扫 <code>setInterval/setTimeout</code> 自递归、<code>while(true)</code>、<code>for(;;)</code>、重试无退避</td>
-      <td>4 处无限循环均有边界：报告轮询（120s 上限 + 1.5s 间隔）、SMTP 读响应（读到完成码即返回）、H5 轮询（10 分钟/次，单次提示）</td>
+      <td>新扫描器：while(true)/for(;;) 40 行窗口、花括号平衡的自递归检测、灾难性正则、setInterval 无清理</td>
+      <td>问题级命中 0；12 条自递归复核项人工确认全部有护栏（connectWithRetry 指数退避封顶 30s、树遍历由数据结构定界、canvas 动画有停止条件）</td>
     </tr>
     <tr>
-      <td><b>无意义轮询</b></td>
-      <td>检查后台标签页是否仍在打请求</td>
-      <td><span class="pill p-warn">已修</span> account 页 30s 轮询改为 <code>document.hidden</code> 跳过，切回时补一次</td>
+      <td><b>客户端 API 死链</b></td>
+      <td>提取客户端 43 条 /v1、/api 路径 ↔ server 路由注册 + functions 文件树对账</td>
+      <td><span class="pill p-ok">43/43 全部有对应路由</span>（首扫时因扫描器自身过滤 bug 误报 6 条，修复后清零）</td>
     </tr>
     <tr>
-      <td><b>空链接</b></td>
-      <td>32 个内链本地存在性 + 线上 HEAD + <code>audit-dead-ends</code></td>
-      <td>内链 0 缺失；下载页 10 个未上线入口渲染成 disabled（不产生可点空 href）</td>
+      <td><b>硬编码密钥</b></td>
+      <td>LTAI/32 位十六进制/口令型/PEM 带体 四类模式扫 git 跟踪文件；.dev.vars/cf.env/.env 入库检查</td>
+      <td><span class="pill p-warn">已修</span> 3 处 AK ID → env；PEM 命中均为解析常量（无密钥体）；密钥文件均未入库</td>
     </tr>
     <tr>
-      <td><b>空 src</b></td>
-      <td>扫 <code>src=""</code></td>
-      <td><span class="pill p-warn">已修</span> 首页收款码图片原为 <code>src=""</code>（会让浏览器重请求当前文档），改为无 src + hidden</td>
+      <td><b>升级通道</b></td>
+      <td>APP_VERSION ↔ manifest ↔ 发布清单 ↔ 下载配置 四处对账 + 生成文件重跑漂移检测（时间戳除外）</td>
+      <td><span class="pill p-ok">1.0.6 四处一致</span>；生成文件内容同步</td>
     </tr>
     <tr>
-      <td><b>越权 / 鉴权</b></td>
-      <td>逐路由看 requireAuth；线上探测未登录响应</td>
-      <td>敏感接口未登录一律 401（非 404/500，不泄露存在性）；admin 组在未配 <code>ADMIN_KEY</code> 时整组 404</td>
+      <td><b>空链接 / 空 src</b></td>
+      <td>audit-dead-ends（v1 结论继续有效）</td>
+      <td>内链 0 缺失；32 个内链全在本地</td>
     </tr>
     <tr>
-      <td><b>注入</b></td>
-      <td>84 处 <code>innerHTML</code> 逐类核对转义</td>
-      <td>用户/模型内容走 <code>escapeHtml</code>/<code>esc</code>；新增内容一律先转义再拼接</td>
-    </tr>
-    <tr>
-      <td><b>密钥泄露</b></td>
-      <td>扫 PEM / <code>sk-</code> / <code>AKIA</code> / <code>LTAI</code>；Pages 泄露自检</td>
-      <td>命中的都是 PEM <b>格式化函数</b>，非真私钥；部署后 9 个敏感路径全 404</td>
-    </tr>
-    <tr>
-      <td><b>CORS</b></td>
-      <td>看白名单是否 <code>*</code></td>
-      <td>严格白名单（qtvq.cn / www / api 子域 / 本地调试），拒绝时返回 403 而非放行</td>
-    </tr>
-    <tr>
-      <td><b>SEO 卫生</b></td>
-      <td>sitemap 与页面清单对比</td>
-      <td><span class="pill p-warn">已修</span> 补 advice/report/wheel/terms 4 页，去掉与 <code>/</code> 重复的 index.html</td>
+      <td><b>越权 / 注入 / CORS</b></td>
+      <td>v1 逐路由核对（结论继续有效）</td>
+      <td>敏感接口未登录 401；84 处 innerHTML 已核对；CORS 严格白名单</td>
     </tr>
   </tbody>
 </table>
 </div>
 
-<h2>七、检查门索引（39 项）</h2>
+<h2>六、检查门索引（本地 35 + 在线 8）</h2>
 
 <details>
-  <summary>展开：每项守的是什么</summary>
-  <div class="card flat scroll" style="margin-top:10px">
-  <table>
-    <thead><tr><th style="width:34px">#</th><th>检查项</th><th>本次是否新增</th></tr></thead>
-    <tbody>
-      <tr><td>1</td><td>小程序接线（import/导出/模板变量/生命周期/页面入口）</td><td></td></tr>
-      <tr><td>2</td><td>小程序静态（渠道一致/名单一致/图片存在）</td><td></td></tr>
-      <tr><td>3</td><td>全端平台矩阵（8 小程序 + H5 + App + 自动更新能力）</td><td></td></tr>
-      <tr><td>4</td><td>鸿蒙 uni-app x 工程（路由/uvue 样式限制/防漂移）</td><td></td></tr>
-      <tr><td>5</td><td>下载页链路（生成文件/分区/容器/同源）</td><td></td></tr>
-      <tr><td>6</td><td>Pages Functions 打包预检（esbuild）</td><td></td></tr>
-      <tr><td>7</td><td>各端专用端口契约（纯函数单测 + 数据同源）</td><td></td></tr>
-      <tr><td>8</td><td>发布记录覆盖度（14 渠道版本/豁免、版本号统一）</td><td><span class="pill p-ok">新增</span></td></tr>
-      <tr><td>9</td><td>渠道名契约（客户端 runtimeTag ↔ 服务端 APP_CHANNELS）</td><td><span class="pill p-ok">新增</span></td></tr>
-      <tr><td>10</td><td>桌面发布包自洽（latest.yml ↔ 包 ↔ 下载页）</td><td><span class="pill p-ok">新增</span></td></tr>
-      <tr><td>11</td><td>静态站死胡同（链接/锚点/按钮/导航）</td><td></td></tr>
-      <tr><td>12</td><td>内容安全词表（绕过手法 + 误伤）</td><td></td></tr>
-      <tr><td>13</td><td>文本水印（往返/截断可溯源）</td><td></td></tr>
-      <tr><td>14</td><td>设计令牌（产物是否漂移）</td><td></td></tr>
-      <tr><td>15</td><td>配色一致（页面色值必须在令牌里）</td><td><span class="pill p-ok">新增</span></td></tr>
-      <tr><td>16</td><td>共享层纯度（L0–L3 禁平台 API）</td><td></td></tr>
-      <tr><td>17</td><td>ESM 导入导出交叉校验</td><td></td></tr>
-      <tr><td>18</td><td>HTML 内联脚本语法</td><td></td></tr>
-      <tr><td>19</td><td>三端派生自 shared（单一来源）</td><td></td></tr>
-      <tr><td>20</td><td>图片格式守卫（picture 兜底/WebP）</td><td></td></tr>
-      <tr><td>21</td><td>WebP 变体（存在/更小/像素一致）</td><td></td></tr>
-      <tr><td>22</td><td>i18n 覆盖</td><td></td></tr>
-      <tr><td>23</td><td>收款渠道声明（是否自动到账）</td><td></td></tr>
-      <tr><td>24</td><td>二维码本地实现（jsQR 双模解码）</td><td></td></tr>
-      <tr><td>25</td><td>PowerShell 脚本编码（UTF-8 BOM）</td><td></td></tr>
-      <tr><td>26</td><td>增长内容矩阵（20 条 × 2 平台 + 40 渠道码）</td><td></td></tr>
-      <tr><td>27</td><td>激活事件接线（两端上报/年龄门顺序）</td><td></td></tr>
-      <tr><td>28</td><td>问答链路安全（审核/危机转介/号码单一来源）</td><td></td></tr>
-      <tr><td>29</td><td>小程序审核合规（iOS 虚拟支付/协议入口/隐私）</td><td></td></tr>
-      <tr><td>30</td><td>数据可携带与痛苦提示（白名单/两端入口）</td><td></td></tr>
-      <tr><td>31</td><td>埋点 SDK 运行时（报文/鉴权/批量/回队）</td><td></td></tr>
-      <tr><td>32</td><td>测试套件 43 项（接口/支付/账号/安全/静态页）<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>33</td><td>各端专用端口线上实测<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>34</td><td>双端闸门（Pages vs Node 逐字段）<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>35</td><td>模型链路（两侧真实探测）<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>36</td><td>线上缓存策略（指纹长缓存 / 不再清空）<span class="pill p-skip">在线</span></td><td><span class="pill p-ok">已转绿</span></td></tr>
-      <tr><td>37</td><td>静态图片双端一致（防旧收款码）<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>38</td><td>API 延迟预算（P95 ≤ 800ms）<span class="pill p-skip">在线</span></td><td></td></tr>
-      <tr><td>39</td><td>服务端代码指纹（线上 = 本地）<span class="pill p-skip">在线</span></td><td></td></tr>
-    </tbody>
-  </table>
+  <summary>展开：v2 相对 v1 的变化</summary>
+  <div class="card" style="margin-top:10px">
+    <p>v1（E.47，10-28）：39 项（31 本地 + 8 在线）全绿。<br>
+    v2（10-31）：本地增至 <b>35 项</b>（新增上架前静态扫描等 4 门），本轮 35/35 通过；在线 8 项<b>刻意跳过</b>——在线测试套件会向生产库写测试账号/订单，刚清理的 90 天基线会被重新污染。在线套件的代偿验证是<b>服务器端验收扫描 16/16</b>（它自带探针清理逻辑，实测后已复核无残留）。下次发版后在线套件照常跑，跑完再复核一次基线。</p>
   </div>
 </details>
 
-<h2>八、仍需人工材料的部分（代码已尽力）</h2>
+<h2>七、仍需人工材料的部分（代码已尽力）</h2>
 
 <div class="card">
   <table>
     <tbody>
-      <tr><td style="width:180px"><b>微信小程序类目</b></td><td>「深度合成-AI问答」类目 + 算法备案编号 + 安全评估报告 —— 唯一硬阻塞，代码无法替代</td></tr>
-      <tr><td><b>上传私钥</b></td><td><code>private.wx489fbca28401e4e0.key</code> 需在微信后台生成并落到 <code>apps/qtvq-uni/</code>（<code>.gitignore</code> 已排除）</td></tr>
-      <tr><td><b>小程序码</b></td><td>下载页微信卡片目前是"待上传"占位（无码可放，不放假图）</td></tr>
+      <tr><td style="width:180px"><b>内容安全权限</b></td><td><span class="pill p-bad">待开通</span> RAM 授权已到位（qtvq-sms-sender），408 收窄为「内容安全服务未开通」——主账号控制台开通即转绿（E.74）；若只有增强版需改代码适配</td></tr>
+      <tr><td><b>微信小程序类目</b></td><td>「深度合成-AI问答」类目 + 算法备案编号 + 安全评估报告 —— 唯一硬阻塞，代码无法替代</td></tr>
+      <tr><td><b>上传私钥</b></td><td><code>private.wx489fbca28401e4e0.key</code> 需在微信后台生成并落到 <code>apps/qtvq-uni/</code>（.gitignore 已排除）</td></tr>
+      <tr><td><b>小程序码真机验证</b></td><td>短码归因链路代码侧已闭环，真机扫码进场景（scene → qtvq_inviter）待微信开发者工具/真机跑一次</td></tr>
       <tr><td><b>快手限入类目</b></td><td>情感咨询属限入类目，需提交资质；担保支付需企业主体开通</td></tr>
       <tr><td><b>移动安装包</b></td><td>Android（应用宝/华为/小米/OPPO/vivo）、iOS（Apple 开发者账号）、鸿蒙（HAP）均无包</td></tr>
-      <tr><td><b>真实用户</b></td><td>注册量仍为个位数，端到端体验需真实流量验证</td></tr>
+      <tr><td><b>真实用户</b></td><td>激活用户 0，90 天基线自 10-31 干净起算——等 40 条内容发布带来真实注册后开表</td></tr>
     </tbody>
   </table>
 </div>
 
 <footer>
-  <p>复跑：<code>npm run check:all</code>（39 项）｜ 单项：<code>npm run check:channel</code> / <code>check:app-releases</code> / <code>check:desktop-release</code> / <code>check:mini-colors</code></p>
+  <p>复跑：<code>node tools/scripts/check-all.mjs --local</code>（本地 35 项）｜ <code>node tools/scripts/check-prelaunch-static.mjs</code>（上架前四类静态扫描）｜ 服务器：<code>cd /opt/qtvq/server &amp;&amp; sudo node --env-file=.env scripts/acceptance-sweep.mjs</code>（16 断点）｜ <code>aggregate-metrics.mjs --verdict</code>（验收门读数）</p>
   <p>本文档随代码演进；若某项检查转红，先跑对应的单项脚本看完整输出，再改代码 —— 不要改断言来迁就现状。</p>
 </footer>
 

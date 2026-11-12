@@ -33,6 +33,9 @@
 export const COLOR = {
   // 主色
   pink: '#ff6b81',
+  /** 动作色（E.80 WCAG AA）：白字底用。品牌粉 #ff6b81 白字仅 2.74:1（<4.5 不达标），
+   *  加深至 #cc4560 = 4.58:1，与紫端 #6c5ce7(4.86) 同档；品牌粉保留用于装饰/描边。 */
+  pinkAction: '#cc4560',
   pinkLight: '#ff8fa3',
   pinkSoft: '#ff9db0',
   purple: '#6c5ce7',
@@ -109,8 +112,9 @@ export const SPACE = {
 /** 字体栈（两端一致） */
 export const FONT_STACK = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
 
-/** 渐变（官网既有） */
-export const GRADIENT = 'linear-gradient(135deg, #ff6b81 0%, #6c5ce7 100%)';
+/** 渐变：动作面（按钮等白字 CTA）用 AA 达标的 pinkAction → purple（E.80，4.58/4.86）。
+ *  品牌视觉的装饰渐变（logo SVG 等）不受影响——它们用各自独立色值。 */
+export const GRADIENT = 'linear-gradient(135deg, #cc4560 0%, #6c5ce7 100%)';
 
 /** 阴影（官网既有） */
 export const SHADOW = '0 8px 32px rgba(108, 92, 231, 0.25)';

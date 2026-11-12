@@ -146,6 +146,15 @@ router.post(
     } catch {
       /* 索引已存在 */
     }
+    /* E.85：月度集合例行索引 + TTL（首次写入该月集合时建，createIndex 幂等）。
+     * ts TTL 180 天：埋点原始数据的留存上限——聚合（metrics_daily）每日已汇总，
+     * 90 天验收窗口也只用近 3 个月，180 天足够回溯且防无限增长。 */
+    try {
+      await col.createIndex({ ts: 1 }, { expireAfterSeconds: 180 * 86400, name: 'ts_ttl_180d' });
+      await col.createIndex({ uid: 1, ts: 1 }, { name: 'uid_ts' });
+    } catch {
+      /* 月度集合例行索引已存在 */
+    }
     try {
       const r = await col.insertMany(docs, { ordered: false });
       accepted = r.insertedCount;

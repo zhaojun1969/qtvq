@@ -116,7 +116,8 @@ for (const h of hits) {
 
 console.log('');
 console.log('=== B) 那把短信 AK 的 OSS/ECS 调用方：本地是否有文件引用它 ===');
-const TARGET = 'LTAI5t7RccCgS8TCrsovav42';
+const TARGET = process.env.QTVQ_AUDIT_AK_ID;
+if (!TARGET) { console.error('缺环境变量 QTVQ_AUDIT_AK_ID（审计目标 AccessKey ID，从 env 注入，不写入源码）'); process.exit(1); }
 const refs = [];
 const walk2 = (dir, depth = 0) => {
   if (depth > 4) return;

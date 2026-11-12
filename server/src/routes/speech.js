@@ -21,6 +21,8 @@
  */
 import express, { Router } from 'express';
 import { isNlsConfigured, recognizeOneSentence, probeNls } from '../lib/aliyun-nls.js';
+import { wrap } from '../lib/http.js';
+/* E.87：probeNls 走外网调用，异常未捕获会崩进程 → 套 wrap。 */
 
 const MAX_AUDIO_BYTES = 512 * 1024;
 
@@ -29,7 +31,7 @@ const env = process.env;
 const router = Router();
 
 /** GET = 真实就绪探测（前端据此决定语音按钮是否可用） */
-router.get('/', async (req, res) => {
+router.get('/', wrap(async (req, res) => {
   const probe = await probeNls(env);
   res.json({
     configured: isNlsConfigured(env),
@@ -37,7 +39,7 @@ router.get('/', async (req, res) => {
     reason: probe.reason,
     nlsCode: probe.nlsCode,
   });
-});
+}));
 
 /*
  * ⚠️ 单独的 body 解析器，且 limit 必须 ≥1mb：

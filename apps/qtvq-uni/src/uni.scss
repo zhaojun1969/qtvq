@@ -3,6 +3,7 @@
 
 // ---- 颜色 ----
 $color-pink: #ff6b81;
+$color-pink-action: #cc4560;
 $color-pink-light: #ff8fa3;
 $color-pink-soft: #ff9db0;
 $color-purple: #6c5ce7;
@@ -46,5 +47,5 @@ $space-xxl: 64rpx;
 
 // ---- 字体与视觉 ----
 $font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-$gradient-brand: linear-gradient(135deg, #ff6b81 0%, #6c5ce7 100%);
+$gradient-brand: linear-gradient(135deg, #cc4560 0%, #6c5ce7 100%);
 $shadow-card: 0 8px 32px rgba(108, 92, 231, 0.25);

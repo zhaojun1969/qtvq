@@ -111,11 +111,44 @@ async function verifyPassword(password, hash, salt) {
   return derived.hash === hash;
 }
 
+/** 境内用户回源（E.76）：境内注册的用户本体在 Mongo，不在本 KV —— 会话桥通了、用户也要桥。 */
+async function loadUserViaNode(env, userId) {
+  const cfg = nodeAuthConfig(env);
+  if (!cfg || !userId) return null;
+  try {
+    let res = null;
+    for (let attempt = 0; attempt < 2 && !res; attempt++) {
+      try {
+        res = await fetch(`${cfg.base}/v1/admin/auth-accounts/${encodeURIComponent(userId)}`, {
+          headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+          signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+        });
+        if (!res.ok) return null;
+      } catch (err) {
+        if (attempt === 1) throw err;
+        res = null;
+      }
+    }
+    if (!res) return null;
+    const j = await res.json().catch(() => null);
+    const u = j?.data;
+    if (!u || !u.id) return null;
+    return u;
+  } catch (err) {
+    console.error('[auth] 读境内用户异常：', err?.message || err);
+    return null;
+  }
+}
+
 async function loadUser(env, userId) {
   const kv = getKv(env);
   if (kv) {
     const raw = await kv.get(`${USER_PREFIX}${userId}`);
-    if (!raw) return null;
+    if (!raw) {
+      // KV 未命中 ≠ 用户不存在：境内（Node/Mongo）注册的用户不在本 KV。
+      // 回源取（可识别字段不出境，见 Node 侧 auth-users 路由的安全边界注释）。
+      return await loadUserViaNode(env, userId);
+    }
     try {
       return JSON.parse(raw);
     } catch (err) {
@@ -319,8 +352,33 @@ async function findUserIdByClientId(env, clientId) {
 
 async function findUserIdByPhone(env, phone) {
   const kv = getKv(env);
-  if (kv) return (await kvGetMigrating(kv, await phoneKey(phone), `${PHONE_PREFIX}${phone}`)) || null;
+  if (kv) {
+    const viaKv = (await kvGetMigrating(kv, await phoneKey(phone), `${PHONE_PREFIX}${phone}`)) || null;
+    if (viaKv) return viaKv;
+    // KV 未命中 ≠ 账号不存在：境内注册的用户手机号索引在 Mongo `auth_users`，不在本 KV。
+    // （2026-11-04 UI 实测：注册/改密走同源 Node、登录走直连 CF 时，这里查空 →
+    //  误报「账号不存在，请先注册」。）回源按手机号找 userId。
+    return await findUserIdByPhoneViaNode(env, phone);
+  }
   return memory.phones.get(phone) || null;
+}
+
+/** 手机号 → userId 的境内回源（登录桥，配对 /v1/admin/auth-phone/:phone） */
+async function findUserIdByPhoneViaNode(env, phone) {
+  const cfg = nodeAuthConfig(env);
+  if (!cfg || !phone) return null;
+  try {
+    const res = await fetch(`${cfg.base}/v1/admin/auth-phone/${encodeURIComponent(phone)}`, {
+      headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+      signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const j = await res.json().catch(() => null);
+    return j?.data?.userId || null;
+  } catch (err) {
+    console.error('[auth] 手机号回源异常：', err?.message || err);
+    return null;
+  }
 }
 
 /* ------------------------------------------------ 会话：境内 Node 优先（2026-10-26） */
@@ -377,11 +435,21 @@ async function loadSessionViaNode(env, token) {
   const cfg = nodeAuthConfig(env);
   if (!cfg) return null;
   try {
-    const res = await fetch(`${cfg.base}/v1/admin/auth-sessions/${await sessionIdOf(token)}`, {
-      headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
-      signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
+    let res = null;
+    // 桥接带 1.5s 超时，串行负载下偶发超时（2026-11-04 E2E 实测 0 字节中断）—— 重试一次
+    for (let attempt = 0; attempt < 2 && !res; attempt++) {
+      try {
+        res = await fetch(`${cfg.base}/v1/admin/auth-sessions/${await sessionIdOf(token)}`, {
+          headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+          signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+        });
+        if (!res.ok) return null;
+      } catch (err) {
+        if (attempt === 1) throw err;
+        res = null;
+      }
+    }
+    if (!res) return null;
     const j = await res.json().catch(() => null);
     const d = j?.data;
     if (!d || !d.userId) return null;
@@ -766,9 +834,31 @@ export async function deleteUserAccount(env, userId) {
   // 境内可识别字段：注销就是删除权，整条删掉（不做脱敏保留 —— 需要保留的是订单）
   await syncUserIdentity(env, { id: user.id }, { remove: true });
 
+  /*
+   * 境内账号本体桥删（E.76）：境内注册的用户本体在 Mongo `users` 集合，KV 里没有，
+   * 上面的 KV 清理对它们是空操作 —— 不桥删的话"注销"删不掉本体，手机号还能重新注册。
+   * 失败不阻塞（与 syncUserIdentity 同一原则：境内侧失败打日志，返回体里带 removed 标记）。
+   */
+  let nodeDeleted = false;
+  try {
+    const cfg = nodeAuthConfig(env);
+    if (cfg) {
+      const res = await fetch(`${cfg.base}/v1/admin/auth-accounts/${encodeURIComponent(user.id)}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Key': cfg.adminKey, 'User-Agent': 'qtvq-auth/1.0 (+https://qtvq.cn)' },
+        signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
+      });
+      nodeDeleted = Boolean(res.ok);
+      if (!res.ok) console.error('[auth] 境内账号本体删除失败：HTTP', res.status);
+    }
+  } catch (err) {
+    console.error('[auth] 境内账号本体删除异常：', err?.message || err);
+  }
+
   return {
     ok: true,
     removedKeys,
+    nodeDeleted,
     clientId: user.clientId || null,
     phoneMasked: user.phone ? maskPhone(user.phone) : null,
   };

@@ -158,7 +158,7 @@ onMounted(() => {
 .reason-chip.active { background: rgba(255,107,129,0.18); border-color: $color-pink; color: $color-pink-light; }
 .textarea { width: 100%; min-height: 200rpx; background: $color-bg-deep; color: $color-text-bright; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; box-sizing: border-box; }
 .counter { font-size: 22rpx; color: $color-text-dim; display: block; text-align: right; margin-top: 8rpx; }
-.btn-primary { background: $color-pink; color: #fff; border-radius: 999rpx; margin-top: 16rpx; }
+.btn-primary { background: $color-pink-action; color: #fff; border-radius: 999rpx; margin-top: 16rpx; }
 .msg { font-size: 24rpx; display: block; margin-top: 14rpx; line-height: 1.6; }
 .msg.ok { color: $color-success-soft; }
 .msg.bad { color: $color-danger-soft; }

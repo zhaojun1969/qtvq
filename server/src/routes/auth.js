@@ -22,6 +22,8 @@ import {
   resolveSession,
 } from '../services/auth-store.js';
 import { getQuota } from '../services/quota-store.js';
+import { wrap } from '../lib/http.js';
+/* E.87：GET /me 无 try/catch，resolveSession/getQuota 异常会崩进程 → 套 wrap。 */
 
 const router = Router();
 
@@ -101,7 +103,7 @@ router.post('/', async (req, res) => {
 });
 
 /** GET /api/auth/me —— 用 Bearer token 取当前身份 */
-router.get('/me', async (req, res) => {
+router.get('/me', wrap(async (req, res) => {
   const token = bearerToken(req) || String(req.query.token || '');
   if (!token) return res.status(401).json({ error: '请先登录' });
   const resolved = await resolveSession(token);
@@ -119,6 +121,6 @@ router.get('/me', async (req, res) => {
     },
     quota,
   });
-});
+}));
 
 export default router;
