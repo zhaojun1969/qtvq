@@ -57,16 +57,16 @@
 <div class="wrap">
 
 <header>
-  <div class="kicker">System Skeleton &amp; Route Audit · v2</div>
+  <div class="kicker">System Skeleton &amp; Route Audit · v3</div>
   <h1>系统骨骼与全链路检测图</h1>
-  <p class="sub">我心永恒 · Q问 ｜ 体检时间 2026-10-31 ｜ 本地检查门 <code>check-all --local</code> 35/35 全绿 ＋ 服务器端验收扫描 <code>acceptance-sweep</code> 16/16 ｜ 在线套件本轮<b>刻意跳过</b>：防止测试账号重新污染刚清理的 90 天基线（v1 见 git 历史 E.47，2026-10-28）</p>
+  <p class="sub">我心永恒 · Q问 ｜ 体检时间 2026-11-12 ｜ 本地检查门 <code>check-all --local</code> 36/36 全绿 ＋ 服务器验收扫描 16/16 ＋ 部署冒烟 9/9（GET+POST 双面，E.88 接线部署流程）｜ 跨端 API 审计 103/103（E.83）</p>
 </header>
 
 <div class="summary">
-  <div class="stat ok"><b>35 / 35</b><span>本地检查门通过（含新增上架前静态扫描）</span></div>
+  <div class="stat ok"><b>35 / 35</b><span>本地检查门通过（含 crash-surface 等新增门）</span></div>
   <div class="stat ok"><b>16 / 16</b><span>服务器端验收断点（生产实测）</span></div>
-  <div class="stat fix"><b>3</b><span>本次修掉的泄露面（AK ID 硬编码 → env）</span></div>
-  <div class="stat fix"><b>8</b><span>测试脏文档清理（基线 10-31 干净起算）</span></div>
+  <div class="stat ok"><b>103 / 103</b><span>跨端 API 引用对账（七端全覆盖）</span></div>
+  <div class="stat fix"><b>3</b><span>跨栈会话桥修复（auth-accounts/auth-phone/桥删，E.76）</span></div>
   <div class="stat warn"><b>1</b><span>待补缺口：内容安全 408 No permissions</span></div>
 </div>
 
@@ -229,6 +229,36 @@
       <td><span class="pill p-bad">权限缺失</span></td>
       <td>验收扫描暴露；当前降级为「待复核」运行，上线前必须开通</td>
     </tr>
+    <tr>
+      <td><b>联系方式二次限流</b></td>
+      <td class="route">遮蔽态 → 登录后 <em>POST /v1/contact/reveal</em>（每日 5 次/账号 429）→ 审计 contact_reveals</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>E.82 线上实测 5 次递减→第 6 次 429；全站 HTML 明文邮箱清零（法务页保留）</td>
+    </tr>
+    <tr>
+      <td><b>留言幂等 + 图片审核</b></td>
+      <td class="route">60s 内容幂等窗口（同 clientId+同内容 dedupKey）→ 图片 <em>greenImageCheckByBase64</em> 并行审 ≤4 张</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>E.86/E.89；408 期间图片降级 imageReview:degraded（开通后自动实审）</td>
+    </tr>
+    <tr>
+      <td><b>跨栈会话三桥</b></td>
+      <td class="route">CF loadUser/findUserIdByPhone → <em>/v1/admin/auth-accounts·auth-phone</em> 回源；注销桥删 auth_users+users+auth_sessions</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>E.76 三连断修复；D4 并发防双花实证（6 并发扣款恰好 1 成 5 拒）</td>
+    </tr>
+    <tr>
+      <td><b>GEO / 收录</b></td>
+      <td class="route">www 双协议 301 → llms.txt → robots AI 爬虫段（GPTBot/ClaudeBot 等 Allow）→ sitemap 11 页</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>E.84；account/callback noindex、land canonical、15 页 title 唯一</td>
+    </tr>
+    <tr>
+      <td><b>部署冒烟</b></td>
+      <td class="route">deploy-server-ssh → <em>deploy-smoke 9 探针</em>（GET+POST 双面，5xx/HTML 即 fail exit 1）</td>
+      <td><span class="pill p-ok">通</span></td>
+      <td>E.88；E.86 事故（POST 路由崩循环、health 依旧绿）的对策</td>
+    </tr>
   </tbody>
 </table>
 </div>
@@ -310,7 +340,7 @@
 </table>
 </div>
 
-<h2>六、检查门索引（本地 35 + 在线 8）</h2>
+<h2>六、检查门索引（本地 36 + 在线 9）</h2>
 
 <details>
   <summary>展开：v2 相对 v1 的变化</summary>
@@ -320,7 +350,25 @@
   </div>
 </details>
 
-<h2>七、仍需人工材料的部分（代码已尽力）</h2>
+<h2>七、v3 增量清单（E.82–E.93，2026-11-05 至 11-12）</h2>
+
+<div class="card">
+  <table>
+    <tbody>
+      <tr><td style="width:180px"><b>跨栈会话三桥</b></td><td>CF loadUser / findUserIdByPhone 回源桥（/v1/admin/auth-accounts·auth-phone）+ 注销桥删——境内注册用户此前在 CF 全 401（注销/短信找回失效），已修复并 E2E 23/23</td></tr>
+      <tr><td><b>查询级属主约束</b></td><td>订单查询（getOrderOwned）与报告分享改查询级属主限定——防御纵深，E2E 27/27 回归</td></tr>
+      <tr><td><b>留言三层加固</b></td><td>双入口 assertSafe + 60s 内容幂等窗口 + 图片 base64 审核（408 期间降级 degraded）+ contact_reveals 审计</td></tr>
+      <tr><td><b>联系方式二次限流</b></td><td>全站 HTML 明文邮箱清零；/v1/contact/reveal 每日 5 次/账号 + 审计留痕；三页蜜罐水印（trap-*@ 可定位泄漏页）</td></tr>
+      <tr><td><b>安全响应头</b></td><td>HSTS/CSP/XFO/Referrer/Permissions 六头上线（tools/nginx/qtvq-security-headers.conf）——v2 体检发现的硬否决项</td></tr>
+      <tr><td><b>GEO 收录</b></td><td>www 双协议 301、llms.txt、robots AI 爬虫段、noindex/canonical 补齐、JSON-LD×2</td></tr>
+      <tr><td><b>部署冒烟</b></td><td>deploy-smoke 9 探针接线部署流程——E.86 类"GET 绿 POST 死"崩循环在部署一刻即被拦截</td></tr>
+      <tr><td><b>AA 动作色</b></td><td>tokens pinkAction #cc4560 → GRADIENT 全端生效（白字 4.58:1），品牌粉保留装饰用途</td></tr>
+      <tr><td><b>候选池种子</b></td><td>3 个完整测试候选（业务方手动测转盘用），凭据在业务方文档目录；年龄门 upsert 缺陷已修（E.93）</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>八、仍需人工材料的部分（代码已尽力）</h2>
 
 <div class="card">
   <table>
@@ -328,7 +376,7 @@
       <tr><td style="width:180px"><b>内容安全权限</b></td><td><span class="pill p-bad">待开通</span> RAM 授权已到位（qtvq-sms-sender），408 收窄为「内容安全服务未开通」——主账号控制台开通即转绿（E.74）；若只有增强版需改代码适配</td></tr>
       <tr><td><b>微信小程序类目</b></td><td>「深度合成-AI问答」类目 + 算法备案编号 + 安全评估报告 —— 唯一硬阻塞，代码无法替代</td></tr>
       <tr><td><b>上传私钥</b></td><td><code>private.wx489fbca28401e4e0.key</code> 需在微信后台生成并落到 <code>apps/qtvq-uni/</code>（.gitignore 已排除）</td></tr>
-      <tr><td><b>小程序码真机验证</b></td><td>短码归因链路代码侧已闭环，真机扫码进场景（scene → qtvq_inviter）待微信开发者工具/真机跑一次</td></tr>
+      <tr><td><b>小程序码真机验证</b></td><td><span class="pill p-ok">材料就绪</span> 体验版码已生成（qtvq.cn/assets/trial-*.png，E.92 修复 page 指向 + env_version=trial）——微信后台设 1.0.6 体验版即可扫码开测</td></tr>
       <tr><td><b>快手限入类目</b></td><td>情感咨询属限入类目，需提交资质；担保支付需企业主体开通</td></tr>
       <tr><td><b>移动安装包</b></td><td>Android（应用宝/华为/小米/OPPO/vivo）、iOS（Apple 开发者账号）、鸿蒙（HAP）均无包</td></tr>
       <tr><td><b>真实用户</b></td><td>激活用户 0，90 天基线自 10-31 干净起算——等 40 条内容发布带来真实注册后开表</td></tr>
@@ -337,7 +385,7 @@
 </div>
 
 <footer>
-  <p>复跑：<code>node tools/scripts/check-all.mjs --local</code>（本地 35 项）｜ <code>node tools/scripts/check-prelaunch-static.mjs</code>（上架前四类静态扫描）｜ 服务器：<code>cd /opt/qtvq/server &amp;&amp; sudo node --env-file=.env scripts/acceptance-sweep.mjs</code>（16 断点）｜ <code>aggregate-metrics.mjs --verdict</code>（验收门读数）</p>
+  <p>复跑：<code>node tools/scripts/check-all.mjs --local</code>（本地 36 项）｜ <code>node tools/scripts/deploy-smoke.mjs</code>（部署后双面冒烟）｜ <code>node tools/scripts/audit-cross-platform-api.mjs</code>（跨端 API 审计）｜ <code>node tools/scripts/check-crash-surface.mjs</code>（崩溃面）｜ 服务器：<code>cd /opt/qtvq/server &amp;&amp; sudo node --env-file=.env scripts/acceptance-sweep.mjs</code>（16 断点）｜ <code>aggregate-metrics.mjs --verdict</code>（验收门读数）</p>
   <p>本文档随代码演进；若某项检查转红，先跑对应的单项脚本看完整输出，再改代码 —— 不要改断言来迁就现状。</p>
 </footer>
 

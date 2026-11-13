@@ -182,6 +182,7 @@ export async function changePassword(oldPassword, newPassword) {
 
 const WX_STATE_KEY = 'qtvq_wx_open_state';
 const WX_FORGOT_KEY = 'qtvq_wx_open_forgot';
+const WX_RESET_DATA_KEY = 'qtvq_wx_reset_data';
 
 export async function fetchWechatOpenConfig(state) {
   const qs = state ? `?state=${encodeURIComponent(state)}` : '';
@@ -250,11 +251,15 @@ function consumeWxState(gotState) {
   return matched;
 }
 
-export async function startWechatOpenLogin({ forReset = false } = {}) {
+export async function startWechatOpenLogin({ forReset = false, resetData = null } = {}) {
   const state = crypto.randomUUID().replace(/-/g, '');
   rememberWxState(state);
   try {
-    if (forReset) sessionStorage.setItem(WX_FORGOT_KEY, '1');
+    if (forReset) {
+      sessionStorage.setItem(WX_FORGOT_KEY, '1');
+      /* E.96：重置数据在**发起时**快照——回调页没有表单 DOM，回调时从快照读 */
+      sessionStorage.setItem(WX_RESET_DATA_KEY, JSON.stringify(resetData || null));
+    }
     else sessionStorage.removeItem(WX_FORGOT_KEY);
   } catch {
     /* ignore */
@@ -350,12 +355,16 @@ export async function loginWechatOpen(code, state) {
   const clientId = getClientId();
   const body = { code, clientId };
   if (forReset) {
-    const form = document.getElementById('forgot-form');
-    const fd = form ? new FormData(form) : null;
-    const phone = fd?.get('phone')?.toString().trim();
-    const np = fd?.get('newPassword')?.toString();
-    const np2 = fd?.get('newPassword2')?.toString();
-    if (!phone || !np || np !== np2) throw new Error('请先填写手机号与一致的新密码');
+    /* E.96 修复：重置数据从 **sessionStorage 快照** 读取（发起扫码时已存）。
+     * 旧实现在回调页上读 `forgot-form` DOM —— 但该表单在 account.html，
+     * 回调页根本没有这个 DOM → form 恒为 null → 必然抛
+     * 「请先填写手机号与一致的新密码」，扫码找回**从独立回调页上线起就是坏的**
+     * （2026-11-13 业务方真机实测抓到，诊断单 E.86 口径）。 */
+    const snapshot = JSON.parse(sessionStorage.getItem(WX_RESET_DATA_KEY) || 'null');
+    sessionStorage.removeItem(WX_RESET_DATA_KEY);
+    const phone = snapshot?.phone?.trim();
+    const np = snapshot?.newPassword;
+    if (!phone || !np) throw new Error('找回信息不完整（手机号或新密码缺失），请回到账户页重新操作');
     body.action = 'resetPassword';
     body.phone = phone;
     body.newPassword = np;

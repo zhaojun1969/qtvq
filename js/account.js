@@ -648,12 +648,16 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-wechat-open-reset')?.addEventListener('click', async () => {
   const form = document.getElementById('forgot-form');
   const fd = new FormData(form);
-  if (fd.get('newPassword') !== fd.get('newPassword2')) {
-    showToast('两次新密码不一致');
-    return;
-  }
+  const phone = String(fd.get('phone') || '').trim();
+  const np = String(fd.get('newPassword') || '');
+  const np2 = String(fd.get('newPassword2') || '');
+  /* E.96 发起前完整校验：旧版只查两次密码一致，手机号/新密码为空也能发起扫码，
+   * 用户扫完才在回调页撞上「请先填写手机号与一致的新密码」——白扫一趟还一脸懵。 */
+  if (!phone) { showToast('请先填写注册手机号'); return; }
+  if (!np || np.length < 6) { showToast('请先填写新密码（至少 6 位）'); return; }
+  if (np !== np2) { showToast('两次新密码不一致'); return; }
   try {
-    await startWechatOpenLogin({ forReset: true });
+    await startWechatOpenLogin({ forReset: true, resetData: { phone, newPassword: np } });
   } catch (e) {
     showToast(e.message || '微信验证未配置');
   }
