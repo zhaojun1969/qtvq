@@ -51,7 +51,8 @@ Write-Host ">> 根目录页面 $($htmlPages.Count) 个：$($htmlPages -join ', '
 
 $items = @($htmlPages) + @(
     "css", "js", "assets",
-    "robots.txt", "sitemap.xml", "_headers", "_redirects"
+    "robots.txt", "sitemap.xml", "_headers", "_redirects",
+    "llms.txt", "llms-full.txt"
 )
 foreach ($item in $items) {
     if (Test-Path $item) { Copy-Item $item (Join-Path $stage $item) -Recurse -Force }

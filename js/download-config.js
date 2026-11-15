@@ -5,7 +5,7 @@
  *   node tools/scripts/write-download-config.mjs && node tools/scripts/write-release-manifest.mjs
  * 这两个脚本读同一份 release-links.json，下载页与 App 自动更新不会分叉。
  *
- * 生成时间: 2026-11-11T23:03:41.190Z
+ * 生成时间: 2026-11-15T02:56:26.416Z
  * App 版本: 1.0.6
  * 留空的入口在页面上显示「即将上线」，但**不再是一个点了没反应的死链**：
  * js/download.js 会把它们渲染成不可点状态并写明原因。
