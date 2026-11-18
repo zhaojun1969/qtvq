@@ -32,8 +32,11 @@ console.log('IndexNow:', idxRes.status, idxRes.status === 200 || idxRes.status =
 
 // 百度主动推送：token 从 BAIDU_SITE_TOKEN 环境变量读（业务方在百度站长平台获取后注入）
 const bdToken = process.env.BAIDU_SITE_TOKEN;
+/* E.108 实测：百度推送 site 参数=**纯域名**（qtvq.cn）——带协议头（https://qtvq.cn）
+ * 会返回 400 site init fail（控制台展示的 curl 样例带协议头，照抄会踩坑）。 */
+const bdSite = process.env.BAIDU_SITE || 'qtvq.cn';
 if (bdToken) {
-  const bdRes = await fetch(`http://data.zz.baidu.com/urls?site=${host}&token=${bdToken}`, {
+  const bdRes = await fetch(`http://data.zz.baidu.com/urls?site=${encodeURIComponent(bdSite)}&token=${encodeURIComponent(bdToken)}`, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
     body: urlList.join('\n'),
     signal: AbortSignal.timeout(10000),

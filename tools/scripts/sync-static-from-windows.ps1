@@ -54,6 +54,8 @@ $items = @($htmlPages) + @(
     "robots.txt", "sitemap.xml", "_headers", "_redirects",
     "llms.txt", "llms-full.txt"
 )
+# IndexNow key 文件（36 位 uuid 命名），动态加入——丢失即 IndexNow 推送失效
+Get-ChildItem -File -Filter "*.txt" | Where-Object { $_.Name -match "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.txt$" } | ForEach-Object { $items += $_.Name }
 foreach ($item in $items) {
     if (Test-Path $item) { Copy-Item $item (Join-Path $stage $item) -Recurse -Force }
 }
