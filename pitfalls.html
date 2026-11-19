@@ -82,7 +82,9 @@
     <button type="button" id="btn-submit-lesson" class="btn btn-primary">提交我的教训（审核有奖）</button>
   </p>
 
-  <!-- E.110 内容层 GEO：可抓取的静态案例区（JS 交互层在其后独立渲染） -->
+  <!-- E.110/E.111 内容层 GEO：静态案例区默认折叠（details 内容可被引擎索引，Google 官方确认渲染）；交互工具在页面顶部，人类用户不受 10 屏全文干扰 -->
+<details id="cases-crawlable-details">
+  <summary>情感避坑案例库全文（50 条真实案例 · 点击展开 / 供搜索引擎与 AI 引用）</summary>
 <section id="cases-crawlable" aria-label="情感避坑案例库（可抓取全文）">
   <h2>情感避坑案例库（50 条真实案例）</h2>
   <p class="section-sub">以下为案例库全文的静态呈现；交互式筛选与测验请使用上方工具。</p>
@@ -387,6 +389,7 @@
   <p class="case-meta">帮助 432 人 · 来源：Q问真实案例库</p>
 </article>
 </section>
+</details>
 <script type="application/ld+json">
 {
  "@context": "https://schema.org",
