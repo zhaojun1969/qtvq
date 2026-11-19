@@ -949,6 +949,47 @@ a.feature-card-link:focus-visible {
   border-color: transparent;
 }
 
+/* E.110 内容层 GEO：可抓取静态案例区（语义排版，深色主题） */
+#cases-crawlable {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2rem;
+}
+#cases-crawlable h2 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+}
+#cases-crawlable .section-sub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem;
+}
+#cases-crawlable .case-item {
+  padding: 1rem 0 1.1rem;
+  border-bottom: 1px solid rgba(255, 107, 129, 0.12);
+}
+#cases-crawlable .case-item h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
+  color: var(--text);
+}
+#cases-crawlable .case-lesson {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+#cases-crawlable .case-steps {
+  margin: 0 0 0.5rem;
+  padding-left: 1.4rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+#cases-crawlable .case-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .pitfall-grid {
   max-width: 1200px;
   margin: 0 auto;
